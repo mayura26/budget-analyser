@@ -1,0 +1,26 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1774144704752,
+      "tag": "0000_normal_bloodscream",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1774250703407,
+      "tag": "0001_neat_echo",
+      "breakpoints": true
+    },{
+      "idx": 2,
+      "version": "6",
+      "when": 1774400000000,
+      "tag": "0002_account_groups",
+      "breakpoints": true
+    }
+  ]
+}
