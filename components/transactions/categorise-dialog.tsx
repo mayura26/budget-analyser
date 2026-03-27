@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getAISuggestions, applyCategorisations } from "@/lib/actions/transactions";
 import { createRulesBulk } from "@/lib/actions/categories";
 import type { SuggestionRow } from "@/lib/actions/transactions";
@@ -205,8 +206,17 @@ export function CategoriseDialog({
                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                         {formatDate(row.date)}
                       </td>
-                      <td className="px-3 py-2 max-w-[180px]">
-                        <p className="truncate">{row.description}</p>
+                      <td className="px-3 py-2 max-w-[300px]">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="truncate cursor-default">{row.description}</p>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              {row.description}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </td>
                       <td className="px-3 py-2 max-w-[120px]">
                         <p className="truncate text-muted-foreground text-xs">{row.accountName}</p>

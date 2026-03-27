@@ -99,4 +99,15 @@ test.describe('Transactions', () => {
     await page.goto('/transactions');
     await expect(page.getByText('Manual Coffee Purchase')).toBeVisible();
   });
+
+  test('delete transaction', async ({ page }) => {
+    await page.goto('/transactions');
+    const deleteButtons = page.locator('[data-testid="delete-transaction"]');
+    const initialCount = await deleteButtons.count();
+    if (initialCount === 0) return; // no data available (isolated run without imports)
+
+    await deleteButtons.first().click();
+    await page.getByRole('button', { name: 'Yes' }).click();
+    await expect(deleteButtons).toHaveCount(initialCount - 1, { timeout: 5000 });
+  });
 });

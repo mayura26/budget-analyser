@@ -30,8 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { updateTransactionCategory } from "@/lib/actions/transactions";
+import { ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { updateTransactionCategory, deleteTransaction } from "@/lib/actions/transactions";
 import { LinkTransferPopover } from "@/components/transactions/link-transfer-popover";
 import type { Account, Category } from "@/types";
 
@@ -188,6 +188,10 @@ export function TransactionTable({
           </div>
         );
       },
+    }),
+    col.display({
+      id: "actions",
+      cell: (info) => <DeleteCell transactionId={info.row.original.id} />,
     }),
   ];
 
@@ -356,6 +360,50 @@ function CategoryCell({
       ) : (
         <span className="text-xs text-muted-foreground italic">Uncategorised</span>
       )}
+    </button>
+  );
+}
+
+function DeleteCell({ transactionId }: { transactionId: number }) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  if (confirming) {
+    return (
+      <div className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant="destructive"
+          className="h-6 px-2 text-xs"
+          disabled={pending}
+          onClick={async () => {
+            setPending(true);
+            await deleteTransaction(transactionId);
+          }}
+        >
+          Yes
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-xs"
+          disabled={pending}
+          onClick={() => setConfirming(false)}
+        >
+          No
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      aria-label="Delete"
+      data-testid="delete-transaction"
+      onClick={() => setConfirming(true)}
+      className="p-1 rounded text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-colors"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
     </button>
   );
 }
