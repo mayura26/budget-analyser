@@ -22,7 +22,7 @@ import {
 import { ACCOUNT_GROUP_SWATCH_COLORS } from "@/lib/accounts/account-group-swatch-colors";
 import { createAccountGroup } from "@/lib/actions/account-groups";
 import { createAccount, updateAccount } from "@/lib/actions/accounts";
-import { deriveSubcategoryColor } from "@/lib/categories/colors";
+import { deriveAccountGroupMemberColor } from "@/lib/accounts/account-member-colors";
 import type { Account, AccountGroup, BankProfile } from "@/types";
 
 const INLINE_NEW_GROUP_COLOR = "#6366f1";
@@ -51,7 +51,7 @@ export function AccountDialog({
   const previewDerivedColor = useMemo((): string | null => {
     if (selectedGroupId === "none") return null;
     if (selectedGroupId === "__new__") {
-      return deriveSubcategoryColor(INLINE_NEW_GROUP_COLOR, 0);
+      return deriveAccountGroupMemberColor(INLINE_NEW_GROUP_COLOR, 0);
     }
     const gid = Number(selectedGroupId);
     const g = groups.find((x) => x.id === gid);
@@ -60,11 +60,11 @@ export function AccountDialog({
     if (isEdit && account) {
       const idx = ids.indexOf(account.id);
       if (idx >= 0) {
-        return deriveSubcategoryColor(g.color, idx);
+        return deriveAccountGroupMemberColor(g.color, idx);
       }
-      return deriveSubcategoryColor(g.color, ids.length);
+      return deriveAccountGroupMemberColor(g.color, ids.length);
     }
-    return deriveSubcategoryColor(g.color, ids.length);
+    return deriveAccountGroupMemberColor(g.color, ids.length);
   }, [selectedGroupId, groups, groupAccountIdsByGroup, isEdit, account]);
 
   function handleOpenChange(v: boolean) {

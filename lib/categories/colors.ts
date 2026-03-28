@@ -12,23 +12,23 @@ export function deriveSubcategoryColor(baseHex: string, siblingIndex: number): s
   return rgbToHex(out.r, out.g, out.b);
 }
 
-function clamp(n: number, min: number, max: number): number {
+export function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
   if (!m) return null;
   const n = parseInt(m[1], 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
-function rgbToHex(r: number, g: number, b: number): string {
+export function rgbToHex(r: number, g: number, b: number): string {
   const to = (x: number) => x.toString(16).padStart(2, "0");
   return `#${to(Math.round(r))}${to(Math.round(g))}${to(Math.round(b))}`;
 }
 
-function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+export function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
   r /= 255;
   g /= 255;
   b /= 255;
@@ -54,7 +54,7 @@ function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: n
   return { h, s, l };
 }
 
-function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+export function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
   let r: number;
   let g: number;
   let b: number;

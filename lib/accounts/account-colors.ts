@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import { deriveSubcategoryColor } from "@/lib/categories/colors";
+import { deriveAccountGroupMemberColor } from "@/lib/accounts/account-member-colors";
 import { db } from "@/lib/db";
 import { accountGroups, accounts } from "@/lib/db/schema";
 
@@ -20,7 +20,7 @@ export function recomputeAccountColorsForGroup(groupId: number): void {
     .all();
 
   for (let i = 0; i < rows.length; i++) {
-    const color = deriveSubcategoryColor(group.color, i);
+    const color = deriveAccountGroupMemberColor(group.color, i);
     db.update(accounts).set({ color }).where(eq(accounts.id, rows[i].id)).run();
   }
 }

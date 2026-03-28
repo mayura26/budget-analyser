@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 const ACCOUNT_NAME = 'Categorise Test Account';
+
+function aiCategoriseDialog(page: Page) {
+  return page.getByRole('dialog', { name: 'AI Categorisation' });
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -40,17 +45,17 @@ test.describe('Categorise Dialog', () => {
     expect(seed.ok()).toBeTruthy();
   });
 
-  async function openAndWaitForReview(page: import('@playwright/test').Page) {
+  async function openAndWaitForReview(page: Page) {
     await page.goto('/transactions');
     const categoriseBtn = page.getByRole('button', { name: /Categorise \d+ uncategorised/i });
     await expect(categoriseBtn).toBeVisible({ timeout: 15_000 });
     await categoriseBtn.click();
-    const dialog = page.getByRole('dialog');
+    const dialog = aiCategoriseDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('tbody tr').first()).toBeVisible({ timeout: 30_000 });
   }
 
-  async function ensureApplyEnabled(page: import('@playwright/test').Page, dialog: import('@playwright/test').Locator) {
+  async function ensureApplyEnabled(page: Page, dialog: import('@playwright/test').Locator) {
     const applyBtn = dialog.getByRole('button', { name: /Apply \d+ suggestion/i });
     if (!(await applyBtn.isEnabled())) {
       await dialog.locator('tbody tr').first().getByRole('combobox').click();
@@ -60,23 +65,21 @@ test.describe('Categorise Dialog', () => {
     return applyBtn;
   }
 
-  /** Apply finished: success copy in dialog, or dialog closed after revalidate (still a success path). */
-  async function waitForApplyFinished(page: import('@playwright/test').Page) {
-    await page.waitForFunction(
-      () => {
-        const d = document.querySelector('[role="dialog"]');
-        if (!d) return true;
-        const text = d.textContent ?? '';
-        return /transactions categorised|create rules for future imports/i.test(text);
-      },
-      { timeout: 25_000 }
-    );
+  /** Success copy visible, or dialog closed after revalidate. */
+  async function waitForApplyFinished(page: Page) {
+    const dialog = aiCategoriseDialog(page);
+    await expect(async () => {
+      const visible = await dialog.isVisible().catch(() => false);
+      if (!visible) return;
+      const text = await dialog.innerText();
+      expect(text).toMatch(/transactions categorised|create rules for future imports/i);
+    }).toPass({ timeout: 25_000 });
   }
 
   test('dialog opens and shows review table with account column', async ({ page }) => {
     await openAndWaitForReview(page);
 
-    const dialog = page.getByRole('dialog');
+    const dialog = aiCategoriseDialog(page);
 
     await expect(dialog.getByRole('columnheader', { name: 'Account' })).toBeVisible();
 
@@ -88,7 +91,7 @@ test.describe('Categorise Dialog', () => {
   test('cancel closes dialog without applying', async ({ page }) => {
     await openAndWaitForReview(page);
 
-    const dialog = page.getByRole('dialog');
+    const dialog = aiCategoriseDialog(page);
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).not.toBeVisible();
   });
@@ -96,7 +99,7 @@ test.describe('Categorise Dialog', () => {
   test('apply leads to suggested rules or done state', async ({ page }) => {
     await openAndWaitForReview(page);
 
-    const dialog = page.getByRole('dialog');
+    const dialog = aiCategoriseDialog(page);
     const applyBtn = await ensureApplyEnabled(page, dialog);
 
     await applyBtn.click();
@@ -106,14 +109,14 @@ test.describe('Categorise Dialog', () => {
   test('skip rules goes to done state', async ({ page }) => {
     await openAndWaitForReview(page);
 
-    const dialog = page.getByRole('dialog');
+    const dialog = aiCategoriseDialog(page);
     const applyBtn = await ensureApplyEnabled(page, dialog);
 
     await applyBtn.click();
     await waitForApplyFinished(page);
 
-    if (await page.getByRole('dialog').isVisible().catch(() => false)) {
-      const d = page.getByRole('dialog');
+    const d = aiCategoriseDialog(page);
+    if (await d.isVisible().catch(() => false)) {
       const skipBtn = d.getByRole('button', { name: 'Skip' });
       if (await skipBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await expect(skipBtn).toBeEnabled({ timeout: 15_000 });
@@ -124,26 +127,28 @@ test.describe('Categorise Dialog', () => {
         await d.getByRole('button', { name: 'Close' }).click();
       }
     }
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(aiCategoriseDialog(page)).not.toBeVisible();
   });
 
   test('create rules completes to done state', async ({ page }) => {
     await openAndWaitForReview(page);
 
-    const dialog = page.getByRole('dialog');
+    const dialog = aiCategoriseDialog(page);
     const applyBtn = await ensureApplyEnabled(page, dialog);
 
     await applyBtn.click();
     await waitForApplyFinished(page);
 
-    if (await page.getByRole('dialog').isVisible().catch(() => false)) {
-      const d = page.getByRole('dialog');
+    const d = aiCategoriseDialog(page);
+    if (await d.isVisible().catch(() => false)) {
       const createBtn = d.getByRole('button', { name: /Create \d+ rule/i });
       if (await createBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         if (await createBtn.isEnabled()) {
           await createBtn.click();
         } else {
-          await d.getByRole('button', { name: 'Skip' }).click();
+          const skip = d.getByRole('button', { name: 'Skip' });
+          await expect(skip).toBeEnabled({ timeout: 15_000 });
+          await skip.click();
         }
       }
       if (await d.isVisible().catch(() => false)) {
@@ -155,7 +160,7 @@ test.describe('Categorise Dialog', () => {
   test('apply categorisation marks category confirmed on transactions list', async ({ page }) => {
     await openAndWaitForReview(page);
 
-    const dialog = page.getByRole('dialog');
+    const dialog = aiCategoriseDialog(page);
     const descSnippet = (
       await dialog.locator('tbody tr').first().locator('td').nth(1).innerText()
     ).slice(0, 28);
@@ -164,8 +169,8 @@ test.describe('Categorise Dialog', () => {
     await applyBtn.click();
     await waitForApplyFinished(page);
 
-    if (await page.getByRole('dialog').isVisible().catch(() => false)) {
-      const d = page.getByRole('dialog');
+    const d = aiCategoriseDialog(page);
+    if (await d.isVisible().catch(() => false)) {
       const skipBtn = d.getByRole('button', { name: 'Skip' });
       if (await skipBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
         await expect(skipBtn).toBeEnabled({ timeout: 15_000 });
@@ -176,7 +181,7 @@ test.describe('Categorise Dialog', () => {
         await d.getByRole('button', { name: 'Close' }).click();
       }
     }
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(aiCategoriseDialog(page)).not.toBeVisible();
 
     await page.goto('/transactions');
     await page.getByPlaceholder('Search transactions…').fill(descSnippet.trim());
