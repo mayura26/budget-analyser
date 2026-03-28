@@ -256,7 +256,7 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
             amount: txn.amount,
             accountName: txn.accountName,
             suggestedCategoryId: ai?.categoryId ?? null,
-            suggestedCategoryName: ai?.categoryName ?? "Uncategorised",
+            suggestedCategoryName: ai?.categoryName ?? "Not processed",
             source: ai?.categoryId ? "ai" : "none",
             confidence: ai?.confidence ?? 0,
           });
@@ -272,7 +272,7 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
             amount: txn.amount,
             accountName: txn.accountName,
             suggestedCategoryId: null,
-            suggestedCategoryName: "Uncategorised",
+            suggestedCategoryName: "Not processed",
             source: "none",
             confidence: 0,
           });
@@ -288,7 +288,7 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
           amount: txn.amount,
           accountName: txn.accountName,
           suggestedCategoryId: null,
-          suggestedCategoryName: "Uncategorised",
+          suggestedCategoryName: "Not processed",
           source: "none",
           confidence: 0,
         });

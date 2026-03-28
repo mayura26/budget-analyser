@@ -16,7 +16,7 @@ const DEFAULT_CATEGORIES = [
   { name: "Income", color: "#10b981", icon: "TrendingUp", type: "income" as const },
   { name: "Transfer", color: "#6366f1", icon: "ArrowLeftRight", type: "transfer" as const },
   { name: "Credit Card Payment", color: "#a855f7", icon: "CreditCard", type: "transfer" as const },
-  { name: "Uncategorised", color: "#9ca3af", icon: "HelpCircle", type: "expense" as const },
+  { name: "Misc", color: "#9ca3af", icon: "HelpCircle", type: "expense" as const },
 ];
 
 const DEFAULT_BANK_PROFILES = [

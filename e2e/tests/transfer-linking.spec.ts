@@ -89,7 +89,7 @@ test.describe('Transfer Linking', () => {
     // Set "Transfer to B" category to Transfer (whatever it currently shows)
     await page.goto('/transactions');
     const toB = page.locator('tr').filter({ hasText: 'Transfer to B' });
-    // Click the category button — it may show "Uncategorised" or any category name
+    // Click the category button — it may show "Not processed" or any category name
     // Exclude Link/Linked buttons and icon-only delete button (no word chars)
     await toB.locator('button').filter({ hasNotText: /Link|Linked/ }).filter({ hasText: /\w/ }).first().click();
     await page.getByRole('option', { name: 'Transfer' }).first().click();

@@ -75,7 +75,7 @@ test.describe('Transactions', () => {
     await page.goto('/transactions');
     const catSelect = page.getByRole('combobox').filter({ hasText: /all categories/i });
     await catSelect.click();
-    await page.getByRole('option', { name: 'Uncategorised' }).first().click();
+    await page.getByRole('option', { name: 'Not processed' }).first().click();
     await expect(page).toHaveURL(/categoryId=none/);
   });
 
@@ -88,7 +88,7 @@ test.describe('Transactions', () => {
 
   test('inline category change', async ({ page }) => {
     await page.goto('/transactions');
-    // Click the first category cell button (shows category or "Uncategorised")
+    // Click the first category cell button (shows category or "Not processed")
     await page.locator('td button').first().click();
     await page.getByRole('option', { name: 'Groceries' }).click();
     await expect(page.getByText('Groceries').first()).toBeVisible();
@@ -122,7 +122,7 @@ test.describe('Transactions', () => {
   test('process uncategorised button visible when uncategorised rows exist', async ({ page }) => {
     await page.goto('/transactions');
     await page.getByRole('combobox').filter({ hasText: /all categories/i }).click();
-    await page.getByRole('option', { name: 'Uncategorised' }).first().click();
+    await page.getByRole('option', { name: 'Not processed' }).first().click();
     const rowCount = await page.locator('tbody tr').count();
     test.skip(rowCount === 0, 'No uncategorised rows in fixture');
     await expect(page.getByTestId('process-uncategorised')).toBeVisible();

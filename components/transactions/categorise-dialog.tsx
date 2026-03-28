@@ -234,7 +234,7 @@ export function CategoriseDialog({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">
-                              <span className="text-muted-foreground">Uncategorised</span>
+                              <span className="text-muted-foreground">Not processed</span>
                             </SelectItem>
                             {categories.map((c) => (
                               <SelectItem key={c.id} value={String(c.id)}>

@@ -119,7 +119,7 @@ Transaction groups (description | category | occurrences | avg_amount | dates | 
 ${recurring
   .map(
     (g) =>
-      `- "${g.description}" | ${g.categoryName ?? "Uncategorised"} | ${g.occurrences}x | AUD ${g.avgAmount.toFixed(2)} | [${g.dates.join(", ")}] | avg day ${g.avgDayOfMonth}`
+      `- "${g.description}" | ${g.categoryName ?? "Not processed"} | ${g.occurrences}x | AUD ${g.avgAmount.toFixed(2)} | [${g.dates.join(", ")}] | avg day ${g.avgDayOfMonth}`
   )
   .join("\n")}
 

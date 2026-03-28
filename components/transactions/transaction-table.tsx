@@ -274,7 +274,7 @@ export function TransactionTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
-            <SelectItem value="none">Uncategorised</SelectItem>
+            <SelectItem value="none">Not processed</SelectItem>
             {categories.map((c) => (
               <SelectItem key={c.id} value={String(c.id)}>
                 {c.name}
@@ -437,7 +437,7 @@ function CategoryCell({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">Uncategorised</SelectItem>
+          <SelectItem value="none">Not processed</SelectItem>
           {categories.map((c) => (
             <SelectItem key={c.id} value={String(c.id)}>
               {c.name}
@@ -450,6 +450,7 @@ function CategoryCell({
 
   return (
     <button
+      type="button"
       onClick={() => setEditing(true)}
       disabled={pending}
       className="hover:opacity-80 transition-opacity"
@@ -472,7 +473,7 @@ function CategoryCell({
         </Badge>
       ) : (
         <span className="text-xs text-muted-foreground italic">
-          Uncategorised
+          Not processed
         </span>
       )}
     </button>

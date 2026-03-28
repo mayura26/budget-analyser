@@ -40,7 +40,7 @@ function getCategoryTotals(start: string, end: string): CategoryTotal[] {
   const rows = db
     .select({
       categoryId: transactions.categoryId,
-      categoryName: sql<string>`COALESCE(${categories.name}, 'Uncategorised')`,
+      categoryName: sql<string>`COALESCE(${categories.name}, 'Not processed')`,
       color: sql<string>`COALESCE(${categories.color}, '#9ca3af')`,
       total: sql<number>`SUM(ABS(${transactions.amount}))`,
       count: sql<number>`COUNT(*)`,
