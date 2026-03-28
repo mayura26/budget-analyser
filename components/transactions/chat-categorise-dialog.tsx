@@ -106,16 +106,6 @@ export function ChatCategoriseDialog({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  // When externally opened, trigger the dialog
-  const prevOpenRef = useRef(false);
-  useEffect(() => {
-    if (isControlled && externalOpen && !prevOpenRef.current) {
-      openDialog();
-    }
-    prevOpenRef.current = externalOpen ?? false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalOpen]);
-
   function openDialog() {
     setOpen(true);
     setState("loading");
@@ -138,6 +128,18 @@ export function ChatCategoriseDialog({
       askAI(result.data[0], [], categories);
     });
   }
+
+  const openDialogRef = useRef(openDialog);
+  openDialogRef.current = openDialog;
+
+  // When externally opened, trigger the dialog
+  const prevOpenRef = useRef(false);
+  useEffect(() => {
+    if (isControlled && externalOpen && !prevOpenRef.current) {
+      openDialogRef.current();
+    }
+    prevOpenRef.current = externalOpen ?? false;
+  }, [externalOpen, isControlled]);
 
   async function askAI(
     txn: UncategorisedTransaction,
@@ -454,13 +456,10 @@ export function ChatCategoriseDialog({
                       <SelectContent>
                         <SelectItem value="suggested">Use suggested</SelectItem>
                         {categories.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                              <CategoryNameParts
-                                name={c.name}
-                                variant="select"
-                              />
-                            </SelectItem>
-                          ))}
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            <CategoryNameParts name={c.name} variant="select" />
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -521,7 +520,10 @@ export function ChatCategoriseDialog({
                       </span>
                       <span className="text-muted-foreground text-sm">→</span>
                       <span className="text-sm">{rule.categoryName}</span>
-                      <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-xs shrink-0"
+                      >
                         {rule.matchCount} this session
                       </Badge>
                       {(rule.unverifiedMatchCount ?? 0) > 0 ? (

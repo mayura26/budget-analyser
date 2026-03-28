@@ -100,7 +100,12 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
       <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
         {cells.map(({ key: cellKey, dateStr }) => {
           if (!dateStr) {
-            return <div key={cellKey} className="bg-background min-h-12 sm:min-h-20" />;
+            return (
+              <div
+                key={cellKey}
+                className="bg-background min-h-12 sm:min-h-20"
+              />
+            );
           }
 
           const events = occByDate.get(dateStr) ?? [];

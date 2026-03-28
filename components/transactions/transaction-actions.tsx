@@ -46,11 +46,7 @@ export function TransactionActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="ai-actions-menu"
-          >
+          <Button variant="outline" size="sm" data-testid="ai-actions-menu">
             {processing ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (

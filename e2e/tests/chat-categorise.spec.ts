@@ -1,5 +1,5 @@
 import path from "node:path";
-import { type Page, expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 const commbankCsv = path.join(__dirname, "../fixtures/commbank.csv");
 

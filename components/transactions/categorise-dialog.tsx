@@ -13,12 +13,6 @@ import { CategorySelectGrouped } from "@/components/categories/category-select-g
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,6 +20,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -90,9 +90,8 @@ export function CategoriseDialog({
     ? (v: boolean) => onExternalOpenChange?.(v)
     : setInternalOpen;
   const [state, setState] = useState<DialogState>("idle");
-  const [activeScope, setActiveScope] = useState<AISuggestionScope>(
-    "uncategorised",
-  );
+  const [activeScope, setActiveScope] =
+    useState<AISuggestionScope>("uncategorised");
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [selections, setSelections] = useState<Record<number, number | null>>(
     {},
@@ -106,16 +105,6 @@ export function CategoriseDialog({
   const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set());
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
-
-  // When externally opened with an initialScope, trigger the dialog
-  const prevOpenRef = useRef(false);
-  useEffect(() => {
-    if (isControlled && externalOpen && !prevOpenRef.current && initialScope) {
-      openDialog(initialScope);
-    }
-    prevOpenRef.current = externalOpen ?? false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalOpen]);
 
   function openDialog(scope: AISuggestionScope) {
     setActiveScope(scope);
@@ -149,6 +138,18 @@ export function CategoriseDialog({
     });
   }
 
+  const openDialogRef = useRef(openDialog);
+  openDialogRef.current = openDialog;
+
+  // When externally opened with an initialScope, trigger the dialog
+  const prevOpenRef = useRef(false);
+  useEffect(() => {
+    if (isControlled && externalOpen && !prevOpenRef.current && initialScope) {
+      openDialogRef.current(initialScope);
+    }
+    prevOpenRef.current = externalOpen ?? false;
+  }, [externalOpen, initialScope, isControlled]);
+
   function handleCategoryChange(transactionId: number, value: string) {
     setSelections((prev) => ({
       ...prev,
@@ -156,7 +157,10 @@ export function CategoriseDialog({
     }));
   }
 
-  function handleVerifyWhenApplyChange(transactionId: number, checked: boolean) {
+  function handleVerifyWhenApplyChange(
+    transactionId: number,
+    checked: boolean,
+  ) {
     setVerifyWhenApply((prev) => ({ ...prev, [transactionId]: checked }));
   }
 
@@ -581,7 +585,10 @@ export function CategoriseDialog({
                           variant="list"
                         />
                       </span>
-                      <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-xs shrink-0"
+                      >
                         {rule.matchCount} this session
                       </Badge>
                       {(rule.unverifiedMatchCount ?? 0) > 0 ? (

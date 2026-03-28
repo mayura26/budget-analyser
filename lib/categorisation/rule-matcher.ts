@@ -60,4 +60,3 @@ export function keywordRuleStub(
     updatedAt: 0,
   };
 }
-

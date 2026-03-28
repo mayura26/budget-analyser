@@ -142,7 +142,9 @@ test.describe("Categorise Dialog", () => {
         await skipBtn.click();
       }
       if (await d.isVisible().catch(() => false)) {
-        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible({
+        await expect(
+          d.getByText(/transactions categorised/i).first(),
+        ).toBeVisible({
           timeout: 10_000,
         });
         await d.getByRole("button", { name: "Close" }).first().click();
@@ -173,7 +175,9 @@ test.describe("Categorise Dialog", () => {
         }
       }
       if (await d.isVisible().catch(() => false)) {
-        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible({
+        await expect(
+          d.getByText(/transactions categorised/i).first(),
+        ).toBeVisible({
           timeout: 10_000,
         });
       }
@@ -202,7 +206,9 @@ test.describe("Categorise Dialog", () => {
         await skipBtn.click();
       }
       if (await d.isVisible().catch(() => false)) {
-        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible({
+        await expect(
+          d.getByText(/transactions categorised/i).first(),
+        ).toBeVisible({
           timeout: 15_000,
         });
         await d.getByRole("button", { name: "Close" }).first().click();
@@ -251,11 +257,11 @@ test.describe("Categorise Dialog", () => {
         await skipBtn.click();
       }
       if (await d.isVisible().catch(() => false)) {
-        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible(
-          {
-            timeout: 15_000,
-          },
-        );
+        await expect(
+          d.getByText(/transactions categorised/i).first(),
+        ).toBeVisible({
+          timeout: 15_000,
+        });
         await d.getByRole("button", { name: "Close" }).first().click();
       }
     }
