@@ -2,6 +2,7 @@
 
 import { Pencil, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { AccountColourPicker } from "@/components/accounts/account-colour-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ACCOUNT_GROUP_SWATCH_COLORS } from "@/lib/accounts/account-group-swatch-colors";
-import { deriveAccountGroupMemberColor } from "@/lib/accounts/account-member-colors";
+import {
+  deriveAccountGroupMemberColor,
+  listDerivedAccountMemberColors,
+} from "@/lib/accounts/account-member-colors";
 import { createAccountGroup } from "@/lib/actions/account-groups";
 import { createAccount, updateAccount } from "@/lib/actions/accounts";
 import type { Account, AccountGroup, BankProfile } from "@/types";
@@ -53,6 +57,18 @@ export function AccountDialog({
     () => account?.color ?? ACCOUNT_GROUP_SWATCH_COLORS[0],
   );
   const isEdit = !!account;
+
+  const groupBaseHexForSuggestions = useMemo(() => {
+    if (selectedGroupId === "none") return null;
+    if (selectedGroupId === "__new__") return INLINE_NEW_GROUP_COLOR;
+    const g = groups.find((x) => x.id === Number(selectedGroupId));
+    return g?.color ?? null;
+  }, [selectedGroupId, groups]);
+
+  const derivedSuggestions = useMemo(() => {
+    if (!groupBaseHexForSuggestions) return undefined;
+    return listDerivedAccountMemberColors(groupBaseHexForSuggestions, 8);
+  }, [groupBaseHexForSuggestions]);
 
   const previewDerivedColor = useMemo((): string | null => {
     if (selectedGroupId === "none") return null;
@@ -272,47 +288,20 @@ export function AccountDialog({
                   </div>
                 )}
                 {useCustomColor && (
-                  <div className="flex gap-2 flex-wrap pt-1">
-                    {ACCOUNT_GROUP_SWATCH_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setCustomColor(color)}
-                        className="h-7 w-7 rounded-full ring-2 ring-offset-2 ring-transparent transition-[box-shadow] hover:ring-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        style={{
-                          backgroundColor: color,
-                          boxShadow:
-                            customColor === color
-                              ? "0 0 0 2px hsl(var(--foreground))"
-                              : undefined,
-                        }}
-                        aria-label={`Colour ${color}`}
-                        aria-pressed={customColor === color}
-                      />
-                    ))}
-                  </div>
+                  <AccountColourPicker
+                    value={customColor}
+                    onChange={setCustomColor}
+                    suggestions={derivedSuggestions}
+                    suggestionsLabel="Suggested from group colour"
+                  />
                 )}
               </>
             ) : (
-              <div className="flex gap-2 flex-wrap">
-                {ACCOUNT_GROUP_SWATCH_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setCustomColor(color)}
-                    className="h-6 w-6 rounded-full ring-2 ring-offset-2 ring-transparent transition-[box-shadow] hover:ring-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    style={{
-                      backgroundColor: color,
-                      boxShadow:
-                        customColor === color
-                          ? "0 0 0 2px hsl(var(--foreground))"
-                          : undefined,
-                    }}
-                    aria-label={`Colour ${color}`}
-                    aria-pressed={customColor === color}
-                  />
-                ))}
-              </div>
+              <AccountColourPicker
+                value={customColor}
+                onChange={setCustomColor}
+                swatchSize="sm"
+              />
             )}
           </div>
 

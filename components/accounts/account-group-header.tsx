@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, Pencil, Trash2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AccountColourPicker } from "@/components/accounts/account-colour-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,7 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ACCOUNT_GROUP_SWATCH_COLORS } from "@/lib/accounts/account-group-swatch-colors";
+import { listDerivedAccountMemberColors } from "@/lib/accounts/account-member-colors";
 import {
   deleteAccountGroup,
   updateAccountGroup,
@@ -37,7 +38,12 @@ export function AccountGroupHeader({
   const [deleting, setDeleting] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [colorSaving, setColorSaving] = useState(false);
+  const [draftColor, setDraftColor] = useState(group.color);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (colorPickerOpen) setDraftColor(group.color);
+  }, [colorPickerOpen, group.color]);
 
   async function saveRename() {
     if (!name.trim() || name.trim() === group.name) {
@@ -66,42 +72,38 @@ export function AccountGroupHeader({
             disabled={renaming}
           />
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-3" align="start">
+        <PopoverContent className="w-[min(100vw-2rem,20rem)] p-3" align="start">
           <p className="mb-2 text-xs font-medium text-muted-foreground">
             Group colour
           </p>
-          <div className="flex max-w-[220px] flex-wrap gap-2">
-            {ACCOUNT_GROUP_SWATCH_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                disabled={colorSaving}
-                className="h-7 w-7 rounded-full ring-2 ring-offset-2 ring-transparent transition-[box-shadow] hover:ring-foreground/30 disabled:opacity-50"
-                style={{
-                  backgroundColor: color,
-                  boxShadow:
-                    color === group.color
-                      ? "0 0 0 2px hsl(var(--foreground))"
-                      : undefined,
-                }}
-                aria-label={`Set colour ${color}`}
-                aria-current={color === group.color}
-                onClick={async () => {
-                  if (color === group.color) {
-                    setColorPickerOpen(false);
-                    return;
-                  }
-                  setColorSaving(true);
-                  const fd = new FormData();
-                  fd.set("name", group.name);
-                  fd.set("color", color);
-                  await updateAccountGroup(group.id, null, fd);
-                  setColorSaving(false);
-                  setColorPickerOpen(false);
-                }}
-              />
-            ))}
-          </div>
+          <AccountColourPicker
+            value={draftColor}
+            onChange={setDraftColor}
+            suggestions={listDerivedAccountMemberColors(draftColor, 8)}
+            suggestionsLabel="Suggested account colours"
+            swatchSize="sm"
+          />
+          <Button
+            type="button"
+            className="mt-3 w-full"
+            size="sm"
+            disabled={colorSaving}
+            onClick={async () => {
+              if (draftColor === group.color) {
+                setColorPickerOpen(false);
+                return;
+              }
+              setColorSaving(true);
+              const fd = new FormData();
+              fd.set("name", group.name);
+              fd.set("color", draftColor);
+              await updateAccountGroup(group.id, null, fd);
+              setColorSaving(false);
+              setColorPickerOpen(false);
+            }}
+          >
+            {colorSaving ? "Saving…" : "Apply colour"}
+          </Button>
         </PopoverContent>
       </Popover>
 

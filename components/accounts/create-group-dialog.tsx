@@ -1,7 +1,8 @@
 "use client";
 
 import { FolderPlus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { AccountColourPicker } from "@/components/accounts/account-colour-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,19 +14,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ACCOUNT_GROUP_SWATCH_COLORS } from "@/lib/accounts/account-group-swatch-colors";
+import { listDerivedAccountMemberColors } from "@/lib/accounts/account-member-colors";
 import { createAccountGroup } from "@/lib/actions/account-groups";
 
 export function CreateGroupDialog() {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [color, setColor] = useState<string>(ACCOUNT_GROUP_SWATCH_COLORS[0]);
+
+  const derivedPreview = useMemo(
+    () => listDerivedAccountMemberColors(color, 8),
+    [color],
+  );
 
   return (
     <Dialog
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
-        if (!v) setError(null);
+        if (!v) {
+          setError(null);
+          setColor(ACCOUNT_GROUP_SWATCH_COLORS[0]);
+        }
       }}
     >
       <DialogTrigger asChild>
@@ -42,6 +53,7 @@ export function CreateGroupDialog() {
           action={async (fd) => {
             setPending(true);
             setError(null);
+            fd.set("color", color);
             const result = await createAccountGroup(null, fd);
             setPending(false);
             if (result.success) {
@@ -58,24 +70,18 @@ export function CreateGroupDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label>Color</Label>
-            <div className="flex gap-2 flex-wrap">
-              {ACCOUNT_GROUP_SWATCH_COLORS.map((color) => (
-                <label key={color} className="cursor-pointer">
-                  <input
-                    type="radio"
-                    name="color"
-                    value={color}
-                    className="sr-only"
-                    defaultChecked={color === ACCOUNT_GROUP_SWATCH_COLORS[0]}
-                  />
-                  <div
-                    className="h-6 w-6 rounded-full ring-2 ring-offset-2 ring-transparent has-[:checked]:ring-foreground"
-                    style={{ backgroundColor: color }}
-                  />
-                </label>
-              ))}
-            </div>
+            <Label>Group colour</Label>
+            <p className="text-xs text-muted-foreground">
+              This is the main bank colour. Account colours can follow it or use
+              the suggested variants below.
+            </p>
+            <AccountColourPicker
+              value={color}
+              onChange={setColor}
+              suggestions={derivedPreview}
+              suggestionsLabel="Suggested account colours (same family)"
+              swatchSize="sm"
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

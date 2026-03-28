@@ -113,3 +113,18 @@ export function deriveAccountGroupMemberColor(
   const out = hslToRgb(hNorm, s, l);
   return rgbToHex(out.r, out.g, out.b);
 }
+
+/**
+ * Preview swatches for the same hue-family derivation as automatic grouped accounts (indices 0…count-1).
+ */
+export function listDerivedAccountMemberColors(
+  baseHex: string,
+  count: number,
+): string[] {
+  const n = Math.max(1, Math.min(count, 16));
+  const result: string[] = [];
+  for (let i = 0; i < n; i++) {
+    result.push(deriveAccountGroupMemberColor(baseHex, i));
+  }
+  return result;
+}
