@@ -174,6 +174,7 @@ export async function confirmImport(
           normalised: row.normalised,
           amount: row.amount,
           tags: "[]",
+          categoryConfirmed: false,
         }).returning({ id: transactions.id }).get();
         insertedIds.push(result.id);
       } catch {

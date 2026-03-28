@@ -147,7 +147,7 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
                   {cell}
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-3 space-y-2">
+              <PopoverContent className="w-56 sm:w-64 p-3 space-y-2">
                 <p className="text-sm font-semibold">
                   {new Date(dateStr + "T00:00:00").toLocaleDateString("en-AU", {
                     weekday: "short",

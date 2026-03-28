@@ -13,7 +13,7 @@ export default function SettingsPage() {
   const allProfiles = db.select().from(bankProfiles).all();
 
   return (
-    <div className="p-6 space-y-8 max-w-2xl">
+    <div className="p-4 sm:p-6 space-y-8 max-w-2xl">
       <h1 className="text-2xl font-semibold">Settings</h1>
       <SettingsForm
         defaultValues={{

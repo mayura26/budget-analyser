@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
           categoryId: result.categoryId,
           categorySource: "ai",
           confidence: result.confidence,
+          categoryConfirmed: false,
           updatedAt: Math.floor(Date.now() / 1000),
         })
         .where(eq(transactions.id, result.transactionId))

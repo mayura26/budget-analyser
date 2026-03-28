@@ -94,7 +94,7 @@ export function CashFlowChart({ points, currentBalance }: Props) {
         </div>
       </div>
 
-      <div className="w-full" style={{ height: 320 }}>
+      <div className="w-full h-48 sm:h-80">
         {mounted && <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={visible} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>

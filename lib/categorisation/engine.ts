@@ -40,6 +40,7 @@ export async function categoriseTransactions(
           categoryId: match.categoryId,
           categorySource: "rule",
           confidence: match.confidence,
+          categoryConfirmed: false,
           updatedAt: Math.floor(Date.now() / 1000),
         })
         .where(eq(transactions.id, txn.id))
@@ -86,6 +87,7 @@ export async function categoriseTransactions(
               categoryId: result.categoryId,
               categorySource: "ai",
               confidence: result.confidence,
+              categoryConfirmed: false,
               updatedAt: Math.floor(Date.now() / 1000),
             })
             .where(eq(transactions.id, result.transactionId))

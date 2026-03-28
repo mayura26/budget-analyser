@@ -1,12 +1,13 @@
 export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { transactions, categories, accounts } from "@/lib/db/schema";
-import { sql, and, gte, lte, eq, like, isNull } from "drizzle-orm";
+import { sql, and, gte, lte, eq, like, isNull, isNotNull } from "drizzle-orm";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { CategoriseDialog } from "@/components/transactions/categorise-dialog";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { ProcessUncategorisedButton } from "@/components/transactions/process-uncategorised-button";
 
 export default async function TransactionsPage({
   searchParams,
@@ -17,6 +18,7 @@ export default async function TransactionsPage({
     categoryId?: string;
     search?: string;
     uncategorised?: string;
+    needsReview?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -45,6 +47,9 @@ export default async function TransactionsPage({
   if (params.search) {
     filters.push(like(transactions.description, `%${params.search}%`));
   }
+  if (params.needsReview === "1") {
+    filters.push(and(isNotNull(transactions.categoryId), eq(transactions.categoryConfirmed, false)));
+  }
 
   const rows = db
     .select({
@@ -60,6 +65,7 @@ export default async function TransactionsPage({
       accountName: sql<string>`${accounts.name}`,
       accountColor: sql<string>`${accounts.color}`,
       categorySource: transactions.categorySource,
+      categoryConfirmed: transactions.categoryConfirmed,
       notes: transactions.notes,
       linkedTransactionId: transactions.linkedTransactionId,
     })
@@ -77,19 +83,36 @@ export default async function TransactionsPage({
     .where(isNull(transactions.categoryId))
     .get()?.count ?? 0;
 
+  const needsReviewCount =
+    db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(transactions)
+      .where(
+        and(isNotNull(transactions.categoryId), eq(transactions.categoryConfirmed, false))
+      )
+      .get()?.count ?? 0;
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Transactions</h1>
           <p className="text-sm text-muted-foreground">{rows.length} transactions</p>
+          {needsReviewCount > 0 && (
+            <p className="text-sm text-amber-600 dark:text-amber-500 mt-0.5">
+              {needsReviewCount} need category confirmation
+            </p>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
           {uncategorisedCount > 0 && (
-            <CategoriseDialog
-              uncategorisedCount={uncategorisedCount}
-              categories={allCategories}
-            />
+            <>
+              <ProcessUncategorisedButton count={uncategorisedCount} />
+              <CategoriseDialog
+                uncategorisedCount={uncategorisedCount}
+                categories={allCategories}
+              />
+            </>
           )}
           <Button asChild size="sm">
             <Link href="/transactions/new">

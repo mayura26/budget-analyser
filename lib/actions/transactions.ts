@@ -72,6 +72,7 @@ export async function createManualTransaction(
       notes: notes ?? null,
       tags: JSON.stringify(tagsArray),
       isManual: true,
+      categoryConfirmed: Boolean(categoryId),
     }).returning({ id: transactions.id }).get();
 
     if (!categoryId) {
@@ -102,6 +103,7 @@ export async function updateTransactionCategory(
       categoryId,
       categorySource: "manual",
       confidence: 1.0,
+      categoryConfirmed: false,
       updatedAt: Math.floor(Date.now() / 1000),
     })
     .where(eq(transactions.id, transactionId))
@@ -122,6 +124,29 @@ export async function updateTransactionCategory(
       }).run();
     }
   }
+
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  return { success: true, data: undefined };
+}
+
+export async function setTransactionCategoryConfirmed(
+  transactionId: number,
+  confirmed: boolean
+): Promise<ActionResult> {
+  const txn = db.select().from(transactions).where(eq(transactions.id, transactionId)).get();
+  if (!txn) return { success: false, error: "Transaction not found" };
+  if (txn.categoryId === null && confirmed) {
+    return { success: false, error: "Cannot confirm without a category" };
+  }
+
+  db.update(transactions)
+    .set({
+      categoryConfirmed: confirmed,
+      updatedAt: Math.floor(Date.now() / 1000),
+    })
+    .where(eq(transactions.id, transactionId))
+    .run();
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
@@ -286,6 +311,7 @@ export async function applyCategorisations(
       .set({
         categoryId: u.categoryId,
         categorySource: u.source === "none" ? "manual" : u.source,
+        categoryConfirmed: true,
         updatedAt: now,
       })
       .where(eq(transactions.id, u.transactionId))

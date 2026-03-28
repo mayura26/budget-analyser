@@ -161,6 +161,9 @@ export const transactions = sqliteTable(
     notes: text("notes"),
     tags: text("tags").default("[]"), // JSON array
     isManual: integer("is_manual", { mode: "boolean" }).notNull().default(false),
+    categoryConfirmed: integer("category_confirmed", { mode: "boolean" })
+      .notNull()
+      .default(true),
     linkedTransactionId: integer("linked_transaction_id"),
     createdAt: integer("created_at")
       .notNull()

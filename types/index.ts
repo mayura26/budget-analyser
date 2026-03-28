@@ -58,6 +58,7 @@ export type Transaction = {
   notes: string | null;
   tags: string; // JSON array
   isManual: boolean;
+  categoryConfirmed: boolean;
   linkedTransactionId: number | null;
   createdAt: number;
   updatedAt: number;

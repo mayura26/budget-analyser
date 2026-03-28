@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { updateTransactionCategory, deleteTransaction } from "@/lib/actions/transactions";
 import { LinkTransferPopover } from "@/components/transactions/link-transfer-popover";
@@ -108,10 +108,10 @@ export function TransactionTable({
     col.accessor("description", {
       header: "Description",
       cell: (info) => (
-        <div className="max-w-xs">
-          <p className="text-sm truncate">{info.getValue()}</p>
+        <div className="min-w-0">
+          <p className="text-sm whitespace-normal wrap-break-word">{info.getValue()}</p>
           {info.row.original.notes && (
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-xs text-muted-foreground whitespace-normal wrap-break-word mt-0.5">
               {info.row.original.notes}
             </p>
           )}
@@ -209,7 +209,7 @@ export function TransactionTable({
   return (
     <div className="space-y-3">
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-2">
         <Input
           placeholder="Search transactions…"
           value={globalFilter}
@@ -217,14 +217,14 @@ export function TransactionTable({
             setGlobalFilter(e.target.value);
             updateFilter("search", e.target.value || undefined);
           }}
-          className="max-w-xs h-8 text-sm"
+          className="w-full sm:max-w-xs h-8 text-sm"
         />
 
         <Select
           value={currentFilters.accountId ?? "all"}
           onValueChange={(v) => updateFilter("accountId", v === "all" ? undefined : v)}
         >
-          <SelectTrigger className="h-8 text-sm w-40">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-40">
             <SelectValue placeholder="All accounts" />
           </SelectTrigger>
           <SelectContent>
@@ -241,7 +241,7 @@ export function TransactionTable({
           value={currentFilters.categoryId ?? "all"}
           onValueChange={(v) => updateFilter("categoryId", v === "all" ? undefined : v)}
         >
-          <SelectTrigger className="h-8 text-sm w-44">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-44">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
@@ -263,7 +263,10 @@ export function TransactionTable({
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
                 {hg.headers.map((header) => (
-                  <TableHead key={header.id} className="h-9 text-xs">
+                  <TableHead
+                    key={header.id}
+                    className={cn("h-9 text-xs", header.column.id === "accountName" && "hidden sm:table-cell")}
+                  >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
@@ -279,9 +282,16 @@ export function TransactionTable({
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="h-10">
+                <TableRow key={row.id} className="min-h-10">
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-1">
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        "py-2",
+                        cell.column.id === "accountName" && "hidden sm:table-cell",
+                        cell.column.id === "description" && "align-top"
+                      )}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

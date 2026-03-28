@@ -132,7 +132,7 @@ export function DashboardCharts({
             </div>
           ) : (
             <div className="flex items-center gap-4">
-              <div className="shrink-0 w-[180px] h-[180px]">
+              <div className="shrink-0 w-[140px] h-[140px] sm:w-[180px] sm:h-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
