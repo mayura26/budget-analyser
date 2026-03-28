@@ -10,12 +10,18 @@ import {
 /** Low-saturation anchors: keep same-hue stepping (readability on greys). */
 const NEUTRAL_S_MAX = 0.12;
 
-type HueFamily = "redPink" | "yellowOrange" | "greenTeal" | "bluePurple" | "neutral";
+type HueFamily =
+  | "redPink"
+  | "yellowOrange"
+  | "greenTeal"
+  | "bluePurple"
+  | "neutral";
 
 /** Arc endpoints in degrees [0, 360). Non-wrap families use linear interpolation. */
 const FAMILY_ARCS: Record<
   Exclude<HueFamily, "neutral">,
-  { kind: "linear"; a: number; b: number } | { kind: "wrap"; start: number; len: number }
+  | { kind: "linear"; a: number; b: number }
+  | { kind: "wrap"; start: number; len: number }
 > = {
   redPink: { kind: "wrap", start: 325, len: 57 },
   yellowOrange: { kind: "linear", a: 28, b: 98 },
@@ -50,10 +56,7 @@ function anchorTOnArc(
   return clamp(dist / arc.len, 0, 1);
 }
 
-function hueFromT(
-  family: Exclude<HueFamily, "neutral">,
-  t: number,
-): number {
+function hueFromT(family: Exclude<HueFamily, "neutral">, t: number): number {
   const arc = FAMILY_ARCS[family];
   const tt = clamp(t, 0, 1);
   if (arc.kind === "linear") {
@@ -68,7 +71,10 @@ function hueFromT(
  * Derive a per-account swatch from the group's colour by moving within a related hue band
  * (yellow–orange, green–teal, blue–purple, red–pink). Index 0 matches the group anchor.
  */
-export function deriveAccountGroupMemberColor(baseHex: string, siblingIndex: number): string {
+export function deriveAccountGroupMemberColor(
+  baseHex: string,
+  siblingIndex: number,
+): string {
   const rgb = hexToRgb(baseHex);
   if (!rgb) return baseHex;
   const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
@@ -94,7 +100,11 @@ export function deriveAccountGroupMemberColor(baseHex: string, siblingIndex: num
   const hNorm = hOutDeg / 360;
 
   const j = i - 1;
-  const l = clamp(hsl.l + 0.04 * (j % 4) - 0.02 * Math.floor(j / 4), 0.22, 0.88);
+  const l = clamp(
+    hsl.l + 0.04 * (j % 4) - 0.02 * Math.floor(j / 4),
+    0.22,
+    0.88,
+  );
   const s = clamp(hsl.s - 0.03 * (j % 3), 0.25, 0.95);
   const out = hslToRgb(hNorm, s, l);
   return rgbToHex(out.r, out.g, out.b);

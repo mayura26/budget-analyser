@@ -9,4 +9,4 @@ Whenever you add or modify a feature, you MUST also update the Playwright E2E te
 - New pages → new `e2e/tests/<page>.spec.ts`
 - Modified flows → update existing spec
 
-Don't run tests again unless asked
+When you run tests, run only what covers the change (e.g. `npx playwright test path/to/relevant.spec.ts` or a grep pattern). Do **not** run the full E2E suite after every edit unless the user asks for a full run.

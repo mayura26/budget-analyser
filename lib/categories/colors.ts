@@ -1,7 +1,10 @@
 /**
  * Derive a sub-category swatch from a main group colour (same hue family, stepped lightness/saturation).
  */
-export function deriveSubcategoryColor(baseHex: string, siblingIndex: number): string {
+export function deriveSubcategoryColor(
+  baseHex: string,
+  siblingIndex: number,
+): string {
   const rgb = hexToRgb(baseHex);
   if (!rgb) return baseHex;
   const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
@@ -16,7 +19,9 @@ export function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+export function hexToRgb(
+  hex: string,
+): { r: number; g: number; b: number } | null {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
   if (!m) return null;
   const n = parseInt(m[1], 16);
@@ -28,7 +33,11 @@ export function rgbToHex(r: number, g: number, b: number): string {
   return `#${to(Math.round(r))}${to(Math.round(g))}${to(Math.round(b))}`;
 }
 
-export function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+export function rgbToHsl(
+  r: number,
+  g: number,
+  b: number,
+): { h: number; s: number; l: number } {
   r /= 255;
   g /= 255;
   b /= 255;
@@ -54,7 +63,11 @@ export function rgbToHsl(r: number, g: number, b: number): { h: number; s: numbe
   return { h, s, l };
 }
 
-export function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+export function hslToRgb(
+  h: number,
+  s: number,
+  l: number,
+): { r: number; g: number; b: number } {
   let r: number;
   let g: number;
   let b: number;

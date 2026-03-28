@@ -20,9 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ACCOUNT_GROUP_SWATCH_COLORS } from "@/lib/accounts/account-group-swatch-colors";
+import { deriveAccountGroupMemberColor } from "@/lib/accounts/account-member-colors";
 import { createAccountGroup } from "@/lib/actions/account-groups";
 import { createAccount, updateAccount } from "@/lib/actions/accounts";
-import { deriveAccountGroupMemberColor } from "@/lib/accounts/account-member-colors";
 import type { Account, AccountGroup, BankProfile } from "@/types";
 
 const INLINE_NEW_GROUP_COLOR = "#6366f1";
