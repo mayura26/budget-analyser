@@ -3,10 +3,10 @@ import { test, expect } from '@playwright/test';
 test.describe('Categories', () => {
   test('seeded main groups and sub-categories render', async ({ page }) => {
     await page.goto('/categories');
-    await expect(page.getByRole('heading', { name: 'Living costs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Living Costs' })).toBeVisible();
     await expect(page.getByText('Groceries').first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Money in' })).toBeVisible();
-    await expect(page.getByText('Income', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Money IN' })).toBeVisible();
+    await expect(page.getByText('Income (salary / primary)', { exact: true }).first()).toBeVisible();
   });
 
   test('rule count shown on sub-category card', async ({ page }) => {
@@ -31,13 +31,13 @@ test.describe('Categories', () => {
     await expect(dialog).toBeVisible();
 
     await dialog.getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Living costs' }).click();
+    await page.getByRole('option', { name: 'Living Costs' }).click();
     await dialog.locator('input[name="name"]').fill('E2E Category');
 
     await dialog.getByRole('button', { name: 'Create' }).click();
 
     await expect(page.getByText('E2E Category').first()).toBeVisible();
-    await expect(page.getByText('expense').first()).toBeVisible();
+    await expect(page.getByText('Expense').first()).toBeVisible();
   });
 
   test('add rule to sub-category', async ({ page }) => {

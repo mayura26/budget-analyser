@@ -1,13 +1,19 @@
 export const dynamic = "force-dynamic";
-import { db } from "@/lib/db";
-import { accounts, accountGroups, bankProfiles, transactions } from "@/lib/db/schema";
+
 import { eq, sql } from "drizzle-orm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { AccountDialog } from "@/components/accounts/account-dialog";
-import { DeleteAccountButton } from "@/components/accounts/delete-account-button";
 import { AccountGroupHeader } from "@/components/accounts/account-group-header";
 import { CreateGroupDialog } from "@/components/accounts/create-group-dialog";
+import { DeleteAccountButton } from "@/components/accounts/delete-account-button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { db } from "@/lib/db";
+import {
+  accountGroups,
+  accounts,
+  bankProfiles,
+  transactions,
+} from "@/lib/db/schema";
 import type { AccountGroup } from "@/types";
 
 export default function AccountsPage() {
@@ -35,14 +41,24 @@ export default function AccountsPage() {
   const groupMap = new Map<number, typeof accountRows>();
   const ungrouped: typeof accountRows = [];
 
+  const groupAccountIdsByGroup: Record<number, number[]> = {};
+
   for (const row of accountRows) {
     if (row.groupId) {
       const existing = groupMap.get(row.groupId) ?? [];
       existing.push(row);
       groupMap.set(row.groupId, existing);
+      const idList = groupAccountIdsByGroup[row.groupId] ?? [];
+      idList.push(row.id);
+      groupAccountIdsByGroup[row.groupId] = idList;
     } else {
       ungrouped.push(row);
     }
+  }
+
+  for (const k of Object.keys(groupAccountIdsByGroup)) {
+    const gid = Number(k);
+    groupAccountIdsByGroup[gid].sort((a, b) => a - b);
   }
 
   function AccountCard({ account }: { account: (typeof accountRows)[0] }) {
@@ -77,7 +93,9 @@ export default function AccountsPage() {
         </CardHeader>
         <CardContent>
           <div className="text-sm text-muted-foreground space-y-1">
-            <p>{account.currency} · {account.transactionCount} transactions</p>
+            <p>
+              {account.currency} · {account.transactionCount} transactions
+            </p>
             {account.bankProfileName && (
               <Badge variant="secondary" className="text-xs">
                 {account.bankProfileName}
@@ -98,7 +116,11 @@ export default function AccountsPage() {
         <h1 className="text-2xl font-semibold">Accounts</h1>
         <div className="flex gap-2">
           <CreateGroupDialog />
-          <AccountDialog bankProfiles={allProfiles} groups={allGroups} />
+          <AccountDialog
+            bankProfiles={allProfiles}
+            groups={allGroups}
+            groupAccountIdsByGroup={groupAccountIdsByGroup}
+          />
         </div>
       </div>
 
@@ -106,7 +128,9 @@ export default function AccountsPage() {
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
             <p>No accounts yet.</p>
-            <p className="text-sm mt-1">Add your first account to start importing transactions.</p>
+            <p className="text-sm mt-1">
+              Add your first account to start importing transactions.
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -120,7 +144,9 @@ export default function AccountsPage() {
                   accountCount={groupAccounts.length}
                 />
                 {groupAccounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground pl-4">No accounts in this group.</p>
+                  <p className="text-sm text-muted-foreground pl-4">
+                    No accounts in this group.
+                  </p>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-3">
                     {groupAccounts.map((account) => (

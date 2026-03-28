@@ -1,10 +1,11 @@
-import { runMigrations } from "./migrate";
-import { seedDatabase } from "./seed";
+import { recomputeAllGroupedAccountColors } from "@/lib/accounts/account-colors";
 import {
+  applySubcategoryTaxonomyAndColours,
   migrateLegacyFlatCategoriesIfNeeded,
   normalizeMainGroupNamesAndInsertMissing,
-  applySubcategoryTaxonomyAndColours,
 } from "./category-hierarchy-migrate";
+import { runMigrations } from "./migrate";
+import { seedDatabase } from "./seed";
 
 let initialized = false;
 
@@ -17,6 +18,7 @@ export function initializeDatabase() {
     migrateLegacyFlatCategoriesIfNeeded();
     applySubcategoryTaxonomyAndColours();
     seedDatabase();
+    recomputeAllGroupedAccountColors();
   } catch (err) {
     console.error("Database initialization failed:", err);
     throw err;

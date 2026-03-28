@@ -1,10 +1,11 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { recomputeAccountColorsForGroup } from "@/lib/accounts/account-colors";
 import { db } from "@/lib/db";
 import { accountGroups } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/types";
 
 const AccountGroupSchema = z.object({
@@ -17,7 +18,7 @@ const AccountGroupSchema = z.object({
 
 export async function createAccountGroup(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
   const parsed = AccountGroupSchema.safeParse({
     name: formData.get("name"),
@@ -28,7 +29,10 @@ export async function createAccountGroup(
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
     };
   }
 
@@ -45,7 +49,7 @@ export async function createAccountGroup(
 export async function updateAccountGroup(
   id: number,
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult> {
   const parsed = AccountGroupSchema.safeParse({
     name: formData.get("name"),
@@ -56,7 +60,10 @@ export async function updateAccountGroup(
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
     };
   }
 
@@ -64,6 +71,8 @@ export async function updateAccountGroup(
     .set(parsed.data)
     .where(eq(accountGroups.id, id))
     .run();
+
+  recomputeAccountColorsForGroup(id);
 
   revalidatePath("/accounts");
   return { success: true, data: undefined };

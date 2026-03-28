@@ -1,18 +1,23 @@
-import { eq, and, isNull, asc, sql } from "drizzle-orm";
-import { db } from "./index";
-import { categories } from "./schema";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { deriveSubcategoryColor } from "@/lib/categories/colors";
 import {
+  allKnownMainNames,
+  DEFAULT_SUBS,
+  LEGACY_FLAT_TO_MAIN,
   MAIN_GROUP_DEFAULTS,
   MAIN_GROUP_NAMES,
-  DEFAULT_SUBS,
   MAIN_RENAMES,
-  LEGACY_FLAT_TO_MAIN,
+  type MainGroupName,
   REPARENT_SUB_TO_MAIN,
   SUB_NAME_UPGRADES,
-  allKnownMainNames,
-  type MainGroupName,
 } from "./category-taxonomy";
+import { db } from "./index";
+import {
+  categories,
+  categorisationRules,
+  scheduledTransactions,
+  transactions,
+} from "./schema";
 
 export { MAIN_GROUP_NAMES, MAIN_GROUP_DEFAULTS };
 
@@ -25,6 +30,80 @@ function getMainIdByName(name: string): number | undefined {
   return row?.id;
 }
 
+/** Point transactions, rules, and schedules from one category to another. */
+function reassignCategoryReferences(fromId: number, toId: number): void {
+  db.update(transactions)
+    .set({ categoryId: toId })
+    .where(eq(transactions.categoryId, fromId))
+    .run();
+  db.update(categorisationRules)
+    .set({ categoryId: toId })
+    .where(eq(categorisationRules.categoryId, fromId))
+    .run();
+  db.update(scheduledTransactions)
+    .set({ categoryId: toId })
+    .where(eq(scheduledTransactions.categoryId, fromId))
+    .run();
+}
+
+/**
+ * Move subcategories from a duplicate main to the canonical main. When a sub's name
+ * already exists under the canonical main, merge into the existing sub row.
+ */
+function moveSubcategoriesResolvingNameClashes(
+  oldParentId: number,
+  newParentId: number,
+): void {
+  const subs = db
+    .select()
+    .from(categories)
+    .where(eq(categories.parentId, oldParentId))
+    .all();
+  for (const sub of subs) {
+    const clash = db
+      .select()
+      .from(categories)
+      .where(
+        and(
+          eq(categories.parentId, newParentId),
+          eq(categories.name, sub.name),
+        ),
+      )
+      .get();
+    if (clash && clash.id !== sub.id) {
+      reassignCategoryReferences(sub.id, clash.id);
+      db.delete(categories).where(eq(categories.id, sub.id)).run();
+    } else {
+      db.update(categories)
+        .set({ parentId: newParentId })
+        .where(eq(categories.id, sub.id))
+        .run();
+    }
+  }
+}
+
+/**
+ * The DB already has a main row with the canonical name; merge the legacy-named
+ * duplicate into it so we do not violate categories_main_name_unique.
+ */
+function mergeDuplicateMainIntoCanonical(
+  duplicateMainId: number,
+  canonicalMainId: number,
+  def: (typeof MAIN_GROUP_DEFAULTS)[number],
+): void {
+  db.update(categories)
+    .set({
+      color: def.color,
+      icon: def.icon,
+      type: def.type,
+    })
+    .where(eq(categories.id, canonicalMainId))
+    .run();
+  moveSubcategoriesResolvingNameClashes(duplicateMainId, canonicalMainId);
+  reassignCategoryReferences(duplicateMainId, canonicalMainId);
+  db.delete(categories).where(eq(categories.id, duplicateMainId)).run();
+}
+
 export function normalizeMainGroupNamesAndInsertMissing(): void {
   for (const [oldName, newName] of Object.entries(MAIN_RENAMES)) {
     const def = MAIN_GROUP_DEFAULTS.find((d) => d.name === newName);
@@ -35,15 +114,24 @@ export function normalizeMainGroupNamesAndInsertMissing(): void {
       .where(and(eq(categories.name, oldName), isNull(categories.parentId)))
       .get();
     if (row) {
-      db.update(categories)
-        .set({
-          name: def.name,
-          color: def.color,
-          icon: def.icon,
-          type: def.type,
-        })
-        .where(eq(categories.id, row.id))
-        .run();
+      const canonical = db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.name, def.name), isNull(categories.parentId)))
+        .get();
+      if (canonical && canonical.id !== row.id) {
+        mergeDuplicateMainIntoCanonical(row.id, canonical.id, def);
+      } else {
+        db.update(categories)
+          .set({
+            name: def.name,
+            color: def.color,
+            icon: def.icon,
+            type: def.type,
+          })
+          .where(eq(categories.id, row.id))
+          .run();
+      }
     }
   }
 
@@ -88,8 +176,8 @@ export function applySubcategoryTaxonomyAndColours(): void {
         and(
           eq(categories.name, oldName),
           sql`${categories.parentId} IS NOT NULL`,
-          eq(categories.isSystem, true)
-        )
+          eq(categories.isSystem, true),
+        ),
       )
       .all();
     for (const row of rows) {
@@ -99,12 +187,15 @@ export function applySubcategoryTaxonomyAndColours(): void {
         .where(
           and(
             eq(categories.name, newName),
-            eq(categories.parentId, row.parentId as number)
-          )
+            eq(categories.parentId, row.parentId as number),
+          ),
         )
         .get();
       if (clash && clash.id !== row.id) continue;
-      db.update(categories).set({ name: newName }).where(eq(categories.id, row.id)).run();
+      db.update(categories)
+        .set({ name: newName })
+        .where(eq(categories.id, row.id))
+        .run();
     }
   }
 
@@ -117,8 +208,8 @@ export function applySubcategoryTaxonomyAndColours(): void {
         and(
           eq(categories.name, subName),
           eq(categories.isSystem, true),
-          sql`${categories.parentId} IS NOT NULL`
-        )
+          sql`${categories.parentId} IS NOT NULL`,
+        ),
       )
       .run();
   }
@@ -145,7 +236,11 @@ export function applySubcategoryTaxonomyAndColours(): void {
 }
 
 export function refreshSubcategoryColorsForParent(mainId: number): void {
-  const main = db.select().from(categories).where(eq(categories.id, mainId)).get();
+  const main = db
+    .select()
+    .from(categories)
+    .where(eq(categories.id, mainId))
+    .get();
   if (!main || main.parentId !== null) return;
   const subs = db
     .select()
@@ -176,7 +271,7 @@ export function migrateLegacyFlatCategoriesIfNeeded(): void {
 
   const mainNameSet = allKnownMainNames();
   const needsLegacy = all.some(
-    (c) => c.parentId === null && !mainNameSet.has(c.name)
+    (c) => c.parentId === null && !mainNameSet.has(c.name),
   );
   if (!needsLegacy) return;
 
@@ -200,13 +295,21 @@ export function migrateLegacyFlatCategoriesIfNeeded(): void {
     }
   }
 
-  const orphans = db.select().from(categories).where(isNull(categories.parentId)).all();
+  const orphans = db
+    .select()
+    .from(categories)
+    .where(isNull(categories.parentId))
+    .all();
   for (const cat of orphans) {
     if (mainNameSet.has(cat.name)) continue;
-    const mainName = LEGACY_FLAT_TO_MAIN[cat.name] ?? ("Living Costs" as MainGroupName);
+    const mainName =
+      LEGACY_FLAT_TO_MAIN[cat.name] ?? ("Living Costs" as MainGroupName);
     const mainId = getMainIdByName(mainName);
     if (mainId) {
-      db.update(categories).set({ parentId: mainId }).where(eq(categories.id, cat.id)).run();
+      db.update(categories)
+        .set({ parentId: mainId })
+        .where(eq(categories.id, cat.id))
+        .run();
     }
   }
 }
