@@ -148,3 +148,29 @@ export async function toggleScheduledTransaction(
   revalidatePath("/budget");
   return { success: true, data: undefined };
 }
+
+export async function addAIScheduleSuggestion(data: {
+  name: string;
+  amount: number;
+  frequency: "weekly" | "fortnightly" | "monthly" | "quarterly" | "yearly";
+  startDate: string;
+  categoryId?: number | null;
+}): Promise<ActionResult<{ id: number }>> {
+  const result = db
+    .insert(scheduledTransactions)
+    .values({
+      name: data.name,
+      amount: data.amount,
+      frequency: data.frequency,
+      startDate: data.startDate,
+      endDate: null,
+      accountId: null,
+      categoryId: data.categoryId ?? null,
+      notes: "Added via AI suggestion",
+    })
+    .returning({ id: scheduledTransactions.id })
+    .get();
+
+  revalidatePath("/budget");
+  return { success: true, data: { id: result.id } };
+}

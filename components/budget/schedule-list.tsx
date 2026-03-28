@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { ScheduleDialog } from "./schedule-dialog";
+import { AISchedulerDialog } from "./ai-scheduler-dialog";
 import {
   deleteScheduledTransaction,
   toggleScheduledTransaction,
@@ -15,6 +16,7 @@ interface Props {
   schedules: ScheduledTransaction[];
   accounts: Account[];
   categories: Category[];
+  aiEnabled?: boolean;
 }
 
 const FREQ_LABELS: Record<string, string> = {
@@ -55,7 +57,7 @@ function nextOccurrenceDate(schedule: ScheduledTransaction): string {
   return current;
 }
 
-export function ScheduleList({ schedules, accounts, categories }: Props) {
+export function ScheduleList({ schedules, accounts, categories, aiEnabled = false }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ScheduledTransaction | null>(null);
   const [, startTransition] = useTransition();
@@ -88,10 +90,13 @@ export function ScheduleList({ schedules, accounts, categories }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Scheduled transactions</h2>
-        <Button size="sm" onClick={handleAdd}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add schedule
-        </Button>
+        <div className="flex items-center gap-2">
+          {aiEnabled && <AISchedulerDialog categories={categories} />}
+          <Button size="sm" onClick={handleAdd}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add schedule
+          </Button>
+        </div>
       </div>
 
       {schedules.length === 0 ? (

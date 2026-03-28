@@ -159,4 +159,11 @@ test.describe('Budget', () => {
 
     await expect(page.getByText('Salary')).not.toBeVisible();
   });
+
+  test('AI Suggestions button is hidden when AI is not enabled', async ({ page }) => {
+    await page.goto('/budget');
+    await page.getByRole('tab', { name: 'Schedules' }).click();
+    // In the test environment, AI is not configured so the button should not render
+    await expect(page.getByRole('button', { name: 'AI Suggestions' })).not.toBeVisible();
+  });
 });

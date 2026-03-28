@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
-import { scheduledTransactions, accounts, categories, transactions } from "@/lib/db/schema";
+import { scheduledTransactions, accounts, categories, transactions, settings } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { generateOccurrences, buildBalancePoints } from "@/lib/budget/generate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,6 +24,9 @@ export default async function BudgetPage() {
 
   const allAccounts = db.select().from(accounts).all();
   const allCategories = db.select().from(categories).all();
+
+  const aiEnabledSetting = db.select().from(settings).where(eq(settings.key, "ai_enabled")).get();
+  const aiEnabled = aiEnabledSetting?.value === "true";
 
   const categoryColorMap = new Map(allCategories.map((c) => [c.id, c.color]));
 
@@ -143,6 +146,7 @@ export default async function BudgetPage() {
             schedules={rawSchedules}
             accounts={allAccounts}
             categories={allCategories}
+            aiEnabled={aiEnabled}
           />
         </TabsContent>
       </Tabs>
