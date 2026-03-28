@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
-import { db } from "@/lib/db";
-import { accounts, categories } from "@/lib/db/schema";
+
 import { ManualTransactionForm } from "@/components/transactions/manual-entry-form";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
+import { db } from "@/lib/db";
+import { accounts, categories } from "@/lib/db/schema";
 import type { Category } from "@/types";
 
 export default function NewTransactionPage() {

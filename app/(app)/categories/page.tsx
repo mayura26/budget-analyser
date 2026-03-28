@@ -1,8 +1,12 @@
 export const dynamic = "force-dynamic";
-import { db } from "@/lib/db";
-import { categories, categorisationRules } from "@/lib/db/schema";
+
 import { eq, sql } from "drizzle-orm";
 import { CategoryList } from "@/components/categories/category-list";
+import { db } from "@/lib/db";
+import { categories, categorisationRules } from "@/lib/db/schema";
+import type { Category } from "@/types";
+
+type CategoryWithCount = Category & { ruleCount: number };
 
 export default function CategoriesPage() {
   const allCategories = db
@@ -18,9 +22,12 @@ export default function CategoriesPage() {
       ruleCount: sql<number>`COUNT(${categorisationRules.id})`,
     })
     .from(categories)
-    .leftJoin(categorisationRules, eq(categories.id, categorisationRules.categoryId))
+    .leftJoin(
+      categorisationRules,
+      eq(categories.id, categorisationRules.categoryId),
+    )
     .groupBy(categories.id)
-    .all();
+    .all() as CategoryWithCount[];
 
   const allRules = db
     .select({
@@ -40,7 +47,7 @@ export default function CategoriesPage() {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Categories & Rules</h1>
-      <CategoryList categories={allCategories as any} rules={allRules} />
+      <CategoryList categories={allCategories} rules={allRules} />
     </div>
   );
 }

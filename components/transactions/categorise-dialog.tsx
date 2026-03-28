@@ -96,18 +96,24 @@ export function CategoriseDialog({
   function handleCategoryChange(transactionId: number, value: string) {
     setSelections((prev) => ({
       ...prev,
-      [transactionId]: value === "none" ? null : parseInt(value),
+      [transactionId]: value === "none" ? null : parseInt(value, 10),
     }));
   }
 
   function handleApply() {
     const updates = suggestions
       .filter((s) => selections[s.transactionId] != null)
-      .map((s) => ({
-        transactionId: s.transactionId,
-        categoryId: selections[s.transactionId]!,
-        source: s.source,
-      }));
+      .map((s) => {
+        const categoryId = selections[s.transactionId];
+        if (categoryId == null) {
+          throw new Error("selection invariant");
+        }
+        return {
+          transactionId: s.transactionId,
+          categoryId,
+          source: s.source,
+        };
+      });
 
     if (updates.length === 0) return;
 
@@ -130,7 +136,10 @@ export function CategoriseDialog({
       const applied = updates.map((u) => {
         const row = suggestions.find(
           (s) => s.transactionId === u.transactionId,
-        )!;
+        );
+        if (!row) {
+          throw new Error("suggestion invariant");
+        }
         return {
           normalised: row.normalised,
           categoryId: u.categoryId,

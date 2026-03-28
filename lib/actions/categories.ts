@@ -1,13 +1,13 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/lib/db";
-import { categories, categorisationRules } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import type { ActionResult } from "@/types";
 import { assignableCategoryError } from "@/lib/categories/assignable";
+import { db } from "@/lib/db";
 import { refreshSubcategoryColorsForParent } from "@/lib/db/category-hierarchy-migrate";
+import { categories, categorisationRules } from "@/lib/db/schema";
+import type { ActionResult } from "@/types";
 
 const CategorySchema = z.object({
   name: z.string().min(1).max(100),
@@ -34,7 +34,7 @@ function parseParentId(formData: FormData): number | undefined {
 
 export async function createCategory(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
   const parsed = CategorySchema.safeParse({
     name: formData.get("name"),
@@ -47,7 +47,10 @@ export async function createCategory(
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
     };
   }
 
@@ -55,12 +58,19 @@ export async function createCategory(
   const { name, color, icon, type } = parsed.data;
 
   if (parentId) {
-    const parent = db.select().from(categories).where(eq(categories.id, parentId)).get();
+    const parent = db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, parentId))
+      .get();
     if (!parent || parent.parentId !== null) {
       return { success: false, error: "Parent must be a main group" };
     }
     if (parent.type !== type) {
-      return { success: false, error: "Sub-category type must match its main group" };
+      return {
+        success: false,
+        error: "Sub-category type must match its main group",
+      };
     }
     const result = db
       .insert(categories)
@@ -97,7 +107,7 @@ export async function createCategory(
 export async function updateCategory(
   id: number,
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult> {
   const parsed = CategorySchema.safeParse({
     name: formData.get("name"),
@@ -110,7 +120,11 @@ export async function updateCategory(
     return { success: false, error: "Validation failed" };
   }
 
-  const existing = db.select().from(categories).where(eq(categories.id, id)).get();
+  const existing = db
+    .select()
+    .from(categories)
+    .where(eq(categories.id, id))
+    .get();
   if (!existing) {
     return { success: false, error: "Category not found" };
   }
@@ -119,9 +133,17 @@ export async function updateCategory(
   const { name, color, icon, type } = parsed.data;
 
   if (existing.parentId === null) {
-    const child = db.select().from(categories).where(eq(categories.parentId, id)).limit(1).get();
+    const child = db
+      .select()
+      .from(categories)
+      .where(eq(categories.parentId, id))
+      .limit(1)
+      .get();
     if (child && parentId !== undefined) {
-      return { success: false, error: "Remove sub-categories before changing a main group" };
+      return {
+        success: false,
+        error: "Remove sub-categories before changing a main group",
+      };
     }
     db.update(categories)
       .set({
@@ -142,12 +164,19 @@ export async function updateCategory(
   }
 
   const newParentId = parentId ?? existing.parentId;
-  const parent = db.select().from(categories).where(eq(categories.id, newParentId)).get();
+  const parent = db
+    .select()
+    .from(categories)
+    .where(eq(categories.id, newParentId))
+    .get();
   if (!parent || parent.parentId !== null) {
     return { success: false, error: "Parent must be a main group" };
   }
   if (parent.type !== type) {
-    return { success: false, error: "Sub-category type must match its main group" };
+    return {
+      success: false,
+      error: "Sub-category type must match its main group",
+    };
   }
 
   db.update(categories)
@@ -171,7 +200,12 @@ export async function deleteCategory(id: number): Promise<ActionResult> {
   if (cat?.isSystem) {
     return { success: false, error: "Cannot delete system category" };
   }
-  const child = db.select().from(categories).where(eq(categories.parentId, id)).limit(1).get();
+  const child = db
+    .select()
+    .from(categories)
+    .where(eq(categories.parentId, id))
+    .limit(1)
+    .get();
   if (child) {
     return { success: false, error: "Remove sub-categories first" };
   }
@@ -183,7 +217,7 @@ export async function deleteCategory(id: number): Promise<ActionResult> {
 
 export async function createRule(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
   const parsed = RuleSchema.safeParse({
     categoryId: formData.get("categoryId"),
@@ -198,7 +232,10 @@ export async function createRule(
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
     };
   }
 
@@ -223,21 +260,23 @@ export async function deleteRule(id: number): Promise<ActionResult> {
 }
 
 export async function createRulesBulk(
-  rules: { pattern: string; categoryId: number }[]
+  rules: { pattern: string; categoryId: number }[],
 ): Promise<ActionResult<{ created: number }>> {
   let created = 0;
   for (const rule of rules) {
     const err = assignableCategoryError(rule.categoryId);
     if (err) continue;
     try {
-      db.insert(categorisationRules).values({
-        categoryId: rule.categoryId,
-        pattern: rule.pattern,
-        patternType: "keyword",
-        priority: 10,
-        confidence: 0.9,
-        isUserDefined: true,
-      }).run();
+      db.insert(categorisationRules)
+        .values({
+          categoryId: rule.categoryId,
+          pattern: rule.pattern,
+          patternType: "keyword",
+          priority: 10,
+          confidence: 0.9,
+          isUserDefined: true,
+        })
+        .run();
       created++;
     } catch {
       // Skip duplicates

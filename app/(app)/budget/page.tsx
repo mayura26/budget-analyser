@@ -1,20 +1,26 @@
 export const dynamic = "force-dynamic";
 
-import { db } from "@/lib/db";
-import { scheduledTransactions, accounts, categories, transactions, settings } from "@/lib/db/schema";
-import { filterAssignableCategories } from "@/lib/categories/assignable";
-import type { Category } from "@/types";
 import { eq, sql } from "drizzle-orm";
-import { generateOccurrences, buildBalancePoints } from "@/lib/budget/generate";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScheduleList } from "@/components/budget/schedule-list";
+import { DollarSign, TrendingDown, TrendingUp } from "lucide-react";
 import { BudgetCalendar } from "@/components/budget/budget-calendar";
 import { CashFlowChart } from "@/components/budget/cash-flow-chart";
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { ScheduleList } from "@/components/budget/schedule-list";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { buildBalancePoints, generateOccurrences } from "@/lib/budget/generate";
+import { filterAssignableCategories } from "@/lib/categories/assignable";
+import { db } from "@/lib/db";
+import {
+  accounts,
+  categories,
+  scheduledTransactions,
+  settings,
+  transactions,
+} from "@/lib/db/schema";
+import type { Category } from "@/types";
 
 function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
@@ -31,7 +37,11 @@ export default async function BudgetPage() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const allCategories = filterAssignableCategories(allCatsRaw);
 
-  const aiEnabledSetting = db.select().from(settings).where(eq(settings.key, "ai_enabled")).get();
+  const aiEnabledSetting = db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, "ai_enabled"))
+    .get();
   const aiEnabled = aiEnabledSetting?.value === "true";
 
   const categoryColorMap = new Map(allCatsRaw.map((c) => [c.id, c.color]));
@@ -40,7 +50,9 @@ export default async function BudgetPage() {
 
   const schedulesWithColor = rawSchedules.map((s) => ({
     ...s,
-    categoryColor: s.categoryId ? (categoryColorMap.get(s.categoryId) ?? null) : null,
+    categoryColor: s.categoryId
+      ? (categoryColorMap.get(s.categoryId) ?? null)
+      : null,
   }));
 
   // Total balance across all accounts
@@ -53,18 +65,30 @@ export default async function BudgetPage() {
     .groupBy(transactions.accountId)
     .all();
 
-  const totalBalance = balanceRows.reduce((sum, r) => sum + (r.balance ?? 0), 0);
+  const totalBalance = balanceRows.reduce(
+    (sum, r) => sum + (r.balance ?? 0),
+    0,
+  );
 
   // Generate occurrences for 90 days
   const occurrences = generateOccurrences(schedulesWithColor, today, end90);
 
   // Build balance points for chart
-  const balancePoints = buildBalancePoints(occurrences, totalBalance, today, end90);
+  const balancePoints = buildBalancePoints(
+    occurrences,
+    totalBalance,
+    today,
+    end90,
+  );
 
   // 30-day summary
   const occ30 = occurrences.filter((o) => o.date <= end30);
-  const income30 = occ30.filter((o) => o.amount > 0).reduce((s, o) => s + o.amount, 0);
-  const expense30 = occ30.filter((o) => o.amount < 0).reduce((s, o) => s + Math.abs(o.amount), 0);
+  const income30 = occ30
+    .filter((o) => o.amount > 0)
+    .reduce((s, o) => s + o.amount, 0);
+  const expense30 = occ30
+    .filter((o) => o.amount < 0)
+    .reduce((s, o) => s + Math.abs(o.amount), 0);
   const net30 = income30 - expense30;
 
   return (
@@ -85,7 +109,11 @@ export default async function BudgetPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold text-green-600">
-              ${income30.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              $
+              {income30.toLocaleString("en-AU", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
             <p className="text-xs text-muted-foreground">Next 30 days</p>
           </CardContent>
@@ -100,7 +128,11 @@ export default async function BudgetPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold text-red-600">
-              ${expense30.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              $
+              {expense30.toLocaleString("en-AU", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
             <p className="text-xs text-muted-foreground">Next 30 days</p>
           </CardContent>
@@ -114,9 +146,14 @@ export default async function BudgetPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-semibold ${net30 >= 0 ? "text-green-600" : "text-red-600"}`}>
+            <p
+              className={`text-2xl font-semibold ${net30 >= 0 ? "text-green-600" : "text-red-600"}`}
+            >
               {net30 >= 0 ? "+" : "-"}$
-              {Math.abs(net30).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {Math.abs(net30).toLocaleString("en-AU", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
             <p className="text-xs text-muted-foreground">Next 30 days</p>
           </CardContent>
@@ -134,7 +171,10 @@ export default async function BudgetPage() {
         <TabsContent value="overview" className="mt-4">
           <Card>
             <CardContent className="pt-6">
-              <CashFlowChart points={balancePoints} currentBalance={totalBalance} />
+              <CashFlowChart
+                points={balancePoints}
+                currentBalance={totalBalance}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -142,7 +182,10 @@ export default async function BudgetPage() {
         <TabsContent value="calendar" className="mt-4">
           <Card>
             <CardContent className="pt-6">
-              <BudgetCalendar occurrences={occurrences} accounts={allAccounts} />
+              <BudgetCalendar
+                occurrences={occurrences}
+                accounts={allAccounts}
+              />
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,17 +1,23 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { assignableCategoryError } from "@/lib/categories/assignable";
 import { db } from "@/lib/db";
 import { scheduledTransactions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/types";
-import { assignableCategoryError } from "@/lib/categories/assignable";
 
 const ScheduledSchema = z.object({
   name: z.string().min(1, "Name is required"),
   amount: z.coerce.number().refine((v) => v !== 0, "Amount must be non-zero"),
-  frequency: z.enum(["weekly", "fortnightly", "monthly", "quarterly", "yearly"]),
+  frequency: z.enum([
+    "weekly",
+    "fortnightly",
+    "monthly",
+    "quarterly",
+    "yearly",
+  ]),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
   endDate: z
     .string()
@@ -25,7 +31,7 @@ const ScheduledSchema = z.object({
 
 export async function createScheduledTransaction(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
   const rawAmount = formData.get("amount");
   const amountType = formData.get("amountType");
@@ -33,8 +39,8 @@ export async function createScheduledTransaction(
     rawAmount && amountType === "income"
       ? rawAmount
       : rawAmount
-      ? String(-Math.abs(Number(rawAmount)))
-      : rawAmount;
+        ? String(-Math.abs(Number(rawAmount)))
+        : rawAmount;
 
   const parsed = ScheduledSchema.safeParse({
     name: formData.get("name"),
@@ -51,12 +57,23 @@ export async function createScheduledTransaction(
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
     };
   }
 
-  const { name, amount, frequency, startDate, endDate, accountId, categoryId, notes } =
-    parsed.data;
+  const {
+    name,
+    amount,
+    frequency,
+    startDate,
+    endDate,
+    accountId,
+    categoryId,
+    notes,
+  } = parsed.data;
 
   const catErr = assignableCategoryError(categoryId);
   if (catErr) {
@@ -85,7 +102,7 @@ export async function createScheduledTransaction(
 export async function updateScheduledTransaction(
   id: number,
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult> {
   const rawAmount = formData.get("amount");
   const amountType = formData.get("amountType");
@@ -93,8 +110,8 @@ export async function updateScheduledTransaction(
     rawAmount && amountType === "income"
       ? rawAmount
       : rawAmount
-      ? String(-Math.abs(Number(rawAmount)))
-      : rawAmount;
+        ? String(-Math.abs(Number(rawAmount)))
+        : rawAmount;
 
   const parsed = ScheduledSchema.safeParse({
     name: formData.get("name"),
@@ -111,12 +128,23 @@ export async function updateScheduledTransaction(
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
     };
   }
 
-  const { name, amount, frequency, startDate, endDate, accountId, categoryId, notes } =
-    parsed.data;
+  const {
+    name,
+    amount,
+    frequency,
+    startDate,
+    endDate,
+    accountId,
+    categoryId,
+    notes,
+  } = parsed.data;
 
   const catErr = assignableCategoryError(categoryId);
   if (catErr) {
@@ -142,15 +170,19 @@ export async function updateScheduledTransaction(
   return { success: true, data: undefined };
 }
 
-export async function deleteScheduledTransaction(id: number): Promise<ActionResult> {
-  db.delete(scheduledTransactions).where(eq(scheduledTransactions.id, id)).run();
+export async function deleteScheduledTransaction(
+  id: number,
+): Promise<ActionResult> {
+  db.delete(scheduledTransactions)
+    .where(eq(scheduledTransactions.id, id))
+    .run();
   revalidatePath("/budget");
   return { success: true, data: undefined };
 }
 
 export async function toggleScheduledTransaction(
   id: number,
-  isActive: boolean
+  isActive: boolean,
 ): Promise<ActionResult> {
   db.update(scheduledTransactions)
     .set({ isActive, updatedAt: Math.floor(Date.now() / 1000) })

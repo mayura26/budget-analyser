@@ -2,8 +2,8 @@
  * Removes the SQLite database files, then runs the same init as the app
  * (migrations + seed). Stop `npm run dev` first so the files are not locked.
  */
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 
 async function main() {
   const dbPath =

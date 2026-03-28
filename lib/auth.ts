@@ -1,5 +1,5 @@
-import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+import { jwtVerify, SignJWT } from "jose";
 
 const COOKIE_NAME = "budget_session";
 const SESSION_DURATION_DAYS = 30;
@@ -16,7 +16,7 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(
   password: string,
-  hash: string
+  hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
@@ -32,7 +32,7 @@ export async function signSession(): Promise<string> {
 }
 
 export async function verifySession(
-  token: string
+  token: string,
 ): Promise<{ authenticated: boolean } | null> {
   try {
     const secret = getJwtSecret();

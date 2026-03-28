@@ -1,7 +1,7 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { categorisationRules } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 
 // Test-only endpoint: only available in non-production environments
 export async function DELETE() {
@@ -10,7 +10,9 @@ export async function DELETE() {
   }
 
   // Delete all user-defined categorisation rules (created by tests or users)
-  db.delete(categorisationRules).where(eq(categorisationRules.isUserDefined, true)).run();
+  db.delete(categorisationRules)
+    .where(eq(categorisationRules.isUserDefined, true))
+    .run();
 
   return NextResponse.json({ ok: true });
 }

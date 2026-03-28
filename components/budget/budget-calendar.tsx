@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { Occurrence, Account } from "@/types";
+import type { Account, Occurrence } from "@/types";
 
 interface Props {
   occurrences: Occurrence[];
@@ -21,19 +21,22 @@ function isoToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function buildCalendarDays(year: number, month: number): (string | null)[] {
+type CalendarCell = { key: string; dateStr: string | null };
+
+function buildCalendarDays(year: number, month: number): CalendarCell[] {
   // month is 0-indexed
   const firstDay = new Date(year, month, 1);
   // Monday = 0, Sunday = 6
-  let startOffset = (firstDay.getDay() + 6) % 7;
+  const startOffset = (firstDay.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (string | null)[] = [];
+  const cells: CalendarCell[] = [];
 
-  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let i = 0; i < startOffset; i++) {
+    cells.push({ key: `pad-${year}-${month}-${i}`, dateStr: null });
+  }
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(
-      `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-    );
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    cells.push({ key: dateStr, dateStr });
   }
   return cells;
 }
@@ -49,19 +52,23 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
   const occByDate = new Map<string, Occurrence[]>();
   for (const occ of occurrences) {
     if (!occByDate.has(occ.date)) occByDate.set(occ.date, []);
-    occByDate.get(occ.date)!.push(occ);
+    occByDate.get(occ.date)?.push(occ);
   }
 
   const cells = buildCalendarDays(year, month);
 
   function prevMonth() {
-    if (month === 0) { setYear(y => y - 1); setMonth(11); }
-    else setMonth(m => m - 1);
+    if (month === 0) {
+      setYear((y) => y - 1);
+      setMonth(11);
+    } else setMonth((m) => m - 1);
   }
 
   function nextMonth() {
-    if (month === 11) { setYear(y => y + 1); setMonth(0); }
-    else setMonth(m => m + 1);
+    if (month === 11) {
+      setYear((y) => y + 1);
+      setMonth(0);
+    } else setMonth((m) => m + 1);
   }
 
   const monthLabel = new Date(year, month, 1).toLocaleDateString("en-AU", {
@@ -91,9 +98,9 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
 
       {/* Day cells */}
       <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-        {cells.map((dateStr, idx) => {
+        {cells.map(({ key: cellKey, dateStr }) => {
           if (!dateStr) {
-            return <div key={`empty-${idx}`} className="bg-background min-h-20" />;
+            return <div key={cellKey} className="bg-background min-h-20" />;
           }
 
           const events = occByDate.get(dateStr) ?? [];
@@ -117,9 +124,9 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
                 </span>
               </div>
               <div className="mt-0.5 space-y-0.5 overflow-hidden">
-                {events.slice(0, 3).map((ev, i) => (
+                {events.slice(0, 3).map((ev) => (
                   <div
-                    key={i}
+                    key={`${ev.scheduleId}-${ev.name}-${ev.amount}-${dateStr}`}
                     className={`truncate text-xs rounded px-1 py-0.5 ${
                       ev.amount > 0
                         ? "bg-green-100 text-green-700"
@@ -149,18 +156,23 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
               </PopoverTrigger>
               <PopoverContent className="w-56 sm:w-64 p-3 space-y-2">
                 <p className="text-sm font-semibold">
-                  {new Date(dateStr + "T00:00:00").toLocaleDateString("en-AU", {
+                  {new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-AU", {
                     weekday: "short",
                     day: "numeric",
                     month: "short",
                   })}
                 </p>
-                {events.map((ev, i) => (
-                  <div key={i} className="text-sm space-y-0.5">
+                {events.map((ev) => (
+                  <div
+                    key={`${ev.scheduleId}-${ev.name}-${ev.amount}-${dateStr}`}
+                    className="text-sm space-y-0.5"
+                  >
                     <div className="flex justify-between items-center">
                       <span className="font-medium">{ev.name}</span>
                       <span
-                        className={ev.amount > 0 ? "text-green-600" : "text-red-600"}
+                        className={
+                          ev.amount > 0 ? "text-green-600" : "text-red-600"
+                        }
                       >
                         {ev.amount > 0 ? "+" : "-"}$
                         {Math.abs(ev.amount).toLocaleString("en-AU", {

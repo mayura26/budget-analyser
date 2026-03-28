@@ -1,9 +1,9 @@
-import { db } from "./index";
-import { categories, bankProfiles, accounts } from "./schema";
 import { and, eq, isNull } from "drizzle-orm";
-import { MAIN_GROUP_DEFAULTS, DEFAULT_SUBS } from "./category-taxonomy";
-import type { MainGroupName } from "./category-taxonomy";
 import { applySubcategoryTaxonomyAndColours } from "./category-hierarchy-migrate";
+import type { MainGroupName } from "./category-taxonomy";
+import { DEFAULT_SUBS, MAIN_GROUP_DEFAULTS } from "./category-taxonomy";
+import { db } from "./index";
+import { accounts, bankProfiles, categories } from "./schema";
 
 function ensureSystemCategories(): void {
   let inserted = false;
@@ -14,7 +14,9 @@ function ensureSystemCategories(): void {
       .where(and(eq(categories.name, main.name), isNull(categories.parentId)))
       .get();
     if (!exists) {
-      db.insert(categories).values({ ...main, parentId: null, isSystem: true }).run();
+      db.insert(categories)
+        .values({ ...main, parentId: null, isSystem: true })
+        .run();
       inserted = true;
     }
   }
@@ -35,14 +37,16 @@ function ensureSystemCategories(): void {
       .where(and(eq(categories.name, sub.name), eq(categories.parentId, pid)))
       .get();
     if (!exists) {
-      db.insert(categories).values({
-        name: sub.name,
-        icon: sub.icon,
-        type: sub.type,
-        parentId: pid,
-        color: sub.color,
-        isSystem: true,
-      }).run();
+      db.insert(categories)
+        .values({
+          name: sub.name,
+          icon: sub.icon,
+          type: sub.type,
+          parentId: pid,
+          color: sub.color,
+          isSystem: true,
+        })
+        .run();
       inserted = true;
     }
   }
@@ -110,14 +114,15 @@ export async function seedDatabase() {
   // Seed bank profiles and refresh built-in profile defaults by name.
   // First handle legacy rename ("Coles Amex" -> "Coles") before insert/update pass.
   const existingProfiles = db.select().from(bankProfiles).all();
-  const existingByName = new Map(existingProfiles.map((profile) => [profile.name, profile]));
+  const existingByName = new Map(
+    existingProfiles.map((profile) => [profile.name, profile]),
+  );
 
   const existingColesAmex = existingByName.get("Coles Amex");
   const existingColes = existingByName.get("Coles");
   const colesDefaults = DEFAULT_BANK_PROFILES.find((p) => p.name === "Coles");
-  if (existingColesAmex && existingColesAmex.isSystem && !existingColes && colesDefaults) {
-    db
-      .update(bankProfiles)
+  if (existingColesAmex?.isSystem && !existingColes && colesDefaults) {
+    db.update(bankProfiles)
       .set(colesDefaults)
       .where(eq(bankProfiles.id, existingColesAmex.id))
       .run();
@@ -126,7 +131,7 @@ export async function seedDatabase() {
   // Recompute snapshot after migration so insert/update pass is idempotent.
   const profilesAfterMigration = db.select().from(bankProfiles).all();
   const byNameAfterMigration = new Map(
-    profilesAfterMigration.map((profile) => [profile.name, profile])
+    profilesAfterMigration.map((profile) => [profile.name, profile]),
   );
   for (const profile of DEFAULT_BANK_PROFILES) {
     const existing = byNameAfterMigration.get(profile.name);
@@ -135,8 +140,7 @@ export async function seedDatabase() {
       continue;
     }
     if (existing.isSystem) {
-      db
-        .update(bankProfiles)
+      db.update(bankProfiles)
         .set(profile)
         .where(eq(bankProfiles.id, existing.id))
         .run();
@@ -153,8 +157,7 @@ export async function seedDatabase() {
   if (duplicateColes.length > 1) {
     const canonical = duplicateColes[0];
     for (const duplicate of duplicateColes.slice(1)) {
-      db
-        .update(accounts)
+      db.update(accounts)
         .set({ bankProfileId: canonical.id })
         .where(eq(accounts.bankProfileId, duplicate.id))
         .run();
@@ -173,8 +176,7 @@ export async function seedDatabase() {
     const legacyAmex = all.find((p) => norm(p.name) === "Coles Amex");
     if (!legacyAmex) break;
     if (colesTarget && legacyAmex.id !== colesTarget.id) {
-      db
-        .update(accounts)
+      db.update(accounts)
         .set({ bankProfileId: colesTarget.id })
         .where(eq(accounts.bankProfileId, legacyAmex.id))
         .run();
@@ -182,8 +184,7 @@ export async function seedDatabase() {
       continue;
     }
     if (!colesTarget && colesDefaults) {
-      db
-        .update(bankProfiles)
+      db.update(bankProfiles)
         .set(colesDefaults)
         .where(eq(bankProfiles.id, legacyAmex.id))
         .run();

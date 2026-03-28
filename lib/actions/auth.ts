@@ -3,7 +3,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { verifyPassword, signSession, COOKIE_NAME, SESSION_DURATION_DAYS } from "@/lib/auth";
+import {
+  COOKIE_NAME,
+  SESSION_DURATION_DAYS,
+  signSession,
+  verifyPassword,
+} from "@/lib/auth";
 import type { ActionResult } from "@/types";
 
 const LoginSchema = z.object({
@@ -12,7 +17,7 @@ const LoginSchema = z.object({
 
 export async function login(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult> {
   const parsed = LoginSchema.safeParse({
     password: formData.get("password"),
@@ -22,7 +27,10 @@ export async function login(
     return {
       success: false,
       error: "Invalid input",
-      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
     };
   }
 

@@ -1,10 +1,11 @@
+import fs from "node:fs";
+import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
-import path from "path";
-import fs from "fs";
 
-const dbPath = process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "budget.db");
+const dbPath =
+  process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "budget.db");
 
 // Ensure directory exists
 const dir = path.dirname(dbPath);

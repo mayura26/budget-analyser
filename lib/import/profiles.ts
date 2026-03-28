@@ -1,9 +1,6 @@
 import type { BankProfile } from "@/types";
 
-export type BankProfileTemplate = Omit<
-  BankProfile,
-  "id" | "createdAt"
->;
+export type BankProfileTemplate = Omit<BankProfile, "id" | "createdAt">;
 
 export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
   {
@@ -60,23 +57,29 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
 // Column aliases used for auto-detection
 export const COLUMN_ALIASES: Record<string, string[]> = {
   date: ["date", "transaction date", "trans date", "posted date"],
-  description: ["description", "name", "merchant", "payee", "memo", "details", "narrative"],
+  description: [
+    "description",
+    "name",
+    "merchant",
+    "payee",
+    "memo",
+    "details",
+    "narrative",
+  ],
   amount: ["amount", "value", "transaction amount"],
   debit: ["debit", "withdrawal", "debit amount", "money out"],
   credit: ["credit", "deposit", "credit amount", "money in"],
 };
 
 export function detectBankProfile(
-  headers: string[]
+  headers: string[],
 ): BankProfileTemplate | null {
   const lowerHeaders = headers.map((h) => h.toLowerCase().trim());
 
   for (const profile of BUILT_IN_PROFILES) {
-    const dateMatch = lowerHeaders.includes(
-      profile.dateColumn.toLowerCase()
-    );
+    const dateMatch = lowerHeaders.includes(profile.dateColumn.toLowerCase());
     const descMatch = lowerHeaders.includes(
-      profile.descriptionColumn.toLowerCase()
+      profile.descriptionColumn.toLowerCase(),
     );
     if (dateMatch && descMatch) {
       return profile;
@@ -86,10 +89,7 @@ export function detectBankProfile(
   return null;
 }
 
-export function parseDateToISO(
-  dateStr: string,
-  format: string
-): string | null {
+export function parseDateToISO(dateStr: string, format: string): string | null {
   try {
     if (format === "DD MMM YY" || format === "DD MMM YYYY") {
       const match = dateStr
@@ -140,17 +140,22 @@ export function parseDateToISO(
         year = parseInt(yearRaw, 10);
       }
 
-      if (isNaN(year) || day < 1 || day > 31 || month < 1 || month > 12) {
+      if (
+        Number.isNaN(year) ||
+        day < 1 ||
+        day > 31 ||
+        month < 1 ||
+        month > 12
+      ) {
         return null;
       }
 
-      return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(
-        2,
-        "0"
-      )}`;
+      return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(
+        day,
+      ).padStart(2, "0")}`;
     }
 
-    const parts = dateStr.trim().split(/[\/\-\.]/);
+    const parts = dateStr.trim().split(/[/\-.]/);
     if (parts.length !== 3) return null;
 
     let year: string, month: string, day: string;
@@ -166,10 +171,10 @@ export function parseDateToISO(
     }
 
     // Validate
-    const y = parseInt(year);
-    const m = parseInt(month);
-    const d = parseInt(day);
-    if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    const d = parseInt(day, 10);
+    if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
     if (m < 1 || m > 12 || d < 1 || d > 31) return null;
 
     return `${year.padStart(4, "0")}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;

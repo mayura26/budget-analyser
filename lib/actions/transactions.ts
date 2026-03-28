@@ -1,21 +1,27 @@
 "use server";
 
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/lib/db";
-import { transactions, categorisationRules, categories, settings, accounts, accountGroups } from "@/lib/db/schema";
-import { eq, isNull, inArray, desc, sql, ne, and } from "drizzle-orm";
-import { normaliseDescription } from "@/lib/import/normaliser";
-import { generateFingerprint } from "@/lib/import/fingerprint";
-import { categoriseTransactions } from "@/lib/categorisation/engine";
-import { findMatchingRule } from "@/lib/categorisation/rule-matcher";
-import { categoriseWithAI } from "@/lib/categorisation/ai-client";
-import type { ActionResult, CategorisationRule, Category } from "@/types";
 import {
   assignableCategoryError,
   filterAssignableCategories,
   isAssignableCategoryId,
 } from "@/lib/categories/assignable";
+import { categoriseWithAI } from "@/lib/categorisation/ai-client";
+import { categoriseTransactions } from "@/lib/categorisation/engine";
+import { findMatchingRule } from "@/lib/categorisation/rule-matcher";
+import { db } from "@/lib/db";
+import {
+  accounts,
+  categories,
+  categorisationRules,
+  settings,
+  transactions,
+} from "@/lib/db/schema";
+import { generateFingerprint } from "@/lib/import/fingerprint";
+import { normaliseDescription } from "@/lib/import/normaliser";
+import type { ActionResult, CategorisationRule, Category } from "@/types";
 
 export type SuggestionRow = {
   transactionId: number;
@@ -30,7 +36,6 @@ export type SuggestionRow = {
   confidence: number;
 };
 
-
 const ManualTransactionSchema = z.object({
   accountId: z.coerce.number(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -43,7 +48,7 @@ const ManualTransactionSchema = z.object({
 
 export async function createManualTransaction(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
   const parsed = ManualTransactionSchema.safeParse({
     accountId: formData.get("accountId"),
@@ -56,33 +61,50 @@ export async function createManualTransaction(
   });
 
   if (!parsed.success) {
-    return { success: false, error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]> };
+    return {
+      success: false,
+      error: "Validation failed",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
+    };
   }
 
-  const { accountId, date, description, amount, categoryId, notes, tags } = parsed.data;
+  const { accountId, date, description, amount, categoryId, notes, tags } =
+    parsed.data;
   const catErr = assignableCategoryError(categoryId);
   if (catErr) {
     return { success: false, error: catErr };
   }
   const normalised = normaliseDescription(description);
   const fingerprint = generateFingerprint(accountId, date, amount, normalised);
-  const tagsArray = tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
+  const tagsArray = tags
+    ? tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];
 
   try {
-    const result = db.insert(transactions).values({
-      accountId,
-      date,
-      description,
-      normalised,
-      fingerprint,
-      amount,
-      categoryId: categoryId ?? null,
-      categorySource: categoryId ? "manual" : null,
-      notes: notes ?? null,
-      tags: JSON.stringify(tagsArray),
-      isManual: true,
-      categoryConfirmed: Boolean(categoryId),
-    }).returning({ id: transactions.id }).get();
+    const result = db
+      .insert(transactions)
+      .values({
+        accountId,
+        date,
+        description,
+        normalised,
+        fingerprint,
+        amount,
+        categoryId: categoryId ?? null,
+        categorySource: categoryId ? "manual" : null,
+        notes: notes ?? null,
+        tags: JSON.stringify(tagsArray),
+        isManual: true,
+        categoryConfirmed: Boolean(categoryId),
+      })
+      .returning({ id: transactions.id })
+      .get();
 
     if (!categoryId) {
       await categoriseTransactions([result.id]);
@@ -93,7 +115,10 @@ export async function createManualTransaction(
     return { success: true, data: { id: result.id } };
   } catch (err: unknown) {
     if (err instanceof Error && err.message?.includes("UNIQUE")) {
-      return { success: false, error: "A transaction with the same details already exists" };
+      return {
+        success: false,
+        error: "A transaction with the same details already exists",
+      };
     }
     throw err;
   }
@@ -102,9 +127,13 @@ export async function createManualTransaction(
 export async function updateTransactionCategory(
   transactionId: number,
   categoryId: number | null,
-  createRule = false
+  createRule = false,
 ): Promise<ActionResult> {
-  const txn = db.select().from(transactions).where(eq(transactions.id, transactionId)).get();
+  const txn = db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.id, transactionId))
+    .get();
   if (!txn) return { success: false, error: "Transaction not found" };
 
   const catErr = assignableCategoryError(categoryId);
@@ -138,14 +167,16 @@ export async function updateTransactionCategory(
     const tokens = txn.normalised.split(/\s+/).filter((t) => t.length > 2);
     if (tokens.length > 0) {
       const pattern = tokens[0];
-      db.insert(categorisationRules).values({
-        categoryId,
-        pattern,
-        patternType: "keyword",
-        priority: 10,
-        confidence: 0.9,
-        isUserDefined: true,
-      }).run();
+      db.insert(categorisationRules)
+        .values({
+          categoryId,
+          pattern,
+          patternType: "keyword",
+          priority: 10,
+          confidence: 0.9,
+          isUserDefined: true,
+        })
+        .run();
     }
   }
 
@@ -156,9 +187,13 @@ export async function updateTransactionCategory(
 
 export async function setTransactionCategoryConfirmed(
   transactionId: number,
-  confirmed: boolean
+  confirmed: boolean,
 ): Promise<ActionResult> {
-  const txn = db.select().from(transactions).where(eq(transactions.id, transactionId)).get();
+  const txn = db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.id, transactionId))
+    .get();
   if (!txn) return { success: false, error: "Transaction not found" };
   if (txn.categoryId === null && confirmed) {
     return { success: false, error: "Cannot confirm without a category" };
@@ -207,7 +242,9 @@ export async function deleteTransaction(id: number): Promise<ActionResult> {
   return { success: true, data: undefined };
 }
 
-export async function recategoriseUncategorised(): Promise<ActionResult<{ count: number }>> {
+export async function recategoriseUncategorised(): Promise<
+  ActionResult<{ count: number }>
+> {
   const uncategorised = db
     .select({ id: transactions.id })
     .from(transactions)
@@ -224,7 +261,9 @@ export async function recategoriseUncategorised(): Promise<ActionResult<{ count:
   return { success: true, data: { count: ids.length } };
 }
 
-export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>> {
+export async function getAISuggestions(): Promise<
+  ActionResult<SuggestionRow[]>
+> {
   const uncategorised = db
     .select({
       id: transactions.id,
@@ -281,15 +320,25 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (apiKey) {
-      const modelSetting = db.select().from(settings).where(eq(settings.key, "openai_model")).get();
+      const modelSetting = db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, "openai_model"))
+        .get();
       const model = modelSetting?.value ?? "gpt-4o-mini";
 
       try {
         const aiResults = await categoriseWithAI(
-          needsAI.map((t) => ({ id: t.id, normalised: t.normalised, amount: t.amount, date: t.date, accountName: t.accountName })),
+          needsAI.map((t) => ({
+            id: t.id,
+            normalised: t.normalised,
+            amount: t.amount,
+            date: t.date,
+            accountName: t.accountName,
+          })),
           assignableForAi,
           apiKey,
-          model
+          model,
         );
 
         const aiMap = new Map(aiResults.map((r) => [r.transactionId, r]));
@@ -297,7 +346,9 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
         for (const txn of needsAI) {
           const ai = aiMap.get(txn.id);
           const aiCat =
-            ai?.categoryId != null && isAssignableCategoryId(ai.categoryId) ? ai.categoryId : null;
+            ai?.categoryId != null && isAssignableCategoryId(ai.categoryId)
+              ? ai.categoryId
+              : null;
           suggestions.push({
             transactionId: txn.id,
             date: txn.date,
@@ -349,9 +400,12 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
   return { success: true, data: suggestions };
 }
 
-
 export async function applyCategorisations(
-  updates: { transactionId: number; categoryId: number; source: "rule" | "ai" | "none" }[]
+  updates: {
+    transactionId: number;
+    categoryId: number;
+    source: "rule" | "ai" | "none";
+  }[],
 ): Promise<ActionResult<{ applied: number }>> {
   const now = Math.floor(Date.now() / 1000);
   let applied = 0;
@@ -405,7 +459,9 @@ export type UncategorisedTransaction = {
   accountName: string;
 };
 
-export async function getUncategorisedTransactions(): Promise<ActionResult<UncategorisedTransaction[]>> {
+export async function getUncategorisedTransactions(): Promise<
+  ActionResult<UncategorisedTransaction[]>
+> {
   const rows = db
     .select({
       id: transactions.id,
@@ -436,7 +492,7 @@ export type TransferCandidate = {
 };
 
 export async function findTransferCandidates(
-  transactionId: number
+  transactionId: number,
 ): Promise<ActionResult<TransferCandidate[]>> {
   const source = db
     .select({
@@ -472,8 +528,8 @@ export async function findTransferCandidates(
         isNull(transactions.linkedTransactionId),
         sql`ABS(${transactions.amount}) = ABS(${source.amount})`,
         sql`SIGN(${transactions.amount}) != SIGN(${source.amount})`,
-        sql`julianday(${transactions.date}) BETWEEN julianday(${source.date}) - 2 AND julianday(${source.date}) + 2`
-      )
+        sql`julianday(${transactions.date}) BETWEEN julianday(${source.date}) - 2 AND julianday(${source.date}) + 2`,
+      ),
     )
     .limit(10)
     .all();
@@ -499,7 +555,7 @@ export async function findTransferCandidates(
 
 export async function linkTransactions(
   idA: number,
-  idB: number
+  idB: number,
 ): Promise<ActionResult> {
   if (idA === idB) {
     return { success: false, error: "Cannot link a transaction to itself" };
@@ -559,8 +615,11 @@ export async function linkTransactions(
   const mergedCategoryId = rowA.categoryId ?? rowB.categoryId ?? null;
   if (mergedCategoryId != null) {
     const preferA = rowA.categoryId != null;
-    const mergedSource = (preferA ? rowA.categorySource : rowB.categorySource) ?? "manual";
-    const mergedConfirmed = preferA ? rowA.categoryConfirmed : rowB.categoryConfirmed;
+    const mergedSource =
+      (preferA ? rowA.categorySource : rowB.categorySource) ?? "manual";
+    const mergedConfirmed = preferA
+      ? rowA.categoryConfirmed
+      : rowB.categoryConfirmed;
     const alignPair = {
       categoryId: mergedCategoryId,
       categorySource: mergedSource,

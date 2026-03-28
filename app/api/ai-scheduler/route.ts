@@ -1,8 +1,13 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { transactions, settings, categories, scheduledTransactions } from "@/lib/db/schema";
 import { eq, gte } from "drizzle-orm";
+import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { db } from "@/lib/db";
+import {
+  categories,
+  scheduledTransactions,
+  settings,
+  transactions,
+} from "@/lib/db/schema";
 
 function isOpenAIReasoningChatModel(model: string): boolean {
   const m = model.toLowerCase();
@@ -28,7 +33,10 @@ export async function POST() {
     .get();
 
   if (!apiKeySetting?.value) {
-    return NextResponse.json({ error: "No API key configured" }, { status: 400 });
+    return NextResponse.json(
+      { error: "No API key configured" },
+      { status: 400 },
+    );
   }
 
   const modelSetting = db
@@ -46,7 +54,7 @@ export async function POST() {
 
   const allCategories = db.select().from(categories).all();
   const transferCategoryIds = new Set(
-    allCategories.filter((c) => c.type === "transfer").map((c) => c.id)
+    allCategories.filter((c) => c.type === "transfer").map((c) => c.id),
   );
   const categoryMap = new Map(allCategories.map((c) => [c.id, c]));
 
@@ -60,20 +68,26 @@ export async function POST() {
   // Group by normalised description
   const groups = new Map<
     string,
-    { description: string; categoryId: number | null; amounts: number[]; dates: string[] }
+    {
+      description: string;
+      categoryId: number | null;
+      amounts: number[];
+      dates: string[];
+    }
   >();
 
   for (const txn of rawTxns) {
     const key = txn.normalised;
-    if (!groups.has(key)) {
-      groups.set(key, {
+    let g = groups.get(key);
+    if (!g) {
+      g = {
         description: txn.normalised,
         categoryId: txn.categoryId ?? null,
         amounts: [],
         dates: [],
-      });
+      };
+      groups.set(key, g);
     }
-    const g = groups.get(key)!;
     g.amounts.push(txn.amount);
     g.dates.push(txn.date);
     // Use most recent category
@@ -87,7 +101,7 @@ export async function POST() {
     .map((g) => {
       const sortedDates = [...g.dates].sort();
       const avgAmount = g.amounts.reduce((a, b) => a + b, 0) / g.amounts.length;
-      const days = sortedDates.map((d) => parseInt(d.slice(8, 10)));
+      const days = sortedDates.map((d) => parseInt(d.slice(8, 10), 10));
       const avgDay = Math.round(days.reduce((a, b) => a + b, 0) / days.length);
       const category = g.categoryId ? categoryMap.get(g.categoryId) : null;
       return {
@@ -119,7 +133,7 @@ Transaction groups (description | category | occurrences | avg_amount | dates | 
 ${recurring
   .map(
     (g) =>
-      `- "${g.description}" | ${g.categoryName ?? "Not processed"} | ${g.occurrences}x | AUD ${g.avgAmount.toFixed(2)} | [${g.dates.join(", ")}] | avg day ${g.avgDayOfMonth}`
+      `- "${g.description}" | ${g.categoryName ?? "Not processed"} | ${g.occurrences}x | AUD ${g.avgAmount.toFixed(2)} | [${g.dates.join(", ")}] | avg day ${g.avgDayOfMonth}`,
   )
   .join("\n")}
 
@@ -145,14 +159,18 @@ Only return the JSON object, no other text.`;
     model,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    ...(reasoning ? { reasoning_effort: "medium" as const } : { temperature: 0.1 }),
+    ...(reasoning
+      ? { reasoning_effort: "medium" as const }
+      : { temperature: 0.1 }),
   });
 
   const content = response.choices[0]?.message?.content ?? "{}";
 
   try {
     const parsed = JSON.parse(content);
-    const suggestions = Array.isArray(parsed) ? parsed : (parsed.suggestions ?? []);
+    const suggestions = Array.isArray(parsed)
+      ? parsed
+      : (parsed.suggestions ?? []);
     return NextResponse.json({ suggestions });
   } catch {
     return NextResponse.json({ suggestions: [] });

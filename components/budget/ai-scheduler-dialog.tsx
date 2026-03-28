@@ -1,15 +1,15 @@
 "use client";
 
+import { Check, Loader2, Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Sparkles, Check, Loader2 } from "lucide-react";
 import { addAIScheduleSuggestion } from "@/lib/actions/scheduled";
 import type { Category } from "@/types";
 
@@ -31,6 +31,10 @@ const FREQ_LABELS: Record<string, string> = {
   yearly: "Yearly",
 };
 
+function suggestionKey(s: Suggestion): string {
+  return `${s.name}|${s.frequency}|${s.amount}|${s.startDate}|${s.reasoning}`;
+}
+
 interface Props {
   categories: Category[];
 }
@@ -40,7 +44,7 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [added, setAdded] = useState<Set<number>>(new Set());
+  const [added, setAdded] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
 
   async function handleOpen() {
@@ -54,7 +58,10 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
       const res = await fetch("/api/ai-scheduler", { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (data.error === "AI not enabled" || data.error === "No API key configured") {
+        if (
+          data.error === "AI not enabled" ||
+          data.error === "No API key configured"
+        ) {
           setError("Enable AI in Settings to use this feature.");
         } else {
           setError("Something went wrong. Please try again.");
@@ -70,7 +77,8 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
     }
   }
 
-  function handleAdd(index: number, suggestion: Suggestion) {
+  function handleAdd(suggestion: Suggestion) {
+    const key = suggestionKey(suggestion);
     startTransition(async () => {
       await addAIScheduleSuggestion({
         name: suggestion.name,
@@ -79,7 +87,7 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
         startDate: suggestion.startDate,
         categoryId: suggestion.categoryId,
       });
-      setAdded((prev) => new Set(prev).add(index));
+      setAdded((prev) => new Set(prev).add(key));
     });
   }
 
@@ -121,14 +129,17 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
           {!loading && !error && suggestions.length > 0 && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                {suggestions.length} recurring pattern{suggestions.length !== 1 ? "s" : ""} detected — click to add any to your schedule.
+                {suggestions.length} recurring pattern
+                {suggestions.length !== 1 ? "s" : ""} detected — click to add
+                any to your schedule.
               </p>
-              {suggestions.map((s, i) => {
-                const isAdded = added.has(i);
+              {suggestions.map((s) => {
+                const key = suggestionKey(s);
+                const isAdded = added.has(key);
                 const isIncome = s.amount > 0;
                 return (
                   <div
-                    key={i}
+                    key={key}
                     className={`rounded-lg border p-4 space-y-2 transition-opacity ${isAdded ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -151,7 +162,9 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
                       </span>
                     </div>
 
-                    <p className="text-xs text-muted-foreground">{s.reasoning}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.reasoning}
+                    </p>
 
                     <div className="flex items-center justify-between pt-1">
                       <p className="text-xs text-muted-foreground">
@@ -161,7 +174,7 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
                         size="sm"
                         variant={isAdded ? "ghost" : "default"}
                         disabled={isAdded}
-                        onClick={() => handleAdd(i, s)}
+                        onClick={() => handleAdd(s)}
                         className="h-7 text-xs"
                       >
                         {isAdded ? (

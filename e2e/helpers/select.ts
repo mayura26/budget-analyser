@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator, Page } from "@playwright/test";
 
 export async function selectOption(
   page: Page,
@@ -6,5 +6,5 @@ export async function selectOption(
   optionName: string,
 ) {
   await triggerLocator.click();
-  await page.getByRole('option', { name: optionName }).click();
+  await page.getByRole("option", { name: optionName }).click();
 }

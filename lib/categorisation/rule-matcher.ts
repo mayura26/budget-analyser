@@ -8,7 +8,7 @@ export type MatchResult = {
 
 export function matchRule(
   normalised: string,
-  rule: CategorisationRule
+  rule: CategorisationRule,
 ): boolean {
   switch (rule.patternType) {
     case "exact":
@@ -28,7 +28,7 @@ export function matchRule(
 
 export function findMatchingRule(
   normalised: string,
-  rules: CategorisationRule[]
+  rules: CategorisationRule[],
 ): MatchResult | null {
   // Rules are pre-sorted by priority DESC
   for (const rule of rules) {

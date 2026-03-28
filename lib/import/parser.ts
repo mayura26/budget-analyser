@@ -1,6 +1,5 @@
 import Papa from "papaparse";
-import type { BankProfile } from "@/types";
-import type { ParsedRow } from "@/types";
+import type { BankProfile, ParsedRow } from "@/types";
 import { parseDateToISO } from "./profiles";
 
 export type ColumnMapping = {
@@ -67,7 +66,7 @@ export type ParseResult = {
 
 export function parseCSV(
   csvContent: string,
-  mapping: ColumnMapping
+  mapping: ColumnMapping,
 ): ParseResult {
   const errors: string[] = [];
 
@@ -113,7 +112,7 @@ export function parseCSV(
       if (amountIdx !== undefined && row[amountIdx] !== undefined) {
         const raw = normaliseAmount(row[amountIdx]);
         amount = parseFloat(raw);
-        if (isNaN(amount)) {
+        if (Number.isNaN(amount)) {
           errors.push(`Invalid amount "${raw}" in row ${i + 1}`);
           continue;
         }
@@ -142,7 +141,9 @@ export function parseCSV(
         date,
         description: desc,
         amount,
-        rawRow: Object.fromEntries(row.map((value, idx) => [`col${idx}`, value])),
+        rawRow: Object.fromEntries(
+          row.map((value, idx) => [`col${idx}`, value]),
+        ),
       });
     }
 
@@ -185,7 +186,7 @@ export function parseCSV(
     if (mapping.amountColumn && row[mapping.amountColumn] !== undefined) {
       const raw = normaliseAmount(row[mapping.amountColumn]);
       amount = parseFloat(raw);
-      if (isNaN(amount)) {
+      if (Number.isNaN(amount)) {
         errors.push(`Invalid amount "${raw}" in row ${i + 1}`);
         continue;
       }

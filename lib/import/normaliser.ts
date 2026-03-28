@@ -10,13 +10,13 @@ export function normaliseDescription(description: string): string {
   let s = description.toUpperCase();
 
   // Strip trailing reference codes after " : " or " - "
-  s = s.replace(/\s+[:\-]\s+[A-Z0-9#*\/]+$/, "");
+  s = s.replace(/\s+[:-]\s+[A-Z0-9#*/]+$/, "");
 
   // Strip embedded date patterns like 12/03 or JAN 12
   s = s.replace(/\b\d{1,2}\/\d{1,2}\b/g, "");
   s = s.replace(
     /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2}\b/gi,
-    ""
+    "",
   );
 
   // Strip card/terminal numbers (5+ consecutive digits)

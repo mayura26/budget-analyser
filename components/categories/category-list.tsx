@@ -71,7 +71,7 @@ export function CategoryList({
     for (const c of categories) {
       if (c.parentId == null) continue;
       if (!map.has(c.parentId)) map.set(c.parentId, []);
-      map.get(c.parentId)!.push(c);
+      map.get(c.parentId)?.push(c);
     }
     for (const arr of map.values()) {
       arr.sort((a, b) => a.name.localeCompare(b.name));
@@ -172,6 +172,8 @@ export function CategoryList({
                                 className="text-[10px] shrink-0"
                               />
                             </div>
+                            {/* biome-ignore lint/a11y/noStaticElementInteractions: stop row expand when interacting with rule actions */}
+                            {/* biome-ignore lint/a11y/useKeyWithClickEvents: paired with actionable controls inside */}
                             <div
                               className="flex shrink-0 items-center gap-1"
                               onClick={(e) => e.stopPropagation()}

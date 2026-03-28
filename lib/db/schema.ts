@@ -1,19 +1,17 @@
 import { sql } from "drizzle-orm";
 import {
+  index,
   integer,
   real,
   sqliteTable,
   text,
   uniqueIndex,
-  index,
 } from "drizzle-orm/sqlite-core";
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value"),
-  updatedAt: integer("updated_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
 });
 
 export const bankProfiles = sqliteTable("bank_profiles", {
@@ -32,18 +30,14 @@ export const bankProfiles = sqliteTable("bank_profiles", {
     .default(true),
   extraMappings: text("extra_mappings"), // JSON
   isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
 });
 
 export const accountGroups = sqliteTable("account_groups", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   color: text("color").notNull().default("#6366f1"),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
 });
 
 export const accounts = sqliteTable("accounts", {
@@ -58,9 +52,7 @@ export const accounts = sqliteTable("accounts", {
   colorCustom: integer("color_custom", { mode: "boolean" })
     .notNull()
     .default(false),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
 });
 
 export const categories = sqliteTable("categories", {
@@ -74,9 +66,7 @@ export const categories = sqliteTable("categories", {
     .notNull()
     .default("expense"),
   isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
 });
 
 export const categorisationRules = sqliteTable("categorisation_rules", {
@@ -95,12 +85,8 @@ export const categorisationRules = sqliteTable("categorisation_rules", {
   isUserDefined: integer("is_user_defined", { mode: "boolean" })
     .notNull()
     .default(false),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
 });
 
 export const importBatches = sqliteTable("import_batches", {
@@ -109,9 +95,7 @@ export const importBatches = sqliteTable("import_batches", {
     .notNull()
     .references(() => accounts.id, { onDelete: "cascade" }),
   filename: text("filename").notNull(),
-  importedAt: integer("imported_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
+  importedAt: integer("imported_at").notNull().default(sql`(unixepoch())`),
   rowCount: integer("row_count").notNull().default(0),
   importedCount: integer("imported_count").notNull().default(0),
   skippedCount: integer("skipped_count").notNull().default(0),
@@ -126,8 +110,12 @@ export const scheduledTransactions = sqliteTable("scheduled_transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   amount: real("amount").notNull(),
-  accountId: integer("account_id").references(() => accounts.id, { onDelete: "cascade" }),
-  categoryId: integer("category_id").references(() => categories.id, { onDelete: "set null" }),
+  accountId: integer("account_id").references(() => accounts.id, {
+    onDelete: "cascade",
+  }),
+  categoryId: integer("category_id").references(() => categories.id, {
+    onDelete: "set null",
+  }),
   frequency: text("frequency", {
     enum: ["weekly", "fortnightly", "monthly", "quarterly", "yearly"],
   }).notNull(),
@@ -148,7 +136,7 @@ export const transactions = sqliteTable(
       .references(() => accounts.id, { onDelete: "cascade" }),
     importBatchId: integer("import_batch_id").references(
       () => importBatches.id,
-      { onDelete: "set null" }
+      { onDelete: "set null" },
     ),
     fingerprint: text("fingerprint").notNull(),
     date: text("date").notNull(), // YYYY-MM-DD
@@ -164,26 +152,24 @@ export const transactions = sqliteTable(
     confidence: real("confidence"),
     notes: text("notes"),
     tags: text("tags").default("[]"), // JSON array
-    isManual: integer("is_manual", { mode: "boolean" }).notNull().default(false),
+    isManual: integer("is_manual", { mode: "boolean" })
+      .notNull()
+      .default(false),
     categoryConfirmed: integer("category_confirmed", { mode: "boolean" })
       .notNull()
       .default(true),
     linkedTransactionId: integer("linked_transaction_id"),
-    createdAt: integer("created_at")
-      .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer("updated_at")
-      .notNull()
-      .default(sql`(unixepoch())`),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
   },
   (table) => [
     uniqueIndex("transactions_account_fingerprint").on(
       table.accountId,
-      table.fingerprint
+      table.fingerprint,
     ),
     index("transactions_date_idx").on(table.date),
     index("transactions_account_idx").on(table.accountId),
     index("transactions_category_idx").on(table.categoryId),
     index("transactions_linked_idx").on(table.linkedTransactionId),
-  ]
+  ],
 );

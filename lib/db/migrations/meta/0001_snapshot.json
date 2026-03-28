@@ -59,12 +59,8 @@
           "name": "accounts_bank_profile_id_bank_profiles_id_fk",
           "tableFrom": "accounts",
           "tableTo": "bank_profiles",
-          "columnsFrom": [
-            "bank_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bank_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -335,12 +331,8 @@
           "name": "categorisation_rules_category_id_categories_id_fk",
           "tableFrom": "categorisation_rules",
           "tableTo": "categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -434,12 +426,8 @@
           "name": "import_batches_account_id_accounts_id_fk",
           "tableFrom": "import_batches",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -545,12 +533,8 @@
           "name": "scheduled_transactions_account_id_accounts_id_fk",
           "tableFrom": "scheduled_transactions",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -558,12 +542,8 @@
           "name": "scheduled_transactions_category_id_categories_id_fk",
           "tableFrom": "scheduled_transactions",
           "tableTo": "categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -727,31 +707,22 @@
       "indexes": {
         "transactions_account_fingerprint": {
           "name": "transactions_account_fingerprint",
-          "columns": [
-            "account_id",
-            "fingerprint"
-          ],
+          "columns": ["account_id", "fingerprint"],
           "isUnique": true
         },
         "transactions_date_idx": {
           "name": "transactions_date_idx",
-          "columns": [
-            "date"
-          ],
+          "columns": ["date"],
           "isUnique": false
         },
         "transactions_account_idx": {
           "name": "transactions_account_idx",
-          "columns": [
-            "account_id"
-          ],
+          "columns": ["account_id"],
           "isUnique": false
         },
         "transactions_category_idx": {
           "name": "transactions_category_idx",
-          "columns": [
-            "category_id"
-          ],
+          "columns": ["category_id"],
           "isUnique": false
         }
       },
@@ -760,12 +731,8 @@
           "name": "transactions_account_id_accounts_id_fk",
           "tableFrom": "transactions",
           "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -773,12 +740,8 @@
           "name": "transactions_import_batch_id_import_batches_id_fk",
           "tableFrom": "transactions",
           "tableTo": "import_batches",
-          "columnsFrom": [
-            "import_batch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["import_batch_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -786,12 +749,8 @@
           "name": "transactions_category_id_categories_id_fk",
           "tableFrom": "transactions",
           "tableTo": "categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

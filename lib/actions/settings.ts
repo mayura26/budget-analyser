@@ -1,10 +1,10 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { settings, bankProfiles } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { bankProfiles, settings } from "@/lib/db/schema";
 import type { ActionResult } from "@/types";
 
 const SettingsSchema = z.object({
@@ -14,10 +14,10 @@ const SettingsSchema = z.object({
 
 export async function saveSettings(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult> {
   const data = {
-    openai_model: formData.get("openai_model") as string || "gpt-4o-mini",
+    openai_model: (formData.get("openai_model") as string) || "gpt-4o-mini",
     ai_enabled: (formData.get("ai_enabled") as string) || "false",
   };
 
@@ -29,10 +29,17 @@ export async function saveSettings(
   for (const [key, value] of Object.entries(parsed.data)) {
     if (value !== undefined) {
       db.insert(settings)
-        .values({ key, value: String(value), updatedAt: Math.floor(Date.now() / 1000) })
+        .values({
+          key,
+          value: String(value),
+          updatedAt: Math.floor(Date.now() / 1000),
+        })
         .onConflictDoUpdate({
           target: settings.key,
-          set: { value: String(value), updatedAt: Math.floor(Date.now() / 1000) },
+          set: {
+            value: String(value),
+            updatedAt: Math.floor(Date.now() / 1000),
+          },
         })
         .run();
     }
@@ -62,7 +69,7 @@ const BankProfileSchema = z.object({
 
 export async function createBankProfile(
   _prev: ActionResult | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
   const parsed = BankProfileSchema.safeParse({
     name: formData.get("name"),
@@ -78,16 +85,31 @@ export async function createBankProfile(
   });
 
   if (!parsed.success) {
-    return { success: false, error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]> };
+    return {
+      success: false,
+      error: "Validation failed",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[]
+      >,
+    };
   }
 
-  const result = db.insert(bankProfiles).values(parsed.data).returning({ id: bankProfiles.id }).get();
+  const result = db
+    .insert(bankProfiles)
+    .values(parsed.data)
+    .returning({ id: bankProfiles.id })
+    .get();
   revalidatePath("/settings");
   return { success: true, data: { id: result.id } };
 }
 
 export async function deleteBankProfile(id: number): Promise<ActionResult> {
-  const profile = db.select().from(bankProfiles).where(eq(bankProfiles.id, id)).get();
+  const profile = db
+    .select()
+    .from(bankProfiles)
+    .where(eq(bankProfiles.id, id))
+    .get();
   if (profile?.isSystem) {
     return { success: false, error: "Cannot delete built-in bank profile" };
   }

@@ -27,7 +27,7 @@ export function CategoryTypeBadge({
       className={cn(
         "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         STYLES[type],
-        className
+        className,
       )}
     >
       {LABELS[type]}

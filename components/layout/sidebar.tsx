@@ -1,30 +1,30 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
   ArrowDownUp,
-  Upload,
-  CreditCard,
-  Tag,
-  Settings,
-  LogOut,
   CalendarDays,
+  CreditCard,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  Tag,
+  Upload,
 } from "lucide-react";
-import { logout } from "@/lib/actions/auth";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import iconSrc from "@/app/icon.png";
+import { logout } from "@/lib/actions/auth";
+import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/budget",       label: "Budget",       icon: CalendarDays },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/budget", label: "Budget", icon: CalendarDays },
   { href: "/transactions", label: "Transactions", icon: ArrowDownUp },
-  { href: "/import",       label: "Import",       icon: Upload },
-  { href: "/accounts",     label: "Accounts",     icon: CreditCard },
-  { href: "/categories",   label: "Categories",   icon: Tag },
-  { href: "/settings",     label: "Settings",     icon: Settings },
+  { href: "/import", label: "Import", icon: Upload },
+  { href: "/accounts", label: "Accounts", icon: CreditCard },
+  { href: "/categories", label: "Categories", icon: Tag },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -58,7 +58,7 @@ export function Sidebar() {
                 "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors relative",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-0.5 before:rounded-full before:bg-sidebar-accent-foreground"
-                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />

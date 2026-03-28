@@ -18,7 +18,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Budget Analyser",
-  description: "Track your income, expenses, and savings with a personal budget analyser.",
+  description:
+    "Track your income, expenses, and savings with a personal budget analyser.",
   manifest: "/manifest.json",
   icons: {
     icon: [{ url: "/icon1.png", type: "image/png" }],

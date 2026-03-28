@@ -120,6 +120,7 @@ export function TransactionTable({
     col.accessor("date", {
       header: ({ column }) => (
         <button
+          type="button"
           className="flex items-center gap-1 text-xs font-medium"
           onClick={() => column.toggleSorting()}
         >
@@ -209,6 +210,7 @@ export function TransactionTable({
     col.accessor("amount", {
       header: ({ column }) => (
         <button
+          type="button"
           className="flex items-center gap-1 text-xs font-medium ml-auto"
           onClick={() => column.toggleSorting()}
         >
@@ -644,6 +646,7 @@ function DeleteCell({ transactionId }: { transactionId: number }) {
 
   return (
     <button
+      type="button"
       aria-label="Delete"
       data-testid="delete-transaction"
       onClick={() => setConfirming(true)}

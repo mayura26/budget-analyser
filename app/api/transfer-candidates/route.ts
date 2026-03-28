@@ -1,16 +1,19 @@
-import { NextResponse } from "next/server";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { transactions, accounts } from "@/lib/db/schema";
-import { eq, ne, isNull, and, sql } from "drizzle-orm";
+import { accounts, transactions } from "@/lib/db/schema";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get("transactionId");
   const transactionId = idParam ? parseInt(idParam, 10) : NaN;
 
-  if (isNaN(transactionId)) {
-    return NextResponse.json({ error: "Invalid transactionId" }, { status: 400 });
+  if (Number.isNaN(transactionId)) {
+    return NextResponse.json(
+      { error: "Invalid transactionId" },
+      { status: 400 },
+    );
   }
 
   const source = db
@@ -27,7 +30,10 @@ export async function GET(request: NextRequest) {
     .get();
 
   if (!source) {
-    return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Transaction not found" },
+      { status: 404 },
+    );
   }
 
   const candidates = db
@@ -48,8 +54,8 @@ export async function GET(request: NextRequest) {
         isNull(transactions.linkedTransactionId),
         sql`ABS(${transactions.amount}) = ABS(${source.amount})`,
         sql`SIGN(${transactions.amount}) != SIGN(${source.amount})`,
-        sql`julianday(${transactions.date}) BETWEEN julianday(${source.date}) - 2 AND julianday(${source.date}) + 2`
-      )
+        sql`julianday(${transactions.date}) BETWEEN julianday(${source.date}) - 2 AND julianday(${source.date}) + 2`,
+      ),
     )
     .limit(10)
     .all();

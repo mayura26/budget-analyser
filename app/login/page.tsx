@@ -1,12 +1,18 @@
 "use client";
 
+import { TrendingUp } from "lucide-react";
 import { useActionState } from "react";
-import { login } from "@/lib/actions/auth";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingUp } from "lucide-react";
+import { login } from "@/lib/actions/auth";
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, null);

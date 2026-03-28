@@ -1,16 +1,16 @@
 "use client";
 
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { ScheduleDialog } from "./schedule-dialog";
-import { AISchedulerDialog } from "./ai-scheduler-dialog";
+import { Button } from "@/components/ui/button";
 import {
   deleteScheduledTransaction,
   toggleScheduledTransaction,
 } from "@/lib/actions/scheduled";
-import type { ScheduledTransaction, Account, Category } from "@/types";
+import type { Account, Category, ScheduledTransaction } from "@/types";
+import { AISchedulerDialog } from "./ai-scheduler-dialog";
+import { ScheduleDialog } from "./schedule-dialog";
 
 interface Props {
   schedules: ScheduledTransaction[];
@@ -38,19 +38,22 @@ function nextOccurrenceDate(schedule: ScheduledTransaction): string {
   const freq = schedule.frequency;
   while (current < today) {
     if (freq === "weekly") {
-      const d = new Date(current + "T00:00:00");
+      const d = new Date(`${current}T00:00:00`);
       d.setDate(d.getDate() + 7);
       current = d.toISOString().slice(0, 10);
     } else if (freq === "fortnightly") {
-      const d = new Date(current + "T00:00:00");
+      const d = new Date(`${current}T00:00:00`);
       d.setDate(d.getDate() + 14);
       current = d.toISOString().slice(0, 10);
     } else {
       const [y, m, day] = current.split("-").map(Number);
-      const months =
-        freq === "monthly" ? 1 : freq === "quarterly" ? 3 : 12;
+      const months = freq === "monthly" ? 1 : freq === "quarterly" ? 3 : 12;
       const nd = new Date(y, m - 1 + months, 1);
-      const lastDay = new Date(nd.getFullYear(), nd.getMonth() + 1, 0).getDate();
+      const lastDay = new Date(
+        nd.getFullYear(),
+        nd.getMonth() + 1,
+        0,
+      ).getDate();
       const clampedDay = Math.min(day, lastDay);
       current = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, "0")}-${String(clampedDay).padStart(2, "0")}`;
     }
@@ -66,7 +69,9 @@ export function ScheduleList({
   aiEnabled = false,
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<ScheduledTransaction | null>(null);
+  const [editTarget, setEditTarget] = useState<ScheduledTransaction | null>(
+    null,
+  );
   const [, startTransition] = useTransition();
 
   const accountMap = new Map(accounts.map((a) => [a.id, a.name]));
@@ -151,6 +156,7 @@ export function ScheduleList({
 
                 <div className="flex items-center justify-between pt-1">
                   <button
+                    type="button"
                     className="text-xs text-muted-foreground underline underline-offset-2"
                     onClick={() => handleToggle(s.id, s.isActive)}
                   >

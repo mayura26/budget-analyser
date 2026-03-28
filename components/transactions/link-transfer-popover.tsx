@@ -1,21 +1,21 @@
 "use client";
 
+import { ArrowLeftRight, Link2Off, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  linkTransactions,
-  unlinkTransaction,
-  type TransferCandidate,
-} from "@/lib/actions/transactions";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  linkTransactions,
+  type TransferCandidate,
+  unlinkTransaction,
+} from "@/lib/actions/transactions";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ArrowLeftRight, Link2Off, Loader2 } from "lucide-react";
 
 export function LinkTransferPopover({
   transactionId,
@@ -26,7 +26,9 @@ export function LinkTransferPopover({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [candidates, setCandidates] = useState<TransferCandidate[] | null>(null);
+  const [candidates, setCandidates] = useState<TransferCandidate[] | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [linking, setLinking] = useState(false);
 
@@ -35,7 +37,9 @@ export function LinkTransferPopover({
     if (v && !linkedTransactionId) {
       setLoading(true);
       try {
-        const res = await fetch(`/api/transfer-candidates?transactionId=${transactionId}`);
+        const res = await fetch(
+          `/api/transfer-candidates?transactionId=${transactionId}`,
+        );
         const json = await res.json();
         setCandidates(res.ok ? (json.data as TransferCandidate[]) : []);
       } catch {
@@ -65,7 +69,11 @@ export function LinkTransferPopover({
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-green-600">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs gap-1 text-green-600"
+          >
             <ArrowLeftRight className="h-3 w-3" />
             Linked
           </Button>
@@ -96,7 +104,11 @@ export function LinkTransferPopover({
   return (
     <Popover open={open} onOpenChange={handleOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeftRight className="h-3 w-3" />
           Link
         </Button>
@@ -109,29 +121,41 @@ export function LinkTransferPopover({
           </div>
         ) : !candidates || candidates.length === 0 ? (
           <p className="text-xs text-muted-foreground py-2">
-            No matching transactions found. Looking for same amount, opposite sign, within ±2 days.
+            No matching transactions found. Looking for same amount, opposite
+            sign, within ±2 days.
           </p>
         ) : (
           <div className="space-y-1.5">
             {candidates.map((c) => (
               <button
+                type="button"
                 key={c.transactionId}
                 onClick={() => handleLink(c.transactionId)}
                 disabled={linking}
                 className="w-full text-left rounded border p-2 text-xs hover:bg-muted transition-colors disabled:opacity-50"
               >
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="font-medium truncate max-w-[140px]">{c.accountName}</span>
-                  <span className={c.amount < 0 ? "text-red-600" : "text-green-600"}>
-                    {c.amount < 0 ? "-" : "+"}{formatCurrency(c.amount)}
+                  <span className="font-medium truncate max-w-[140px]">
+                    {c.accountName}
+                  </span>
+                  <span
+                    className={c.amount < 0 ? "text-red-600" : "text-green-600"}
+                  >
+                    {c.amount < 0 ? "-" : "+"}
+                    {formatCurrency(c.amount)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span className="truncate max-w-[140px]">{c.description}</span>
+                  <span className="truncate max-w-[140px]">
+                    {c.description}
+                  </span>
                   <span>{formatDate(c.date)}</span>
                 </div>
                 {c.sameGroup && (
-                  <Badge variant="secondary" className="text-[10px] mt-1 px-1 py-0">
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] mt-1 px-1 py-0"
+                  >
                     Same bank
                   </Badge>
                 )}

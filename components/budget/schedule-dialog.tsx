@@ -76,13 +76,11 @@ export function ScheduleDialog({
       setAccountId("");
       setCategoryId("");
     }
-  }, [schedule, open]);
+  }, [schedule]);
 
-  const boundUpdate = schedule
+  const action = schedule
     ? updateScheduledTransaction.bind(null, schedule.id)
-    : null;
-
-  const action = isEdit ? boundUpdate! : createScheduledTransaction;
+    : createScheduledTransaction;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [state, formAction, pending] = useActionState<

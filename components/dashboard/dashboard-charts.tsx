@@ -1,21 +1,21 @@
 "use client";
 
 import {
-  ResponsiveContainer,
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { MonthlyTotal, CategoryTotal } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import type { CategoryTotal, MonthlyTotal } from "@/types";
 
 function formatMonthShort(monthStr: string) {
   const [year, month] = monthStr.split("-");
@@ -74,7 +74,9 @@ export function DashboardCharts({
       {/* Bar Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Monthly Overview</CardTitle>
+          <CardTitle className="text-base font-semibold">
+            Monthly Overview
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {!hasBarData ? (
@@ -111,7 +113,9 @@ export function DashboardCharts({
                   content={<ChartTooltip />}
                   cursor={{ fill: "var(--color-accent)" }}
                 />
-                <Legend wrapperStyle={{ fontSize: "0.8125rem", paddingTop: "12px" }} />
+                <Legend
+                  wrapperStyle={{ fontSize: "0.8125rem", paddingTop: "12px" }}
+                />
                 <Bar dataKey="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -123,7 +127,9 @@ export function DashboardCharts({
       {/* Donut Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Spending by Category</CardTitle>
+          <CardTitle className="text-base font-semibold">
+            Spending by Category
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {pieData.length === 0 ? (
@@ -144,8 +150,11 @@ export function DashboardCharts({
                       dataKey="value"
                       strokeWidth={0}
                     >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      {pieData.map((entry) => (
+                        <Cell
+                          key={`cell-${entry.name}-${entry.color}`}
+                          fill={entry.color}
+                        />
                       ))}
                     </Pie>
                     <Tooltip content={<ChartTooltip />} />
@@ -155,7 +164,10 @@ export function DashboardCharts({
 
               <ul className="flex-1 space-y-1.5 min-w-0">
                 {pieData.map((entry) => (
-                  <li key={entry.name} className="flex items-center gap-2 text-sm min-w-0">
+                  <li
+                    key={entry.name}
+                    className="flex items-center gap-2 text-sm min-w-0"
+                  >
                     <span
                       className="h-2.5 w-2.5 rounded-full shrink-0"
                       style={{ background: entry.color }}

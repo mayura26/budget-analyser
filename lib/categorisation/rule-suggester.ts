@@ -6,14 +6,30 @@ export type SuggestedRule = {
 };
 
 const RULE_BLOCKLIST = new Set([
-  "TRANSFER", "DIRECT", "DEBIT", "PAYMENT", "CREDIT", "ACCOUNT",
-  "NETBANK", "PAYID", "COMMBANK", "BPAY", "EFTPOS", "ONLINE",
-  "VISA", "CARD", "MASTERCARD", "BANK", "FROM", "INTO", "TRANSACTION",
+  "TRANSFER",
+  "DIRECT",
+  "DEBIT",
+  "PAYMENT",
+  "CREDIT",
+  "ACCOUNT",
+  "NETBANK",
+  "PAYID",
+  "COMMBANK",
+  "BPAY",
+  "EFTPOS",
+  "ONLINE",
+  "VISA",
+  "CARD",
+  "MASTERCARD",
+  "BANK",
+  "FROM",
+  "INTO",
+  "TRANSACTION",
 ]);
 
 export function computeSuggestedRules(
   applied: { normalised: string; categoryId: number; categoryName: string }[],
-  transferCategoryIds: Set<number>
+  transferCategoryIds: Set<number>,
 ): SuggestedRule[] {
   const ruleMap = new Map<string, SuggestedRule>();
 
@@ -22,7 +38,9 @@ export function computeSuggestedRules(
 
     const tokens = item.normalised
       .split(/\s+/)
-      .filter((t) => t.length >= 4 && !RULE_BLOCKLIST.has(t) && !/^\d+$/.test(t));
+      .filter(
+        (t) => t.length >= 4 && !RULE_BLOCKLIST.has(t) && !/^\d+$/.test(t),
+      );
 
     if (tokens.length === 0) continue;
 
@@ -40,5 +58,7 @@ export function computeSuggestedRules(
     }
   }
 
-  return Array.from(ruleMap.values()).sort((a, b) => b.matchCount - a.matchCount);
+  return Array.from(ruleMap.values()).sort(
+    (a, b) => b.matchCount - a.matchCount,
+  );
 }

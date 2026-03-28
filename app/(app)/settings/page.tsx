@@ -1,13 +1,14 @@
 export const dynamic = "force-dynamic";
-import { db } from "@/lib/db";
-import { settings, bankProfiles } from "@/lib/db/schema";
-import { SettingsForm } from "@/components/settings/settings-form";
+
 import { BankProfilesSection } from "@/components/settings/bank-profiles-section";
+import { SettingsForm } from "@/components/settings/settings-form";
+import { db } from "@/lib/db";
+import { bankProfiles, settings } from "@/lib/db/schema";
 
 export default function SettingsPage() {
   const allSettings = db.select().from(settings).all();
   const settingsMap = Object.fromEntries(
-    allSettings.map((s) => [s.key, s.value ?? ""])
+    allSettings.map((s) => [s.key, s.value ?? ""]),
   );
 
   const allProfiles = db.select().from(bankProfiles).all();
@@ -21,7 +22,7 @@ export default function SettingsPage() {
           ai_enabled: settingsMap.ai_enabled ?? "false",
         }}
       />
-      <BankProfilesSection profiles={allProfiles as any} />
+      <BankProfilesSection profiles={allProfiles} />
     </div>
   );
 }

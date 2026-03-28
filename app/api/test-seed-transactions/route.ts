@@ -1,7 +1,7 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { accounts, transactions } from "@/lib/db/schema";
 import { generateFingerprint } from "@/lib/import/fingerprint";
@@ -20,15 +20,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const accountName = typeof body.accountName === "string" ? body.accountName.trim() : "";
+  const accountName =
+    typeof body.accountName === "string" ? body.accountName.trim() : "";
   if (!accountName) {
-    return NextResponse.json({ error: "accountName required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "accountName required" },
+      { status: 400 },
+    );
   }
 
   const count = Math.min(50, Math.max(1, Number(body.count) || 3));
   const reset = body.reset !== false;
 
-  const account = db.select().from(accounts).where(eq(accounts.name, accountName)).get();
+  const account = db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.name, accountName))
+    .get();
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
@@ -44,7 +52,12 @@ export async function POST(request: Request) {
     const description = `E2E categorise seed ${suffix}`;
     const normalised = normaliseDescription(description);
     const amount = -25.5 - i * 0.01;
-    const fingerprint = generateFingerprint(account.id, baseDate, amount, normalised);
+    const fingerprint = generateFingerprint(
+      account.id,
+      baseDate,
+      amount,
+      normalised,
+    );
     const row = db
       .insert(transactions)
       .values({

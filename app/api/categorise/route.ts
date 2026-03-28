@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server";
+import { eq, inArray } from "drizzle-orm";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
-import { transactions, settings, categories } from "@/lib/db/schema";
-import { inArray, eq } from "drizzle-orm";
+import {
+  filterAssignableCategories,
+  isAssignableCategoryId,
+} from "@/lib/categories/assignable";
 import { categoriseWithAI } from "@/lib/categorisation/ai-client";
+import { db } from "@/lib/db";
+import { categories, settings, transactions } from "@/lib/db/schema";
 import type { Category } from "@/types";
-import { filterAssignableCategories, isAssignableCategoryId } from "@/lib/categories/assignable";
 
 const RequestSchema = z.object({
   transactionIds: z.array(z.number()).min(1).max(100),
@@ -36,7 +39,10 @@ export async function POST(request: NextRequest) {
     .get();
 
   if (!apiKeySetting?.value) {
-    return NextResponse.json({ error: "No API key configured" }, { status: 400 });
+    return NextResponse.json(
+      { error: "No API key configured" },
+      { status: 400 },
+    );
   }
 
   const modelSetting = db
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
     })),
     assignableForAi,
     apiKeySetting.value,
-    model
+    model,
   );
 
   // Update transactions

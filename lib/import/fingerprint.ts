@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 /**
  * Generate a deduplication fingerprint for a transaction.
@@ -8,7 +8,7 @@ export function generateFingerprint(
   accountId: number,
   date: string,
   amount: number,
-  normalisedDescription: string
+  normalisedDescription: string,
 ): string {
   const raw = `${accountId}|${date}|${amount.toFixed(2)}|${normalisedDescription}`;
   return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 32);

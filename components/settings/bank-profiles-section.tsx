@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { deleteBankProfile } from "@/lib/actions/settings";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { deleteBankProfile } from "@/lib/actions/settings";
 import type { BankProfile } from "@/types";
 
 export function BankProfilesSection({ profiles }: { profiles: BankProfile[] }) {
@@ -14,8 +19,8 @@ export function BankProfilesSection({ profiles }: { profiles: BankProfile[] }) {
       <CardHeader>
         <CardTitle>Bank Profiles</CardTitle>
         <CardDescription>
-          These define how CSV files are parsed for each bank.
-          Built-in profiles cannot be deleted.
+          These define how CSV files are parsed for each bank. Built-in profiles
+          cannot be deleted.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -29,13 +34,16 @@ export function BankProfilesSection({ profiles }: { profiles: BankProfile[] }) {
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium">{profile.name}</p>
                   {profile.isSystem && (
-                    <Badge variant="secondary" className="text-xs">built-in</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      built-in
+                    </Badge>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Date: {profile.dateColumn} ({profile.dateFormat}) ·
-                  Desc: {profile.descriptionColumn} ·
-                  Amount: {profile.amountColumn ?? `${profile.debitColumn}/${profile.creditColumn}`}
+                  Date: {profile.dateColumn} ({profile.dateFormat}) · Desc:{" "}
+                  {profile.descriptionColumn} · Amount:{" "}
+                  {profile.amountColumn ??
+                    `${profile.debitColumn}/${profile.creditColumn}`}
                 </p>
               </div>
               {!profile.isSystem && (

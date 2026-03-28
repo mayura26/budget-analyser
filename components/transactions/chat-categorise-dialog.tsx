@@ -40,7 +40,11 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category } from "@/types";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
 type DialogState =
   | "idle"
   | "loading"
@@ -53,10 +57,8 @@ type DialogState =
 type Applied = { normalised: string; categoryId: number; categoryName: string };
 
 export function ChatCategoriseDialog({
-  uncategorisedCount,
   categories,
 }: {
-  uncategorisedCount: number;
   categories: Category[];
 }) {
   const [open, setOpen] = useState(false);
@@ -88,7 +90,7 @@ export function ChatCategoriseDialog({
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, aiThinking]);
+  }, []);
 
   function openDialog() {
     setOpen(true);
@@ -129,7 +131,7 @@ export function ChatCategoriseDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transactionId: txn.id,
-          messages: history,
+          messages: history.map(({ role, content }) => ({ role, content })),
           categories: cats,
         }),
       });
@@ -141,7 +143,11 @@ export function ChatCategoriseDialog({
         return;
       }
 
-      const aiMsg: ChatMessage = { role: "assistant", content: json.reply };
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: json.reply,
+      };
       setMessages((prev) => [...prev, aiMsg]);
       setSuggestedCategoryId(json.suggestedCategoryId);
       setSuggestedCategoryName(json.suggestedCategoryName);
@@ -161,7 +167,7 @@ export function ChatCategoriseDialog({
     setUserInput("");
     const newMessages: ChatMessage[] = [
       ...messages,
-      { role: "user", content: text },
+      { id: crypto.randomUUID(), role: "user", content: text },
     ];
     setMessages(newMessages);
     const txn = transactions[currentIndex];
@@ -324,9 +330,9 @@ export function ChatCategoriseDialog({
 
               {/* Chat messages */}
               <div className="flex-1 overflow-y-auto space-y-2 min-h-0 max-h-52 pr-1">
-                {messages.map((msg, i) => (
+                {messages.map((msg) => (
                   <div
-                    key={i}
+                    key={msg.id}
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div

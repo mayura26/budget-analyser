@@ -8,9 +8,9 @@ import { ChatCategoriseDialog } from "@/components/transactions/chat-categorise-
 import { ProcessUncategorisedButton } from "@/components/transactions/process-uncategorised-button";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
+import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
-import { filterAssignableCategories } from "@/lib/categories/assignable";
 import type { Category } from "@/types";
 
 export default async function TransactionsPage({
@@ -124,8 +124,9 @@ export default async function TransactionsPage({
           )}
           {needsReviewCount > 0 && uncategorisedCount === 0 && (
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Bulk AI categorise only appears when some transactions have no category.
-              These rows already have a suggested category — mark each as verified in the Verified column, or{" "}
+              Bulk AI categorise only appears when some transactions have no
+              category. These rows already have a suggested category — mark each
+              as verified in the Verified column, or{" "}
               <Link
                 href="/transactions?needsReview=1"
                 className="text-primary underline underline-offset-2 hover:underline"
@@ -145,10 +146,7 @@ export default async function TransactionsPage({
                 categories={allCategories}
                 categoryMains={categoryMains}
               />
-              <ChatCategoriseDialog
-                uncategorisedCount={uncategorisedCount}
-                categories={allCategories}
-              />
+              <ChatCategoriseDialog categories={allCategories} />
             </>
           )}
           <Button asChild size="sm">
