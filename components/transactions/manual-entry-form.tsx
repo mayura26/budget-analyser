@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createManualTransaction } from "@/lib/actions/transactions";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export function ManualTransactionForm({
   accounts: Account[];
   categories: Category[];
 }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(
     createManualTransaction as (
       state: ActionResult<{ id: number }> | null,
@@ -30,6 +31,12 @@ export function ManualTransactionForm({
     ) => Promise<ActionResult<{ id: number }>>,
     null
   );
+
+  useEffect(() => {
+    if (state?.success) {
+      router.push("/transactions");
+    }
+  }, [state, router]);
 
   return (
     <form action={formAction} className="space-y-4">

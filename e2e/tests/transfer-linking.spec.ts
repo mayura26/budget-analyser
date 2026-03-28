@@ -1,4 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function selectAccountByName(page: Page, name: string) {
+  await page.locator('#accountId').evaluate((select, wanted) => {
+    const s = select as HTMLSelectElement;
+    for (let i = 0; i < s.options.length; i++) {
+      if (s.options[i].text.trim() === wanted) {
+        s.selectedIndex = i;
+        s.dispatchEvent(new Event('input', { bubbles: true }));
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+    }
+    throw new Error(`No account option: ${wanted}`);
+  }, name);
+}
 
 test.describe('Transfer Linking', () => {
   // Create two accounts and matching transfer transactions, then test linking/unlinking
@@ -23,8 +38,7 @@ test.describe('Transfer Linking', () => {
 
     // Add manual transaction on Account A (debit -100)
     await page.goto('/transactions/new');
-    await page.getByRole('combobox').first().click();
-    await page.getByRole('option', { name: 'Transfer Test A' }).first().click();
+    await selectAccountByName(page, 'Transfer Test A');
     await page.locator('input[name="date"]').fill('2024-06-15');
     await page.locator('input[name="description"]').fill('Transfer to B');
     await page.locator('input[name="amount"]').fill('-100');
@@ -33,8 +47,7 @@ test.describe('Transfer Linking', () => {
 
     // Add manual transaction on Account B (credit +100)
     await page.goto('/transactions/new');
-    await page.getByRole('combobox').first().click();
-    await page.getByRole('option', { name: 'Transfer Test B' }).first().click();
+    await selectAccountByName(page, 'Transfer Test B');
     await page.locator('input[name="date"]').fill('2024-06-15');
     await page.locator('input[name="description"]').fill('Transfer from A');
     await page.locator('input[name="amount"]').fill('100');

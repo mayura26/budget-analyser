@@ -94,9 +94,7 @@ test.describe('Transactions', () => {
     // Account is a native select — pick first option (Import Test Account)
     await page.locator('select#accountId').selectOption({ index: 0 });
     await page.getByRole('button', { name: 'Save transaction' }).click();
-    // No redirect — wait for button to re-enable then navigate
-    await expect(page.getByRole('button', { name: 'Save transaction' })).toBeEnabled({ timeout: 10000 });
-    await page.goto('/transactions');
+    await expect(page).toHaveURL('/transactions', { timeout: 15000 });
     await expect(page.getByText('Manual Coffee Purchase')).toBeVisible();
   });
 
