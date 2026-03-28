@@ -431,6 +431,8 @@ export async function applyCategorisations(
     transactionId: number;
     categoryId: number;
     source: "rule" | "ai" | "none";
+    /** When false, category is saved but not marked verified. Defaults to true. */
+    confirm?: boolean;
   }[],
 ): Promise<ActionResult<{ applied: number }>> {
   const now = Math.floor(Date.now() / 1000);
@@ -453,7 +455,7 @@ export async function applyCategorisations(
     const batchUpdate = {
       categoryId: u.categoryId,
       categorySource: u.source === "none" ? ("manual" as const) : u.source,
-      categoryConfirmed: true,
+      categoryConfirmed: u.confirm !== false,
       updatedAt: now,
     };
 

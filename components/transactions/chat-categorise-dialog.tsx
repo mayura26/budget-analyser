@@ -81,6 +81,7 @@ export function ChatCategoriseDialog({
     string | null
   >(null);
   const [isConfident, setIsConfident] = useState(false);
+  const [markVerifiedWhenApply, setMarkVerifiedWhenApply] = useState(true);
   const [overrideCategoryId, setOverrideCategoryId] = useState<number | null>(
     null,
   );
@@ -104,6 +105,7 @@ export function ChatCategoriseDialog({
     setMessages([]);
     setAppliedItems([]);
     setAppliedCount(0);
+    setMarkVerifiedWhenApply(true);
     setErrorMsg("");
 
     startTransition(async () => {
@@ -193,7 +195,12 @@ export function ChatCategoriseDialog({
     setState("saving");
     startTransition(async () => {
       await applyCategorisations([
-        { transactionId: txn.id, categoryId: finalCategoryId, source: "ai" },
+        {
+          transactionId: txn.id,
+          categoryId: finalCategoryId,
+          source: "ai",
+          confirm: markVerifiedWhenApply,
+        },
       ]);
       const updatedApplied = [...appliedItems, newApplied];
       setAppliedItems(updatedApplied);
@@ -217,6 +224,7 @@ export function ChatCategoriseDialog({
     setSuggestedCategoryId(null);
     setSuggestedCategoryName(null);
     setIsConfident(false);
+    setMarkVerifiedWhenApply(true);
     setOverrideCategoryId(null);
     setState("chatting");
     askAI(transactions[nextIndex], [], categories);
@@ -544,19 +552,34 @@ export function ChatCategoriseDialog({
                   Skip
                 </Button>
                 {isConfident && !aiThinking && (
-                  <Button
-                    size="sm"
-                    onClick={handleConfirm}
-                    disabled={
-                      isPending || (!suggestedCategoryId && !overrideCategoryId)
-                    }
-                    data-testid="confirm-category-chat"
-                  >
-                    {isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                    ) : null}
-                    Confirm
-                  </Button>
+                  <>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground sm:mr-auto">
+                      <input
+                        type="checkbox"
+                        checked={markVerifiedWhenApply}
+                        onChange={(e) =>
+                          setMarkVerifiedWhenApply(e.target.checked)
+                        }
+                        className="h-4 w-4 rounded"
+                        data-testid="chat-mark-verified"
+                      />
+                      Mark as verified when applying
+                    </label>
+                    <Button
+                      size="sm"
+                      onClick={handleConfirm}
+                      disabled={
+                        isPending ||
+                        (!suggestedCategoryId && !overrideCategoryId)
+                      }
+                      data-testid="confirm-category-chat"
+                    >
+                      {isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                      ) : null}
+                      Confirm
+                    </Button>
+                  </>
                 )}
               </>
             )}

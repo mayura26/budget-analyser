@@ -86,6 +86,10 @@ export function CategoriseDialog({
   const [selections, setSelections] = useState<Record<number, number | null>>(
     {},
   );
+  /** When true (default), applying sets category as verified. */
+  const [verifyWhenApply, setVerifyWhenApply] = useState<
+    Record<number, boolean>
+  >({});
   const [appliedCount, setAppliedCount] = useState(0);
   const [suggestedRules, setSuggestedRules] = useState<SuggestedRule[]>([]);
   const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set());
@@ -98,6 +102,7 @@ export function CategoriseDialog({
     setState("loading");
     setSuggestions([]);
     setSelections({});
+    setVerifyWhenApply({});
     setErrorMsg("");
 
     startTransition(async () => {
@@ -114,6 +119,11 @@ export function CategoriseDialog({
         initial[row.transactionId] = row.suggestedCategoryId;
       }
       setSelections(initial);
+      const initialVerify: Record<number, boolean> = {};
+      for (const row of rows) {
+        initialVerify[row.transactionId] = true;
+      }
+      setVerifyWhenApply(initialVerify);
       setState("review");
     });
   }
@@ -123,6 +133,10 @@ export function CategoriseDialog({
       ...prev,
       [transactionId]: value === "none" ? null : parseInt(value, 10),
     }));
+  }
+
+  function handleVerifyWhenApplyChange(transactionId: number, checked: boolean) {
+    setVerifyWhenApply((prev) => ({ ...prev, [transactionId]: checked }));
   }
 
   function handleApply() {
@@ -137,6 +151,7 @@ export function CategoriseDialog({
           transactionId: s.transactionId,
           categoryId,
           source: s.source,
+          confirm: verifyWhenApply[s.transactionId] !== false,
         };
       });
 
@@ -347,20 +362,26 @@ export function CategoriseDialog({
               <table className="w-full table-fixed text-sm">
                 <thead className="sticky top-0 z-1 border-b bg-muted/80 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[11%] px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
                       Date
                     </th>
-                    <th className="w-[32%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className="w-[28%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                       Description
                     </th>
-                    <th className="w-[14%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                    <th className="w-[12%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
                       Account
                     </th>
-                    <th className="w-[12%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    <th className="w-[11%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
                       Amount
                     </th>
-                    <th className="w-[23%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className="w-[20%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                       Category
+                    </th>
+                    <th
+                      className="w-[9%] px-2 py-2 text-center text-xs font-medium text-muted-foreground whitespace-nowrap"
+                      title="Mark as verified when applying (green on the list). Untick to save the category but leave it unconfirmed."
+                    >
+                      Verify
                     </th>
                     <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
                       Source
@@ -450,6 +471,27 @@ export function CategoriseDialog({
                             )}
                           </SelectContent>
                         </Select>
+                      </td>
+                      <td className="px-2 py-2 align-middle text-center">
+                        <input
+                          type="checkbox"
+                          checked={verifyWhenApply[row.transactionId] !== false}
+                          disabled={selections[row.transactionId] == null}
+                          onChange={(e) =>
+                            handleVerifyWhenApplyChange(
+                              row.transactionId,
+                              e.target.checked,
+                            )
+                          }
+                          className="h-4 w-4 rounded align-middle"
+                          aria-label="Mark as verified when applying"
+                          title={
+                            selections[row.transactionId] == null
+                              ? "Choose a category first"
+                              : "Uncheck to apply without marking verified"
+                          }
+                          data-testid="bulk-verify-when-apply"
+                        />
                       </td>
                       <td className="px-3 py-2 align-middle hidden sm:table-cell">
                         {sourceLabel(row.source)}

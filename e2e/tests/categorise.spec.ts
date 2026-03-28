@@ -52,11 +52,13 @@ test.describe("Categorise Dialog", () => {
 
   async function openAndWaitForReview(page: Page) {
     await page.goto("/transactions");
-    const categoriseBtn = page.getByRole("button", {
-      name: /Categorise \d+ uncategorised/i,
-    });
+    const categoriseBtn = page.getByTestId("bulk-ai-categorise");
     await expect(categoriseBtn).toBeVisible({ timeout: 15_000 });
     await categoriseBtn.click();
+    const scopeUncategorised = page.getByTestId("bulk-ai-scope-uncategorised");
+    if (await scopeUncategorised.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await scopeUncategorised.click();
+    }
     const dialog = aiCategoriseDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.locator("tbody tr").first()).toBeVisible({
@@ -143,10 +145,10 @@ test.describe("Categorise Dialog", () => {
         await skipBtn.click();
       }
       if (await d.isVisible().catch(() => false)) {
-        await expect(d.getByText(/transactions categorised/i)).toBeVisible({
+        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible({
           timeout: 10_000,
         });
-        await d.getByRole("button", { name: "Close" }).click();
+        await d.getByRole("button", { name: "Close" }).first().click();
       }
     }
     await expect(aiCategoriseDialog(page)).not.toBeVisible();
@@ -163,7 +165,7 @@ test.describe("Categorise Dialog", () => {
 
     const d = aiCategoriseDialog(page);
     if (await d.isVisible().catch(() => false)) {
-      const createBtn = d.getByRole("button", { name: /Create \d+ rule/i });
+      const createBtn = d.getByTestId("create-rules-only-bulk");
       if (await createBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         if (await createBtn.isEnabled()) {
           await createBtn.click();
@@ -174,7 +176,7 @@ test.describe("Categorise Dialog", () => {
         }
       }
       if (await d.isVisible().catch(() => false)) {
-        await expect(d.getByText(/transactions categorised/i)).toBeVisible({
+        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible({
           timeout: 10_000,
         });
       }
@@ -203,10 +205,10 @@ test.describe("Categorise Dialog", () => {
         await skipBtn.click();
       }
       if (await d.isVisible().catch(() => false)) {
-        await expect(d.getByText(/transactions categorised/i)).toBeVisible({
+        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible({
           timeout: 15_000,
         });
-        await d.getByRole("button", { name: "Close" }).click();
+        await d.getByRole("button", { name: "Close" }).first().click();
       }
     }
     await expect(aiCategoriseDialog(page)).not.toBeVisible();
@@ -217,6 +219,54 @@ test.describe("Categorise Dialog", () => {
       .fill(descSnippet.trim());
     const row = page.locator("tbody tr").first();
     await expect(row.getByTestId("confirm-category")).toBeChecked({
+      timeout: 10_000,
+    });
+  });
+
+  test("apply with verify unchecked leaves transaction unconfirmed", async ({
+    page,
+  }) => {
+    await page.request.delete("/api/test-cleanup");
+    const seed = await page.request.post("/api/test-seed-transactions", {
+      data: { accountName: ACCOUNT_NAME, count: 1, reset: true },
+    });
+    expect(seed.ok()).toBeTruthy();
+
+    await openAndWaitForReview(page);
+
+    const dialog = aiCategoriseDialog(page);
+    const applyBtn = await ensureApplyEnabled(page, dialog);
+
+    await dialog
+      .locator("tbody tr")
+      .first()
+      .getByTestId("bulk-verify-when-apply")
+      .uncheck();
+
+    await applyBtn.click();
+    await waitForApplyFinished(page);
+
+    const d = aiCategoriseDialog(page);
+    if (await d.isVisible().catch(() => false)) {
+      const skipBtn = d.getByRole("button", { name: "Skip" });
+      if (await skipBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
+        await expect(skipBtn).toBeEnabled({ timeout: 15_000 });
+        await skipBtn.click();
+      }
+      if (await d.isVisible().catch(() => false)) {
+        await expect(d.getByText(/transactions categorised/i).first()).toBeVisible(
+          {
+            timeout: 15_000,
+          },
+        );
+        await d.getByRole("button", { name: "Close" }).first().click();
+      }
+    }
+    await expect(aiCategoriseDialog(page)).not.toBeVisible();
+
+    await page.goto("/transactions");
+    const row = page.locator("tbody tr").first();
+    await expect(row.getByTestId("confirm-category")).not.toBeChecked({
       timeout: 10_000,
     });
   });
