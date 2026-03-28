@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SWRegister } from "@/components/sw-register";
 import { ThemeProvider } from "@/components/theme-provider";
 import { initializeDatabase } from "@/lib/db/init";
 
@@ -26,9 +27,12 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
     apple: [{ url: "/apple-icon.png", type: "image/png" }],
   },
-  other: {
-    "apple-mobile-web-app-title": "Budget",
+  appleWebApp: {
+    capable: true,
+    title: "Budget",
+    statusBarStyle: "black-translucent",
   },
+  themeColor: "#003b66",
 };
 
 export default function RootLayout({
@@ -44,6 +48,7 @@ export default function RootLayout({
     >
       <body className="h-full bg-background text-foreground antialiased">
         <ThemeProvider>{children}</ThemeProvider>
+        <SWRegister />
       </body>
     </html>
   );
