@@ -98,16 +98,26 @@ export async function updateTransactionCategory(
   const txn = db.select().from(transactions).where(eq(transactions.id, transactionId)).get();
   if (!txn) return { success: false, error: "Transaction not found" };
 
+  const now = Math.floor(Date.now() / 1000);
+  const categoryUpdate = {
+    categoryId,
+    categorySource: "manual" as const,
+    confidence: 1.0,
+    categoryConfirmed: false,
+    updatedAt: now,
+  };
+
   db.update(transactions)
-    .set({
-      categoryId,
-      categorySource: "manual",
-      confidence: 1.0,
-      categoryConfirmed: false,
-      updatedAt: Math.floor(Date.now() / 1000),
-    })
+    .set(categoryUpdate)
     .where(eq(transactions.id, transactionId))
     .run();
+
+  if (txn.linkedTransactionId) {
+    db.update(transactions)
+      .set(categoryUpdate)
+      .where(eq(transactions.id, txn.linkedTransactionId))
+      .run();
+  }
 
   if (createRule && categoryId) {
     // Create a keyword rule from the first meaningful token
@@ -140,13 +150,24 @@ export async function setTransactionCategoryConfirmed(
     return { success: false, error: "Cannot confirm without a category" };
   }
 
+  const now = Math.floor(Date.now() / 1000);
   db.update(transactions)
     .set({
       categoryConfirmed: confirmed,
-      updatedAt: Math.floor(Date.now() / 1000),
+      updatedAt: now,
     })
     .where(eq(transactions.id, transactionId))
     .run();
+
+  if (txn.linkedTransactionId) {
+    db.update(transactions)
+      .set({
+        categoryConfirmed: confirmed,
+        updatedAt: now,
+      })
+      .where(eq(transactions.id, txn.linkedTransactionId))
+      .run();
+  }
 
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
@@ -154,6 +175,18 @@ export async function setTransactionCategoryConfirmed(
 }
 
 export async function deleteTransaction(id: number): Promise<ActionResult> {
+  const txn = db
+    .select({ linkedTransactionId: transactions.linkedTransactionId })
+    .from(transactions)
+    .where(eq(transactions.id, id))
+    .get();
+  const now = Math.floor(Date.now() / 1000);
+  if (txn?.linkedTransactionId) {
+    db.update(transactions)
+      .set({ linkedTransactionId: null, updatedAt: now })
+      .where(eq(transactions.id, txn.linkedTransactionId))
+      .run();
+  }
   db.delete(transactions).where(eq(transactions.id, id)).run();
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
@@ -307,15 +340,30 @@ export async function applyCategorisations(
   let applied = 0;
 
   for (const u of updates) {
+    const row = db
+      .select({ linkedTransactionId: transactions.linkedTransactionId })
+      .from(transactions)
+      .where(eq(transactions.id, u.transactionId))
+      .get();
+
+    const batchUpdate = {
+      categoryId: u.categoryId,
+      categorySource: u.source === "none" ? ("manual" as const) : u.source,
+      categoryConfirmed: true,
+      updatedAt: now,
+    };
+
     db.update(transactions)
-      .set({
-        categoryId: u.categoryId,
-        categorySource: u.source === "none" ? "manual" : u.source,
-        categoryConfirmed: true,
-        updatedAt: now,
-      })
+      .set(batchUpdate)
       .where(eq(transactions.id, u.transactionId))
       .run();
+
+    if (row?.linkedTransactionId) {
+      db.update(transactions)
+        .set(batchUpdate)
+        .where(eq(transactions.id, row.linkedTransactionId))
+        .run();
+    }
     applied++;
   }
 
@@ -400,7 +448,52 @@ export async function linkTransactions(
   idA: number,
   idB: number
 ): Promise<ActionResult> {
+  if (idA === idB) {
+    return { success: false, error: "Cannot link a transaction to itself" };
+  }
+
   const now = Math.floor(Date.now() / 1000);
+
+  const rowA = db
+    .select({
+      linkedTransactionId: transactions.linkedTransactionId,
+      categoryId: transactions.categoryId,
+      categorySource: transactions.categorySource,
+      categoryConfirmed: transactions.categoryConfirmed,
+    })
+    .from(transactions)
+    .where(eq(transactions.id, idA))
+    .get();
+
+  const rowB = db
+    .select({
+      linkedTransactionId: transactions.linkedTransactionId,
+      categoryId: transactions.categoryId,
+      categorySource: transactions.categorySource,
+      categoryConfirmed: transactions.categoryConfirmed,
+    })
+    .from(transactions)
+    .where(eq(transactions.id, idB))
+    .get();
+
+  if (!rowA || !rowB) {
+    return { success: false, error: "Transaction not found" };
+  }
+
+  // Break old pairs so no third row keeps a stale pointer to A or B
+  if (rowA.linkedTransactionId && rowA.linkedTransactionId !== idB) {
+    db.update(transactions)
+      .set({ linkedTransactionId: null, updatedAt: now })
+      .where(eq(transactions.id, rowA.linkedTransactionId))
+      .run();
+  }
+  if (rowB.linkedTransactionId && rowB.linkedTransactionId !== idA) {
+    db.update(transactions)
+      .set({ linkedTransactionId: null, updatedAt: now })
+      .where(eq(transactions.id, rowB.linkedTransactionId))
+      .run();
+  }
+
   db.update(transactions)
     .set({ linkedTransactionId: idB, updatedAt: now })
     .where(eq(transactions.id, idA))
@@ -409,7 +502,31 @@ export async function linkTransactions(
     .set({ linkedTransactionId: idA, updatedAt: now })
     .where(eq(transactions.id, idB))
     .run();
+
+  const mergedCategoryId = rowA.categoryId ?? rowB.categoryId ?? null;
+  if (mergedCategoryId != null) {
+    const preferA = rowA.categoryId != null;
+    const mergedSource = (preferA ? rowA.categorySource : rowB.categorySource) ?? "manual";
+    const mergedConfirmed = preferA ? rowA.categoryConfirmed : rowB.categoryConfirmed;
+    const alignPair = {
+      categoryId: mergedCategoryId,
+      categorySource: mergedSource,
+      confidence: 1.0,
+      categoryConfirmed: mergedConfirmed,
+      updatedAt: now,
+    };
+    db.update(transactions)
+      .set(alignPair)
+      .where(eq(transactions.id, idA))
+      .run();
+    db.update(transactions)
+      .set(alignPair)
+      .where(eq(transactions.id, idB))
+      .run();
+  }
+
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
   return { success: true, data: undefined };
 }
 
@@ -436,5 +553,6 @@ export async function unlinkTransaction(id: number): Promise<ActionResult> {
   }
 
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
   return { success: true, data: undefined };
 }

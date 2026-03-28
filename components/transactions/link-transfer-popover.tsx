@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   linkTransactions,
@@ -23,6 +24,7 @@ export function LinkTransferPopover({
   transactionId: number;
   linkedTransactionId: number | null;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [candidates, setCandidates] = useState<TransferCandidate[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,6 +50,7 @@ export function LinkTransferPopover({
     await linkTransactions(transactionId, candidateId);
     setLinking(false);
     setOpen(false);
+    router.refresh();
   }
 
   async function handleUnlink() {
@@ -55,6 +58,7 @@ export function LinkTransferPopover({
     await unlinkTransaction(transactionId);
     setLinking(false);
     setOpen(false);
+    router.refresh();
   }
 
   if (linkedTransactionId) {
