@@ -117,6 +117,12 @@ export function ImportWizard({
             <p className="text-muted-foreground text-sm mt-1">
               {doneResult.imported} transactions imported, {doneResult.skipped} skipped (duplicates)
             </p>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+              If categories were applied automatically, confirm them on the transactions list.{" "}
+              <a href="/transactions?needsReview=1" className="text-primary underline underline-offset-2">
+                Show pending confirmation
+              </a>
+            </p>
           </div>
           <div className="flex gap-2 justify-center">
             <Button asChild>

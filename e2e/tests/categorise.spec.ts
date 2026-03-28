@@ -169,4 +169,35 @@ test.describe('Categorise Dialog', () => {
 
     await expect(dialog.getByText(/transactions categorised/i)).toBeVisible({ timeout: 10000 });
   });
+
+  test('apply categorisation marks category confirmed on transactions list', async ({ page }) => {
+    await ensureUncategorised(page);
+    const opened = await openAndWaitForReview(page);
+    if (!opened) {
+      test.skip();
+      return;
+    }
+
+    const dialog = page.getByRole('dialog');
+    const descSnippet = (
+      await dialog.locator('tbody tr').first().locator('td').nth(1).innerText()
+    ).slice(0, 28);
+    const applyBtn = await ensureApplyEnabled(page, dialog);
+
+    await applyBtn.click();
+
+    const skipBtn = dialog.getByRole('button', { name: 'Skip' });
+    if (await skipBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
+      await skipBtn.click();
+    }
+
+    await expect(dialog.getByText(/transactions categorised/i)).toBeVisible({ timeout: 15000 });
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).not.toBeVisible();
+
+    await page.goto('/transactions');
+    await page.getByPlaceholder('Search transactions…').fill(descSnippet.trim());
+    const row = page.locator('tbody tr').first();
+    await expect(row.getByTestId('confirm-category')).toBeChecked({ timeout: 10000 });
+  });
 });

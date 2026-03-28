@@ -1,9 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { Button } from "@/components/ui/button";
 import { recategoriseUncategorised } from "@/lib/actions/transactions";
 
 export function ProcessUncategorisedButton({ count }: { count: number }) {

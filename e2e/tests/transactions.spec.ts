@@ -42,7 +42,7 @@ test.describe('Transactions', () => {
 
   test('table columns render', async ({ page }) => {
     await page.goto('/transactions');
-    for (const col of ['Date', 'Description', 'Account', 'Category', 'Amount']) {
+    for (const col of ['Date', 'Description', 'Account', 'Category', 'OK', 'Amount']) {
       await expect(page.getByRole('columnheader', { name: col })).toBeVisible();
     }
   });
@@ -79,12 +79,53 @@ test.describe('Transactions', () => {
     await expect(page).toHaveURL(/categoryId=none/);
   });
 
+  test('needs review filter updates URL', async ({ page }) => {
+    await page.goto('/transactions');
+    await page.getByTestId('filter-needs-review').click();
+    await page.getByRole('option', { name: 'Needs confirmation' }).click();
+    await expect(page).toHaveURL(/needsReview=1/);
+  });
+
   test('inline category change', async ({ page }) => {
     await page.goto('/transactions');
     // Click the first category cell button (shows category or "Uncategorised")
     await page.locator('td button').first().click();
     await page.getByRole('option', { name: 'Groceries' }).click();
     await expect(page.getByText('Groceries').first()).toBeVisible();
+  });
+
+  test('inline category change leaves confirmation unchecked until ticked', async ({ page }) => {
+    await page.goto('/transactions');
+    const accountSelect = page.getByRole('combobox').filter({ hasText: /all accounts/i });
+    await accountSelect.click();
+    await page.getByRole('option', { name: 'Import Test Account' }).click();
+
+    const firstRow = page.locator('tbody tr').first();
+    await firstRow.locator('td').nth(3).locator('button').click();
+    await page.getByRole('option', { name: 'Dining' }).click();
+    await expect(firstRow.getByTestId('confirm-category')).not.toBeChecked();
+    await firstRow.getByTestId('confirm-category').check();
+    await expect(firstRow.getByTestId('confirm-category')).toBeChecked();
+  });
+
+  test('manual transaction with category starts confirmed', async ({ page }) => {
+    await page.goto('/transactions/new');
+    await page.getByLabel('Description').fill('E2E confirmed category');
+    await page.getByLabel('Amount (negative = expense)').fill('-3.50');
+    await page.locator('select#categoryId').selectOption({ label: 'Groceries' });
+    await page.getByRole('button', { name: 'Save transaction' }).click();
+    await expect(page).toHaveURL('/transactions', { timeout: 15000 });
+    const row = page.locator('tbody tr').filter({ hasText: 'E2E confirmed category' });
+    await expect(row.getByTestId('confirm-category')).toBeChecked();
+  });
+
+  test('process uncategorised button visible when uncategorised rows exist', async ({ page }) => {
+    await page.goto('/transactions');
+    await page.getByRole('combobox').filter({ hasText: /all categories/i }).click();
+    await page.getByRole('option', { name: 'Uncategorised' }).first().click();
+    const rowCount = await page.locator('tbody tr').count();
+    test.skip(rowCount === 0, 'No uncategorised rows in fixture');
+    await expect(page.getByTestId('process-uncategorised')).toBeVisible();
   });
 
   test('add manual transaction', async ({ page }) => {

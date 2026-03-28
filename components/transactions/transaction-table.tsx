@@ -1,16 +1,28 @@
 "use client";
 
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useState } from "react";
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-  flexRender,
   createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
   type SortingState,
+  useReactTable,
 } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ArrowUpDown, Trash2 } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
+import { LinkTransferPopover } from "@/components/transactions/link-transfer-popover";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -19,20 +31,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  deleteTransaction,
+  setTransactionCategoryConfirmed,
+  updateTransactionCategory,
+} from "@/lib/actions/transactions";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
-import { updateTransactionCategory, deleteTransaction } from "@/lib/actions/transactions";
-import { LinkTransferPopover } from "@/components/transactions/link-transfer-popover";
 import type { Account, Category } from "@/types";
 
 type Row = {
@@ -48,6 +52,7 @@ type Row = {
   accountName: string | null;
   accountColor: string | null;
   categorySource: string | null;
+  categoryConfirmed: boolean;
   notes: string | null;
   linkedTransactionId: number | null;
 };
@@ -79,7 +84,7 @@ export function TransactionTable({
       if (value) params.set(key, value);
       router.push(`${pathname}?${params.toString()}`);
     },
-    [currentFilters, pathname, router]
+    [currentFilters, pathname, router],
   );
 
   const columns = [
@@ -109,7 +114,9 @@ export function TransactionTable({
       header: "Description",
       cell: (info) => (
         <div className="min-w-0">
-          <p className="text-sm whitespace-normal wrap-break-word">{info.getValue()}</p>
+          <p className="text-sm whitespace-normal wrap-break-word">
+            {info.getValue()}
+          </p>
           {info.row.original.notes && (
             <p className="text-xs text-muted-foreground whitespace-normal wrap-break-word mt-0.5">
               {info.row.original.notes}
@@ -145,10 +152,26 @@ export function TransactionTable({
             categoryId={row.categoryId}
             categoryName={info.getValue()}
             categoryColor={row.categoryColor}
+            categoryConfirmed={row.categoryConfirmed}
             categories={categories}
           />
         );
       },
+    }),
+    col.display({
+      id: "confirm",
+      header: () => (
+        <span className="text-muted-foreground" title="Confirm category">
+          OK
+        </span>
+      ),
+      cell: (info) => (
+        <ConfirmCell
+          transactionId={info.row.original.id}
+          categoryId={info.row.original.categoryId}
+          categoryConfirmed={info.row.original.categoryConfirmed}
+        />
+      ),
     }),
     col.accessor("amount", {
       header: ({ column }) => (
@@ -183,7 +206,8 @@ export function TransactionTable({
                 amount < 0 ? "text-red-600" : "text-green-600"
               }`}
             >
-              {amount < 0 ? "-" : "+"}{formatCurrency(amount)}
+              {amount < 0 ? "-" : "+"}
+              {formatCurrency(amount)}
             </span>
           </div>
         );
@@ -222,7 +246,9 @@ export function TransactionTable({
 
         <Select
           value={currentFilters.accountId ?? "all"}
-          onValueChange={(v) => updateFilter("accountId", v === "all" ? undefined : v)}
+          onValueChange={(v) =>
+            updateFilter("accountId", v === "all" ? undefined : v)
+          }
         >
           <SelectTrigger className="h-8 text-sm w-full sm:w-40">
             <SelectValue placeholder="All accounts" />
@@ -239,7 +265,9 @@ export function TransactionTable({
 
         <Select
           value={currentFilters.categoryId ?? "all"}
-          onValueChange={(v) => updateFilter("categoryId", v === "all" ? undefined : v)}
+          onValueChange={(v) =>
+            updateFilter("categoryId", v === "all" ? undefined : v)
+          }
         >
           <SelectTrigger className="h-8 text-sm w-full sm:w-44">
             <SelectValue placeholder="All categories" />
@@ -254,6 +282,24 @@ export function TransactionTable({
             ))}
           </SelectContent>
         </Select>
+
+        <Select
+          value={currentFilters.needsReview === "1" ? "needsReview" : "all"}
+          onValueChange={(v) =>
+            updateFilter("needsReview", v === "needsReview" ? "1" : undefined)
+          }
+        >
+          <SelectTrigger
+            className="h-8 text-sm w-full sm:w-48"
+            data-testid="filter-needs-review"
+          >
+            <SelectValue placeholder="Review status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All review statuses</SelectItem>
+            <SelectItem value="needsReview">Needs confirmation</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -265,9 +311,17 @@ export function TransactionTable({
                 {hg.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className={cn("h-9 text-xs", header.column.id === "accountName" && "hidden sm:table-cell")}
+                    className={cn(
+                      "h-9 text-xs",
+                      header.column.id === "accountName" &&
+                        "hidden sm:table-cell",
+                      header.column.id === "confirm" && "w-10 px-1 text-center",
+                    )}
                   >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -276,7 +330,10 @@ export function TransactionTable({
           <TableBody>
             {table.getRowModel().rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground text-sm">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center text-muted-foreground text-sm"
+                >
                   No transactions found
                 </TableCell>
               </TableRow>
@@ -288,11 +345,16 @@ export function TransactionTable({
                       key={cell.id}
                       className={cn(
                         "py-2",
-                        cell.column.id === "accountName" && "hidden sm:table-cell",
-                        cell.column.id === "description" && "align-top"
+                        cell.column.id === "accountName" &&
+                          "hidden sm:table-cell",
+                        cell.column.id === "description" && "align-top",
+                        cell.column.id === "confirm" && "w-10 px-1 text-center",
                       )}
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -308,17 +370,50 @@ export function TransactionTable({
   );
 }
 
+function ConfirmCell({
+  transactionId,
+  categoryId,
+  categoryConfirmed,
+}: {
+  transactionId: number;
+  categoryId: number | null;
+  categoryConfirmed: boolean;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const disabled = categoryId === null;
+
+  return (
+    <input
+      type="checkbox"
+      data-testid="confirm-category"
+      title={disabled ? "Set a category first" : "Confirm category"}
+      disabled={disabled || pending}
+      checked={Boolean(categoryId && categoryConfirmed)}
+      onChange={async (e) => {
+        setPending(true);
+        await setTransactionCategoryConfirmed(transactionId, e.target.checked);
+        router.refresh();
+        setPending(false);
+      }}
+      className="h-4 w-4 rounded border-input accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+    />
+  );
+}
+
 function CategoryCell({
   transactionId,
   categoryId,
   categoryName,
   categoryColor,
+  categoryConfirmed,
   categories,
 }: {
   transactionId: number;
   categoryId: number | null;
   categoryName: string | null;
   categoryColor: string | null;
+  categoryConfirmed: boolean;
   categories: Category[];
 }) {
   const [editing, setEditing] = useState(false);
@@ -331,7 +426,7 @@ function CategoryCell({
         onValueChange={async (v) => {
           setPending(true);
           setEditing(false);
-          const newCategoryId = v === "none" ? null : parseInt(v);
+          const newCategoryId = v === "none" ? null : parseInt(v, 10);
           await updateTransactionCategory(transactionId, newCategoryId);
           setPending(false);
         }}
@@ -362,13 +457,23 @@ function CategoryCell({
       {categoryName ? (
         <Badge
           variant="secondary"
-          className="text-xs font-normal"
-          style={{ backgroundColor: `${categoryColor}20`, color: categoryColor ?? undefined }}
+          className={cn(
+            "text-xs font-normal",
+            categoryId !== null &&
+              !categoryConfirmed &&
+              "ring-2 ring-amber-500/40",
+          )}
+          style={{
+            backgroundColor: `${categoryColor}20`,
+            color: categoryColor ?? undefined,
+          }}
         >
           {categoryName}
         </Badge>
       ) : (
-        <span className="text-xs text-muted-foreground italic">Uncategorised</span>
+        <span className="text-xs text-muted-foreground italic">
+          Uncategorised
+        </span>
       )}
     </button>
   );

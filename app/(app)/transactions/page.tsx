@@ -1,13 +1,14 @@
 export const dynamic = "force-dynamic";
-import { db } from "@/lib/db";
-import { transactions, categories, accounts } from "@/lib/db/schema";
-import { sql, and, gte, lte, eq, like, isNull, isNotNull } from "drizzle-orm";
-import { TransactionTable } from "@/components/transactions/transaction-table";
-import { CategoriseDialog } from "@/components/transactions/categorise-dialog";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
+
+import { and, eq, gte, isNotNull, isNull, like, lte, sql } from "drizzle-orm";
 import { Plus } from "lucide-react";
+import Link from "next/link";
+import { CategoriseDialog } from "@/components/transactions/categorise-dialog";
 import { ProcessUncategorisedButton } from "@/components/transactions/process-uncategorised-button";
+import { TransactionTable } from "@/components/transactions/transaction-table";
+import { Button } from "@/components/ui/button";
+import { db } from "@/lib/db";
+import { accounts, categories, transactions } from "@/lib/db/schema";
 
 export default async function TransactionsPage({
   searchParams,
@@ -37,18 +38,23 @@ export default async function TransactionsPage({
     filters.push(lte(transactions.date, end));
   }
   if (params.accountId) {
-    filters.push(eq(transactions.accountId, parseInt(params.accountId)));
+    filters.push(eq(transactions.accountId, parseInt(params.accountId, 10)));
   }
   if (params.categoryId === "none") {
     filters.push(isNull(transactions.categoryId));
   } else if (params.categoryId) {
-    filters.push(eq(transactions.categoryId, parseInt(params.categoryId)));
+    filters.push(eq(transactions.categoryId, parseInt(params.categoryId, 10)));
   }
   if (params.search) {
     filters.push(like(transactions.description, `%${params.search}%`));
   }
   if (params.needsReview === "1") {
-    filters.push(and(isNotNull(transactions.categoryId), eq(transactions.categoryConfirmed, false)));
+    filters.push(
+      and(
+        isNotNull(transactions.categoryId),
+        eq(transactions.categoryConfirmed, false),
+      ),
+    );
   }
 
   const rows = db
@@ -77,18 +83,22 @@ export default async function TransactionsPage({
     .limit(1000)
     .all();
 
-  const uncategorisedCount = db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(transactions)
-    .where(isNull(transactions.categoryId))
-    .get()?.count ?? 0;
+  const uncategorisedCount =
+    db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(transactions)
+      .where(isNull(transactions.categoryId))
+      .get()?.count ?? 0;
 
   const needsReviewCount =
     db
       .select({ count: sql<number>`COUNT(*)` })
       .from(transactions)
       .where(
-        and(isNotNull(transactions.categoryId), eq(transactions.categoryConfirmed, false))
+        and(
+          isNotNull(transactions.categoryId),
+          eq(transactions.categoryConfirmed, false),
+        ),
       )
       .get()?.count ?? 0;
 
@@ -97,7 +107,9 @@ export default async function TransactionsPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Transactions</h1>
-          <p className="text-sm text-muted-foreground">{rows.length} transactions</p>
+          <p className="text-sm text-muted-foreground">
+            {rows.length} transactions
+          </p>
           {needsReviewCount > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-500 mt-0.5">
               {needsReviewCount} need category confirmation

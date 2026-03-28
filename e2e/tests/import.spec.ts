@@ -59,6 +59,26 @@ test.describe('Import', () => {
     await expect(page.getByText(/4 transactions imported/i)).toBeVisible();
   });
 
+  test('import success links to review pending categories', async ({ page }) => {
+    await page.goto('/import');
+
+    await page.getByRole('combobox').nth(0).click();
+    await page.getByRole('option', { name: 'Import Test Account' }).click();
+    await page.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', { name: 'CommBank' }).click();
+    await page.locator('#csv-file').setInputFiles(commbankCsv);
+    await page.getByRole('button', { name: 'Preview import' }).click();
+
+    const importBtn = page.getByRole('button', { name: /Import \d+ transactions/i });
+    await importBtn.waitFor({ state: 'visible' });
+    test.skip(!(await importBtn.isEnabled()), 'No new rows to import (all duplicates)');
+
+    await importBtn.click();
+    await expect(page.getByText('Import complete!')).toBeVisible();
+    const link = page.getByRole('link', { name: /Show pending confirmation/i });
+    await expect(link).toHaveAttribute('href', '/transactions?needsReview=1');
+  });
+
   test('navigate to transactions after import', async ({ page }) => {
     // The 4 CommBank transactions were imported by "confirm import shows success".
     // Just navigate directly to /transactions and verify the data is there.

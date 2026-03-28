@@ -1,14 +1,19 @@
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { categorisationRules, categories, transactions, settings } from "@/lib/db/schema";
-import { eq, inArray, desc } from "drizzle-orm";
-import { findMatchingRule } from "./rule-matcher";
-import { categoriseWithAI } from "./ai-client";
+import {
+  categories,
+  categorisationRules,
+  settings,
+  transactions,
+} from "@/lib/db/schema";
 import type { CategorisationRule, Category } from "@/types";
+import { categoriseWithAI } from "./ai-client";
+import { findMatchingRule } from "./rule-matcher";
 
 const AI_BATCH_SIZE = 50;
 
 export async function categoriseTransactions(
-  transactionIds: number[]
+  transactionIds: number[],
 ): Promise<void> {
   if (transactionIds.length === 0) return;
 
@@ -77,7 +82,7 @@ export async function categoriseTransactions(
         })),
         allCategories,
         apiKey,
-        model
+        model,
       );
 
       for (const result of results) {
