@@ -52,13 +52,10 @@ test.describe("Categorise Dialog", () => {
 
   async function openAndWaitForReview(page: Page) {
     await page.goto("/transactions");
-    const categoriseBtn = page.getByTestId("bulk-ai-categorise");
-    await expect(categoriseBtn).toBeVisible({ timeout: 15_000 });
-    await categoriseBtn.click();
-    const scopeUncategorised = page.getByTestId("bulk-ai-scope-uncategorised");
-    if (await scopeUncategorised.isVisible({ timeout: 1500 }).catch(() => false)) {
-      await scopeUncategorised.click();
-    }
+    const menuBtn = page.getByTestId("ai-actions-menu");
+    await expect(menuBtn).toBeVisible({ timeout: 15_000 });
+    await menuBtn.click();
+    await page.getByTestId("bulk-ai-scope-uncategorised").click();
     const dialog = aiCategoriseDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.locator("tbody tr").first()).toBeVisible({
@@ -289,10 +286,10 @@ test.describe("Categorise Dialog", () => {
       page,
     }) => {
       await page.goto("/transactions");
-      const btn = page.getByTestId("bulk-ai-categorise");
-      await expect(btn).toBeVisible({ timeout: 15_000 });
-      await expect(btn).toContainText(/Recategorise all unconfirmed/i);
-      await btn.click();
+      const menuBtn = page.getByTestId("ai-actions-menu");
+      await expect(menuBtn).toBeVisible({ timeout: 15_000 });
+      await menuBtn.click();
+      await page.getByTestId("bulk-ai-scope-unfinalised").click();
       const dialog = aiCategoriseDialog(page);
       await expect(dialog).toBeVisible();
       await expect(dialog.locator("tbody tr").first()).toBeVisible({

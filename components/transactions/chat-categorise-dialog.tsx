@@ -62,10 +62,19 @@ type Applied = { normalised: string; categoryId: number; categoryName: string };
 
 export function ChatCategoriseDialog({
   categories,
+  externalOpen,
+  onExternalOpenChange,
 }: {
   categories: Category[];
+  externalOpen?: boolean;
+  onExternalOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = externalOpen !== undefined;
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = isControlled
+    ? (v: boolean) => onExternalOpenChange?.(v)
+    : setInternalOpen;
   const [state, setState] = useState<DialogState>("idle");
   const [transactions, setTransactions] = useState<UncategorisedTransaction[]>(
     [],
@@ -96,6 +105,16 @@ export function ChatCategoriseDialog({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  // When externally opened, trigger the dialog
+  const prevOpenRef = useRef(false);
+  useEffect(() => {
+    if (isControlled && externalOpen && !prevOpenRef.current) {
+      openDialog();
+    }
+    prevOpenRef.current = externalOpen ?? false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalOpen]);
 
   function openDialog() {
     setOpen(true);
@@ -307,15 +326,17 @@ export function ChatCategoriseDialog({
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={openDialog}
-        data-testid="chat-categorise-button"
-      >
-        <MessageSquare className="h-4 w-4 mr-2" />
-        Chat &amp; Categorise
-      </Button>
+      {!isControlled && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={openDialog}
+          data-testid="chat-categorise-button"
+        >
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Chat &amp; Categorise
+        </Button>
+      )}
 
       <Dialog
         open={open}

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -27,7 +27,7 @@ import { generateFingerprint } from "@/lib/import/fingerprint";
 import { normaliseDescription } from "@/lib/import/normaliser";
 import type { ActionResult, CategorisationRule, Category } from "@/types";
 
-export type AISuggestionScope = "uncategorised" | "unfinalised";
+export type AISuggestionScope = "uncategorised" | "unfinalised" | "mismatches";
 
 export type SuggestionRow = {
   transactionId: number;
@@ -274,9 +274,14 @@ export async function getAISuggestions(
   scope: AISuggestionScope = "uncategorised",
 ): Promise<ActionResult<SuggestionRow[]>> {
   const whereClause =
-    scope === "unfinalised"
-      ? eq(transactions.categoryConfirmed, false)
-      : isNull(transactions.categoryId);
+    scope === "mismatches"
+      ? and(
+          eq(transactions.categoryConfirmed, true),
+          isNotNull(transactions.categoryId),
+        )
+      : scope === "unfinalised"
+        ? eq(transactions.categoryConfirmed, false)
+        : isNull(transactions.categoryId);
 
   const candidates = db
     .select({
@@ -421,6 +426,16 @@ export async function getAISuggestions(
         });
       }
     }
+  }
+
+  // For mismatches scope, only return rows where AI/rule disagrees with current category
+  if (scope === "mismatches") {
+    const mismatched = suggestions.filter(
+      (s) =>
+        s.suggestedCategoryId != null &&
+        s.suggestedCategoryId !== s.currentCategoryId,
+    );
+    return { success: true, data: mismatched };
   }
 
   return { success: true, data: suggestions };

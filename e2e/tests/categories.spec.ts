@@ -1,4 +1,7 @@
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import Database from "better-sqlite3";
+import { parseCategoryDisplayName } from "@/lib/categories/display-name";
 
 test.describe("Categories", () => {
   test("seeded main groups and sub-categories render", async ({ page }) => {
@@ -96,5 +99,57 @@ test.describe("Categories", () => {
     await expect(
       groceriesCard.locator("button:has(.lucide-trash-2)"),
     ).not.toBeVisible();
+  });
+
+  test("repair orphan sub-category via edit", async ({ page }) => {
+    await page.goto("/categories");
+    await expect(
+      page.getByRole("heading", { name: "Living Costs" }),
+    ).toBeVisible();
+
+    const dbPath = join(process.cwd(), "data", "test.db");
+    const db = new Database(dbPath);
+    const mainRow = db
+      .prepare(
+        "SELECT id FROM categories WHERE name = 'Living Costs' AND parent_id IS NULL",
+      )
+      .get() as { id: number } | undefined;
+    if (!mainRow) throw new Error("Living Costs missing");
+    const subs = db
+      .prepare(
+        "SELECT id, name FROM categories WHERE parent_id = ? ORDER BY name LIMIT 2",
+      )
+      .all(mainRow.id) as { id: number; name: string }[];
+    if (subs.length < 2) {
+      throw new Error("Need two sub-categories under Living Costs");
+    }
+    db.prepare("UPDATE categories SET parent_id = ? WHERE id = ?").run(
+      subs[1].id,
+      subs[0].id,
+    );
+    db.close();
+
+    await page.reload();
+    await expect(
+      page.getByText(/Sub-categories with missing parent/),
+    ).toBeVisible();
+
+    const orphanTitle = parseCategoryDisplayName(subs[0].name).title;
+    const banner = page
+      .getByText(/Sub-categories with missing parent/)
+      .locator("..");
+    const orphanRow = banner.locator("li").filter({ hasText: orphanTitle });
+    await orphanRow.locator("button").first().click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("combobox").click();
+    await page.getByRole("option", { name: "Living Costs" }).click();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).not.toBeVisible();
+
+    await expect(
+      page.getByText(/Sub-categories with missing parent/),
+    ).toHaveCount(0);
   });
 });

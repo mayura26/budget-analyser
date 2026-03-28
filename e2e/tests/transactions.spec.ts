@@ -146,7 +146,7 @@ test.describe("Transactions", () => {
     await expect(row.getByTestId("confirm-category")).toBeChecked();
   });
 
-  test("process uncategorised button visible when uncategorised rows exist", async ({
+  test("AI actions menu shows process uncategorised when uncategorised rows exist", async ({
     page,
   }) => {
     await page.goto("/transactions");
@@ -157,7 +157,14 @@ test.describe("Transactions", () => {
     await page.getByRole("option", { name: "Not processed" }).first().click();
     const rowCount = await page.locator("tbody tr").count();
     test.skip(rowCount === 0, "No uncategorised rows in fixture");
+    await page.getByTestId("ai-actions-menu").click();
     await expect(page.getByTestId("process-uncategorised")).toBeVisible();
+  });
+
+  test("AI actions menu shows find mismatches option", async ({ page }) => {
+    await page.goto("/transactions");
+    await page.getByTestId("ai-actions-menu").click();
+    await expect(page.getByTestId("find-mismatches")).toBeVisible();
   });
 
   test("add manual transaction", async ({ page }) => {

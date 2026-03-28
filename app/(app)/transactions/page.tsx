@@ -3,9 +3,7 @@ export const dynamic = "force-dynamic";
 import { and, eq, gte, isNotNull, isNull, like, lte, sql } from "drizzle-orm";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { CategoriseDialog } from "@/components/transactions/categorise-dialog";
-import { ChatCategoriseDialog } from "@/components/transactions/chat-categorise-dialog";
-import { ProcessUncategorisedButton } from "@/components/transactions/process-uncategorised-button";
+import { TransactionActions } from "@/components/transactions/transaction-actions";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
@@ -116,6 +114,18 @@ export default async function TransactionsPage({
       )
       .get()?.count ?? 0;
 
+  const confirmedCount =
+    db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.categoryConfirmed, true),
+          isNotNull(transactions.categoryId),
+        ),
+      )
+      .get()?.count ?? 0;
+
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -131,20 +141,13 @@ export default async function TransactionsPage({
           )}
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
-          {uncategorisedCount > 0 && (
-            <>
-              <ProcessUncategorisedButton count={uncategorisedCount} />
-              <ChatCategoriseDialog categories={allCategories} />
-            </>
-          )}
-          {unfinalisedCount > 0 && (
-            <CategoriseDialog
-              uncategorisedCount={uncategorisedCount}
-              unfinalisedCount={unfinalisedCount}
-              categories={allCategories}
-              categoryMains={categoryMains}
-            />
-          )}
+          <TransactionActions
+            uncategorisedCount={uncategorisedCount}
+            unfinalisedCount={unfinalisedCount}
+            confirmedCount={confirmedCount}
+            categories={allCategories}
+            categoryMains={categoryMains}
+          />
           <Button asChild size="sm">
             <Link href="/transactions/new">
               <Plus className="h-4 w-4 mr-2" />

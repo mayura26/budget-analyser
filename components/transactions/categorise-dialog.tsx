@@ -7,7 +7,7 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import { Badge } from "@/components/ui/badge";
@@ -71,13 +71,24 @@ export function CategoriseDialog({
   unfinalisedCount,
   categories,
   categoryMains,
+  externalOpen,
+  onExternalOpenChange,
+  initialScope,
 }: {
   uncategorisedCount: number;
   unfinalisedCount: number;
   categories: Category[];
   categoryMains?: Category[];
+  externalOpen?: boolean;
+  onExternalOpenChange?: (open: boolean) => void;
+  initialScope?: AISuggestionScope;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = externalOpen !== undefined;
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = isControlled
+    ? (v: boolean) => onExternalOpenChange?.(v)
+    : setInternalOpen;
   const [state, setState] = useState<DialogState>("idle");
   const [activeScope, setActiveScope] = useState<AISuggestionScope>(
     "uncategorised",
@@ -95,6 +106,16 @@ export function CategoriseDialog({
   const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set());
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  // When externally opened with an initialScope, trigger the dialog
+  const prevOpenRef = useRef(false);
+  useEffect(() => {
+    if (isControlled && externalOpen && !prevOpenRef.current && initialScope) {
+      openDialog(initialScope);
+    }
+    prevOpenRef.current = externalOpen ?? false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalOpen]);
 
   function openDialog(scope: AISuggestionScope) {
     setActiveScope(scope);
@@ -257,7 +278,11 @@ export function CategoriseDialog({
   const showBothScopes =
     uncategorisedCount > 0 && unfinalisedCount > uncategorisedCount;
   const loadingCount =
-    activeScope === "unfinalised" ? unfinalisedCount : uncategorisedCount;
+    activeScope === "mismatches"
+      ? 0
+      : activeScope === "unfinalised"
+        ? unfinalisedCount
+        : uncategorisedCount;
 
   const sourceLabel = (source: SuggestionRow["source"]) => {
     if (source === "ai")
@@ -275,55 +300,56 @@ export function CategoriseDialog({
 
   return (
     <>
-      {showBothScopes ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="bulk-ai-categorise"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              AI categorise
-              <ChevronDown className="h-4 w-4 ml-1 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => openDialog("uncategorised")}
-              data-testid="bulk-ai-scope-uncategorised"
-            >
-              Uncategorised only ({uncategorisedCount})
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => openDialog("unfinalised")}
-              data-testid="bulk-ai-scope-unfinalised"
-            >
-              All unconfirmed ({unfinalisedCount})
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : uncategorisedCount > 0 ? (
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="bulk-ai-categorise"
-          onClick={() => openDialog("uncategorised")}
-        >
-          <Sparkles className="h-4 w-4 mr-2" />
-          Categorise {uncategorisedCount} uncategorised
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="bulk-ai-categorise"
-          onClick={() => openDialog("unfinalised")}
-        >
-          <Sparkles className="h-4 w-4 mr-2" />
-          Recategorise all unconfirmed ({unfinalisedCount})
-        </Button>
-      )}
+      {!isControlled &&
+        (showBothScopes ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="bulk-ai-categorise"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                AI categorise
+                <ChevronDown className="h-4 w-4 ml-1 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => openDialog("uncategorised")}
+                data-testid="bulk-ai-scope-uncategorised"
+              >
+                Uncategorised only ({uncategorisedCount})
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => openDialog("unfinalised")}
+                data-testid="bulk-ai-scope-unfinalised"
+              >
+                All unconfirmed ({unfinalisedCount})
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : uncategorisedCount > 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="bulk-ai-categorise"
+            onClick={() => openDialog("uncategorised")}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Categorise {uncategorisedCount} uncategorised
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="bulk-ai-categorise"
+            onClick={() => openDialog("unfinalised")}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Recategorise all unconfirmed ({unfinalisedCount})
+          </Button>
+        ))}
 
       <Dialog
         open={open}
@@ -333,9 +359,16 @@ export function CategoriseDialog({
       >
         <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden p-4 sm:p-6">
           <DialogHeader className="shrink-0">
-            <DialogTitle>AI Categorisation</DialogTitle>
+            <DialogTitle>
+              {activeScope === "mismatches"
+                ? "Find Mismatches"
+                : "AI Categorisation"}
+            </DialogTitle>
             <DialogDescription>
-              {state === "loading" && "Asking AI to suggest categories…"}
+              {state === "loading" &&
+                (activeScope === "mismatches"
+                  ? "Scanning confirmed transactions for mismatches…"
+                  : "Asking AI to suggest categories…")}
               {state === "review" &&
                 `${suggestions.length} transactions — review and adjust before applying.`}
               {state === "applying" && "Applying categories…"}
@@ -351,7 +384,9 @@ export function CategoriseDialog({
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Processing {loadingCount} transactions…
+                {activeScope === "mismatches"
+                  ? "Reviewing confirmed transactions…"
+                  : `Processing ${loadingCount} transactions…`}
               </p>
             </div>
           )}

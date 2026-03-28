@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CategoryColorField } from "@/components/categories/category-color-field";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { CategoryTypeBadge } from "@/components/categories/category-type-badge";
@@ -33,6 +33,7 @@ import {
   updateCategory,
 } from "@/lib/actions/categories";
 import { deriveSubcategoryColor } from "@/lib/categories/colors";
+import { defaultParentIdStringForSubEdit } from "@/lib/categories/default-parent-for-edit";
 import { parseCategoryDisplayName } from "@/lib/categories/display-name";
 import type { CategorisationRule, Category } from "@/types";
 
@@ -273,10 +274,35 @@ export function CategoryList({
             <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
               Sub-categories with missing parent ({orphanSubs.length})
             </p>
-            <ul className="mt-2 text-sm text-muted-foreground list-disc pl-5">
+            <p className="mt-1 text-xs text-muted-foreground">
+              Choose a main group for each sub-category below, or delete it.
+            </p>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground list-none pl-0">
               {orphanSubs.map((c) => (
-                <li key={c.id}>
-                  <CategoryNameParts name={c.name} variant="list" />
+                <li
+                  key={c.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/20 bg-background/40 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <CategoryNameParts name={c.name} variant="list" />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <EditCategoryDialog
+                      category={c}
+                      mains={mains}
+                      isMain={false}
+                    />
+                    {!c.isSystem && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => deleteCategory(c.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -495,13 +521,25 @@ function EditCategoryDialog({
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [type, setType] = useState<string>(category.type);
-  const [parentId, setParentId] = useState(String(category.parentId ?? ""));
+  const [parentId, setParentId] = useState(() =>
+    isMain
+      ? String(category.parentId ?? "")
+      : defaultParentIdStringForSubEdit(category, mains),
+  );
   const { title: defaultTitle, subtext: defaultSubtext } =
     parseCategoryDisplayName(category.name);
 
   const selectedMain = !isMain
     ? mains.find((m) => String(m.id) === parentId)
     : null;
+
+  useEffect(() => {
+    if (!open) return;
+    setType(category.type);
+    if (!isMain) {
+      setParentId(defaultParentIdStringForSubEdit(category, mains));
+    }
+  }, [open, category, mains, isMain]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 
 const commbankCsv = path.join(__dirname, "../fixtures/commbank.csv");
 
@@ -87,6 +87,7 @@ test.describe("Chat Categorise Dialog", () => {
 
     // Button is gated on global uncategorised count (not account filter)
     await page.goto("/transactions");
+    await page.getByTestId("ai-actions-menu").click();
     const chatBtn = page.getByTestId("chat-categorise-button");
     if (!(await chatBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
       test.skip(
@@ -98,15 +99,29 @@ test.describe("Chat Categorise Dialog", () => {
     await expect(chatBtn).toBeVisible();
   });
 
-  test("dialog opens and AI sends first message", async ({ page }) => {
-    await page.goto("/transactions");
+  async function openChatDialog(page: Page) {
+    await page.getByTestId("ai-actions-menu").click();
     const btn = page.getByTestId("chat-categorise-button");
     if (!(await btn.isVisible({ timeout: 3000 }).catch(() => false))) {
+      return false;
+    }
+    // Menu item is disabled when uncategorisedCount === 0
+    const isDisabled = await btn.getAttribute("data-disabled");
+    if (isDisabled !== null) {
+      // Close the menu by pressing Escape
+      await page.keyboard.press("Escape");
+      return false;
+    }
+    await btn.click();
+    return true;
+  }
+
+  test("dialog opens and AI sends first message", async ({ page }) => {
+    await page.goto("/transactions");
+    if (!(await openChatDialog(page))) {
       test.skip(true, "No uncategorised transactions");
       return;
     }
-
-    await btn.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
@@ -140,13 +155,10 @@ test.describe("Chat Categorise Dialog", () => {
 
   test("skip button advances to next transaction", async ({ page }) => {
     await page.goto("/transactions");
-    const btn = page.getByTestId("chat-categorise-button");
-    if (!(await btn.isVisible({ timeout: 3000 }).catch(() => false))) {
+    if (!(await openChatDialog(page))) {
       test.skip(true, "No uncategorised transactions");
       return;
     }
-
-    await btn.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
@@ -162,13 +174,10 @@ test.describe("Chat Categorise Dialog", () => {
 
   test("skipping all transactions reaches done state", async ({ page }) => {
     await page.goto("/transactions");
-    const btn = page.getByTestId("chat-categorise-button");
-    if (!(await btn.isVisible({ timeout: 3000 }).catch(() => false))) {
+    if (!(await openChatDialog(page))) {
       test.skip(true, "No uncategorised transactions");
       return;
     }
-
-    await btn.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
