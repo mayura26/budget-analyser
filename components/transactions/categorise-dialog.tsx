@@ -472,10 +472,9 @@ export function CategoriseDialog({
                                 className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive sm:hidden"
                                 title="Dismiss"
                                 onClick={() => {
-                                  dismissMismatch(
-                                    row.normalised,
-                                    row.currentCategoryId!,
-                                  );
+                                  const categoryId = row.currentCategoryId;
+                                  if (categoryId == null) return;
+                                  dismissMismatch(row.normalised, categoryId);
                                   setSuggestions((prev) =>
                                     prev.filter(
                                       (s) =>
@@ -568,9 +567,7 @@ export function CategoriseDialog({
                             title="Dismiss — won't show again"
                             data-testid="dismiss-mismatch"
                             onClick={() => {
-                              if (
-                                row.currentCategoryId != null
-                              ) {
+                              if (row.currentCategoryId != null) {
                                 dismissMismatch(
                                   row.normalised,
                                   row.currentCategoryId,

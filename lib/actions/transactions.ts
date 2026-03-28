@@ -375,7 +375,8 @@ async function getMismatchSuggestions(): Promise<SuggestionRow[]> {
         amount: row.amount,
         accountName: row.accountName,
         currentCategoryId: mf.minorityCategoryId,
-        currentCategoryName: categoryMap.get(mf.minorityCategoryId) ?? "Unknown",
+        currentCategoryName:
+          categoryMap.get(mf.minorityCategoryId) ?? "Unknown",
         suggestedCategoryId: mf.majorityCategoryId,
         suggestedCategoryName:
           categoryMap.get(mf.majorityCategoryId) ?? "Unknown",

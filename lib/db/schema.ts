@@ -182,9 +182,7 @@ export const dismissedMismatches = sqliteTable(
     categoryId: integer("category_id")
       .notNull()
       .references(() => categories.id, { onDelete: "cascade" }),
-    createdAt: integer("created_at")
-      .notNull()
-      .default(sql`(unixepoch())`),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
   },
   (table) => [
     uniqueIndex("dismissed_mismatches_unique").on(

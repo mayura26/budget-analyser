@@ -1,0 +1,1 @@
+[ ] Add ability to build up budget. the idea is we can set the expected amount of money we will spend in each group on top of our schedule

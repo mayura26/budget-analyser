@@ -23,7 +23,12 @@
       "Bash(node -e \":*)",
       "Bash(sed -n '10,25p' e2e/tests/categorise.spec.ts)",
       "Bash(sed -n '18,30p' e2e/tests/import.spec.ts)",
-      "Bash(ls -la app/\\\\\\(app\\\\\\)/settings/ components/settings/ lib/actions/)"
+      "Bash(ls -la app/\\\\\\(app\\\\\\)/settings/ components/settings/ lib/actions/)",
+      "Bash(apple)",
+      "Bash(favicon)",
+      "Bash(sw)",
+      "Bash(service \")",
+      "Bash(find 'D:/VSCode Projects/budget-analyser' -type f \\\\\\(-name *.png -o -name *.ico -o -name *.svg -o -name *apple* -o -name *icon* -o -name *favicon* \\\\\\))"
     ]
   }
 }

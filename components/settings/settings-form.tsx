@@ -57,8 +57,8 @@ export function SettingsForm({
       <CardHeader>
         <CardTitle>AI features</CardTitle>
         <CardDescription>
-          Set <code>OPENAI_API_KEY</code> in the server environment. When enabled
-          below, this powers automatic transaction categorisation, chat
+          Set <code>OPENAI_API_KEY</code> in the server environment. When
+          enabled below, this powers automatic transaction categorisation, chat
           categorisation, and Smart Schedule Suggestions on the Budget page.
         </CardDescription>
       </CardHeader>

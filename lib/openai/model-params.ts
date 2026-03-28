@@ -11,7 +11,9 @@ export function isOpenAIReasoningChatModel(model: string): boolean {
  * Some models only accept the API default for `temperature` (1); any other value returns 400.
  * Omit `temperature` in the request for these models.
  */
-export function openAIModelOnlySupportsDefaultTemperature(model: string): boolean {
+export function openAIModelOnlySupportsDefaultTemperature(
+  model: string,
+): boolean {
   const m = model.toLowerCase();
   if (/^gpt-5/.test(m)) return true;
   return false;

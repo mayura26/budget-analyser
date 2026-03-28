@@ -215,7 +215,9 @@ test.describe("Budget", () => {
     await expect(
       page.getByText(/Turn on Enable AI features in Settings/i),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open Settings" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open Settings" }),
+    ).toBeVisible();
 
     await page.goto("/settings");
     await page.getByLabel("Enable AI features").click();

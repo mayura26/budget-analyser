@@ -11,9 +11,7 @@ test.describe("Settings", () => {
     page,
   }) => {
     await page.goto("/settings");
-    await expect(
-      page.getByText(/Smart Schedule Suggestions/i),
-    ).toBeVisible();
+    await expect(page.getByText(/Smart Schedule Suggestions/i)).toBeVisible();
     await expect(page.getByText(/OPENAI_API_KEY/i)).toBeVisible();
   });
 

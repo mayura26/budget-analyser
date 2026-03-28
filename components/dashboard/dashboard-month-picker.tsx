@@ -33,7 +33,12 @@ export function DashboardMonthPicker({
   return (
     <div className="flex items-center gap-2">
       {canGoBack ? (
-        <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          asChild
+        >
           <Link
             href={`/dashboard?month=${prevMonth}`}
             aria-label="Previous month"
@@ -72,7 +77,12 @@ export function DashboardMonthPicker({
       </Select>
 
       {canGoForward ? (
-        <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          asChild
+        >
           <Link href={`/dashboard?month=${nextMonth}`} aria-label="Next month">
             <ChevronRight className="h-4 w-4" />
           </Link>

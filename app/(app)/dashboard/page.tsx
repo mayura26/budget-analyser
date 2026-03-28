@@ -96,7 +96,9 @@ export default async function DashboardPage({
   const maxMonth = getCurrentMonth();
   const earliest = getEarliestTransactionMonth();
   const minMonth = earliest
-    ? (earliest < maxMonth ? earliest : maxMonth)
+    ? earliest < maxMonth
+      ? earliest
+      : maxMonth
     : maxMonth;
 
   const selectedMonth = parseMonthParam(params.month, minMonth, maxMonth);
