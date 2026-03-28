@@ -1,11 +1,23 @@
 "use client";
 
-import { AlertCircle, CheckCircle, Loader2, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  ChevronDown,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useState, useTransition } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +40,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createRulesBulk } from "@/lib/actions/categories";
-import type { SuggestionRow } from "@/lib/actions/transactions";
+import type {
+  AISuggestionScope,
+  SuggestionRow,
+} from "@/lib/actions/transactions";
 import {
   applyCategorisations,
   getAISuggestions,
@@ -49,15 +64,20 @@ type DialogState =
 
 export function CategoriseDialog({
   uncategorisedCount,
+  unfinalisedCount,
   categories,
   categoryMains,
 }: {
   uncategorisedCount: number;
+  unfinalisedCount: number;
   categories: Category[];
   categoryMains?: Category[];
 }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<DialogState>("idle");
+  const [activeScope, setActiveScope] = useState<AISuggestionScope>(
+    "uncategorised",
+  );
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [selections, setSelections] = useState<Record<number, number | null>>(
     {},
@@ -68,7 +88,8 @@ export function CategoriseDialog({
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  function openDialog() {
+  function openDialog(scope: AISuggestionScope) {
+    setActiveScope(scope);
     setOpen(true);
     setState("loading");
     setSuggestions([]);
@@ -76,7 +97,7 @@ export function CategoriseDialog({
     setErrorMsg("");
 
     startTransition(async () => {
-      const result = await getAISuggestions();
+      const result = await getAISuggestions(scope);
       if (!result.success) {
         setErrorMsg(result.error);
         setState("error");
@@ -187,6 +208,11 @@ export function CategoriseDialog({
   ).length;
   const selectedRuleCount = selectedRules.size;
 
+  const showBothScopes =
+    uncategorisedCount > 0 && unfinalisedCount > uncategorisedCount;
+  const loadingCount =
+    activeScope === "unfinalised" ? unfinalisedCount : uncategorisedCount;
+
   const sourceLabel = (source: SuggestionRow["source"]) => {
     if (source === "ai")
       return (
@@ -203,10 +229,55 @@ export function CategoriseDialog({
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={openDialog}>
-        <Sparkles className="h-4 w-4 mr-2" />
-        Categorise {uncategorisedCount} uncategorised
-      </Button>
+      {showBothScopes ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="bulk-ai-categorise"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI categorise
+              <ChevronDown className="h-4 w-4 ml-1 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => openDialog("uncategorised")}
+              data-testid="bulk-ai-scope-uncategorised"
+            >
+              Uncategorised only ({uncategorisedCount})
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => openDialog("unfinalised")}
+              data-testid="bulk-ai-scope-unfinalised"
+            >
+              All unconfirmed ({unfinalisedCount})
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : uncategorisedCount > 0 ? (
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="bulk-ai-categorise"
+          onClick={() => openDialog("uncategorised")}
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Categorise {uncategorisedCount} uncategorised
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="bulk-ai-categorise"
+          onClick={() => openDialog("unfinalised")}
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Recategorise all unconfirmed ({unfinalisedCount})
+        </Button>
+      )}
 
       <Dialog
         open={open}
@@ -234,7 +305,7 @@ export function CategoriseDialog({
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Processing {uncategorisedCount} transactions…
+                Processing {loadingCount} transactions…
               </p>
             </div>
           )}
@@ -278,9 +349,21 @@ export function CategoriseDialog({
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <p className="truncate cursor-default">
-                                {row.description}
-                              </p>
+                              <div className="min-w-0">
+                                <p className="truncate cursor-default">
+                                  {row.description}
+                                </p>
+                                {row.currentCategoryId != null &&
+                                  row.currentCategoryName && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                      Current:{" "}
+                                      <CategoryNameParts
+                                        name={row.currentCategoryName}
+                                        variant="list"
+                                      />
+                                    </p>
+                                  )}
+                              </div>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
                               {row.description}

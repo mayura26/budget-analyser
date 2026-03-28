@@ -23,6 +23,8 @@ import { generateFingerprint } from "@/lib/import/fingerprint";
 import { normaliseDescription } from "@/lib/import/normaliser";
 import type { ActionResult, CategorisationRule, Category } from "@/types";
 
+export type AISuggestionScope = "uncategorised" | "unfinalised";
+
 export type SuggestionRow = {
   transactionId: number;
   date: string;
@@ -30,6 +32,9 @@ export type SuggestionRow = {
   normalised: string;
   amount: number;
   accountName: string;
+  /** Present when the row already had a category (e.g. re-suggesting unconfirmed). */
+  currentCategoryId: number | null;
+  currentCategoryName: string | null;
   suggestedCategoryId: number | null;
   suggestedCategoryName: string;
   source: "rule" | "ai" | "none";
@@ -261,10 +266,15 @@ export async function recategoriseUncategorised(): Promise<
   return { success: true, data: { count: ids.length } };
 }
 
-export async function getAISuggestions(): Promise<
-  ActionResult<SuggestionRow[]>
-> {
-  const uncategorised = db
+export async function getAISuggestions(
+  scope: AISuggestionScope = "uncategorised",
+): Promise<ActionResult<SuggestionRow[]>> {
+  const whereClause =
+    scope === "unfinalised"
+      ? eq(transactions.categoryConfirmed, false)
+      : isNull(transactions.categoryId);
+
+  const candidates = db
     .select({
       id: transactions.id,
       date: transactions.date,
@@ -273,13 +283,16 @@ export async function getAISuggestions(): Promise<
       amount: transactions.amount,
       accountId: transactions.accountId,
       accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+      currentCategoryId: transactions.categoryId,
+      currentCategoryName: categories.name,
     })
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-    .where(isNull(transactions.categoryId))
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(whereClause)
     .all();
 
-  if (uncategorised.length === 0) return { success: true, data: [] };
+  if (candidates.length === 0) return { success: true, data: [] };
 
   const allRules = db
     .select()
@@ -292,10 +305,15 @@ export async function getAISuggestions(): Promise<
   const assignableForAi = filterAssignableCategories(allCategories);
 
   const suggestions: SuggestionRow[] = [];
-  const needsAI: typeof uncategorised = [];
+  const needsAI: typeof candidates = [];
+
+  const rowMeta = (txn: (typeof candidates)[number]) => ({
+    currentCategoryId: txn.currentCategoryId ?? null,
+    currentCategoryName: txn.currentCategoryName ?? null,
+  });
 
   // Phase 1: rule-based (read-only, no DB write)
-  for (const txn of uncategorised) {
+  for (const txn of candidates) {
     const match = findMatchingRule(txn.normalised, allRules);
     if (match) {
       suggestions.push({
@@ -305,6 +323,7 @@ export async function getAISuggestions(): Promise<
         normalised: txn.normalised,
         amount: txn.amount,
         accountName: txn.accountName,
+        ...rowMeta(txn),
         suggestedCategoryId: match.categoryId,
         suggestedCategoryName: categoryMap.get(match.categoryId) ?? "Unknown",
         source: "rule",
@@ -356,6 +375,7 @@ export async function getAISuggestions(): Promise<
             normalised: txn.normalised,
             amount: txn.amount,
             accountName: txn.accountName,
+            ...rowMeta(txn),
             suggestedCategoryId: aiCat,
             suggestedCategoryName: ai?.categoryName ?? "Not processed",
             source: aiCat ? "ai" : "none",
@@ -372,6 +392,7 @@ export async function getAISuggestions(): Promise<
             normalised: txn.normalised,
             amount: txn.amount,
             accountName: txn.accountName,
+            ...rowMeta(txn),
             suggestedCategoryId: null,
             suggestedCategoryName: "Not processed",
             source: "none",
@@ -388,6 +409,7 @@ export async function getAISuggestions(): Promise<
           normalised: txn.normalised,
           amount: txn.amount,
           accountName: txn.accountName,
+          ...rowMeta(txn),
           suggestedCategoryId: null,
           suggestedCategoryName: "Not processed",
           source: "none",

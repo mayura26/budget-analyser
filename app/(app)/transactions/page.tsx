@@ -97,6 +97,13 @@ export default async function TransactionsPage({
       .where(isNull(transactions.categoryId))
       .get()?.count ?? 0;
 
+  const unfinalisedCount =
+    db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(transactions)
+      .where(eq(transactions.categoryConfirmed, false))
+      .get()?.count ?? 0;
+
   const needsReviewCount =
     db
       .select({ count: sql<number>`COUNT(*)` })
@@ -122,32 +129,21 @@ export default async function TransactionsPage({
               {needsReviewCount} need category confirmation
             </p>
           )}
-          {needsReviewCount > 0 && uncategorisedCount === 0 && (
-            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Bulk AI categorise only appears when some transactions have no
-              category. These rows already have a suggested category — mark each
-              as verified in the Verified column, or{" "}
-              <Link
-                href="/transactions?needsReview=1"
-                className="text-primary underline underline-offset-2 hover:underline"
-              >
-                filter to needs confirmation
-              </Link>
-              .
-            </p>
-          )}
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
           {uncategorisedCount > 0 && (
             <>
               <ProcessUncategorisedButton count={uncategorisedCount} />
-              <CategoriseDialog
-                uncategorisedCount={uncategorisedCount}
-                categories={allCategories}
-                categoryMains={categoryMains}
-              />
               <ChatCategoriseDialog categories={allCategories} />
             </>
+          )}
+          {unfinalisedCount > 0 && (
+            <CategoriseDialog
+              uncategorisedCount={uncategorisedCount}
+              unfinalisedCount={unfinalisedCount}
+              categories={allCategories}
+              categoryMains={categoryMains}
+            />
           )}
           <Button asChild size="sm">
             <Link href="/transactions/new">

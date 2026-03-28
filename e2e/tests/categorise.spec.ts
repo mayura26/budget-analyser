@@ -220,4 +220,37 @@ test.describe("Categorise Dialog", () => {
       timeout: 10_000,
     });
   });
+
+  test.describe("Bulk AI — needs confirmation only", () => {
+    test.beforeEach(async ({ page }) => {
+      await page.request.delete("/api/test-cleanup");
+      const seed = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName: ACCOUNT_NAME,
+          count: 2,
+          reset: true,
+          variant: "needs_review",
+        },
+      });
+      expect(seed.ok()).toBeTruthy();
+    });
+
+    test("Recategorise all unconfirmed opens AI dialog with current category", async ({
+      page,
+    }) => {
+      await page.goto("/transactions");
+      const btn = page.getByTestId("bulk-ai-categorise");
+      await expect(btn).toBeVisible({ timeout: 15_000 });
+      await expect(btn).toContainText(/Recategorise all unconfirmed/i);
+      await btn.click();
+      const dialog = aiCategoriseDialog(page);
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator("tbody tr").first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(
+        dialog.getByText(/Current:/, { exact: false }).first(),
+      ).toBeVisible();
+    });
+  });
 });

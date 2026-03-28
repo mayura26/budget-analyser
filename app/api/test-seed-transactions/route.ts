@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { accounts, transactions } from "@/lib/db/schema";
+import { accounts, categories, transactions } from "@/lib/db/schema";
 import { generateFingerprint } from "@/lib/import/fingerprint";
 import { normaliseDescription } from "@/lib/import/normaliser";
 
@@ -13,7 +13,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not available" }, { status: 403 });
   }
 
-  let body: { accountName?: string; count?: number; reset?: boolean };
+  let body: {
+    accountName?: string;
+    count?: number;
+    reset?: boolean;
+    /** Categorised but not verified — for bulk AI “all unconfirmed” E2E. */
+    variant?: "uncategorised" | "needs_review";
+  };
   try {
     body = await request.json();
   } catch {
@@ -31,6 +37,19 @@ export async function POST(request: Request) {
 
   const count = Math.min(50, Math.max(1, Number(body.count) || 3));
   const reset = body.reset !== false;
+  const variant = body.variant ?? "uncategorised";
+
+  let reviewCategoryId: number | null = null;
+  if (variant === "needs_review") {
+    const cat = db.select().from(categories).limit(1).get();
+    if (!cat) {
+      return NextResponse.json(
+        { error: "No categories — seed defaults first" },
+        { status: 400 },
+      );
+    }
+    reviewCategoryId = cat.id;
+  }
 
   const account = db
     .select()
@@ -67,8 +86,8 @@ export async function POST(request: Request) {
         normalised,
         fingerprint,
         amount,
-        categoryId: null,
-        categorySource: null,
+        categoryId: variant === "needs_review" ? reviewCategoryId : null,
+        categorySource: variant === "needs_review" ? "rule" : null,
         categoryConfirmed: false,
         isManual: false,
       })
