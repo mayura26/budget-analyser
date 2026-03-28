@@ -99,16 +99,16 @@ export default async function BudgetPage() {
       </div>
 
       {/* Summary strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Expected Income
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-green-600">
+          <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
+            <p className="text-xl sm:text-2xl font-semibold text-green-600">
               $
               {income30.toLocaleString("en-AU", {
                 minimumFractionDigits: 2,
@@ -120,14 +120,14 @@ export default async function BudgetPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Expected Expenses
             </CardTitle>
             <TrendingDown className="h-4 w-4 text-red-500" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-red-600">
+          <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
+            <p className="text-xl sm:text-2xl font-semibold text-red-600">
               $
               {expense30.toLocaleString("en-AU", {
                 minimumFractionDigits: 2,
@@ -139,15 +139,15 @@ export default async function BudgetPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Projected Net
             </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
             <p
-              className={`text-2xl font-semibold ${net30 >= 0 ? "text-green-600" : "text-red-600"}`}
+              className={`text-xl sm:text-2xl font-semibold ${net30 >= 0 ? "text-green-600" : "text-red-600"}`}
             >
               {net30 >= 0 ? "+" : "-"}$
               {Math.abs(net30).toLocaleString("en-AU", {

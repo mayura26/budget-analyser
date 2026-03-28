@@ -285,7 +285,7 @@ export function CategoriseDialog({
           if (!isPending) setOpen(v);
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden p-4 sm:p-6">
           <DialogHeader className="shrink-0">
             <DialogTitle>AI Categorisation</DialogTitle>
             <DialogDescription>
@@ -312,7 +312,7 @@ export function CategoriseDialog({
 
           {/* Review table */}
           {state === "review" && (
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-md border">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-md border">
               <table className="w-full table-fixed text-sm">
                 <thead className="sticky top-0 z-1 border-b bg-muted/80 backdrop-blur-sm">
                   <tr>
@@ -322,7 +322,7 @@ export function CategoriseDialog({
                     <th className="w-[32%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                       Description
                     </th>
-                    <th className="w-[14%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className="w-[14%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
                       Account
                     </th>
                     <th className="w-[12%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
@@ -331,7 +331,7 @@ export function CategoriseDialog({
                     <th className="w-[23%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                       Category
                     </th>
-                    <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
                       Source
                     </th>
                   </tr>
@@ -371,7 +371,7 @@ export function CategoriseDialog({
                           </Tooltip>
                         </TooltipProvider>
                       </td>
-                      <td className="min-w-0 px-3 py-2 align-middle">
+                      <td className="min-w-0 px-3 py-2 align-middle hidden sm:table-cell">
                         <p className="truncate text-muted-foreground text-xs">
                           {row.accountName}
                         </p>
@@ -420,7 +420,7 @@ export function CategoriseDialog({
                           </SelectContent>
                         </Select>
                       </td>
-                      <td className="px-3 py-2 align-middle">
+                      <td className="px-3 py-2 align-middle hidden sm:table-cell">
                         {sourceLabel(row.source)}
                       </td>
                     </tr>

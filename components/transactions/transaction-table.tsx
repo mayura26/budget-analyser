@@ -359,7 +359,7 @@ export function TransactionTable({
       </div>
 
       {/* Table */}
-      <div className="rounded-md border overflow-hidden">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -375,7 +375,7 @@ export function TransactionTable({
                       header.column.id === "accountName" &&
                         "hidden sm:table-cell",
                       header.column.id === "confirm" &&
-                        "w-12 min-w-12 px-1 text-center",
+                        "w-12 min-w-12 px-1 text-center hidden sm:table-cell",
                     )}
                   >
                     {flexRender(
@@ -409,7 +409,7 @@ export function TransactionTable({
                           "hidden sm:table-cell",
                         cell.column.id === "description" && "align-top",
                         cell.column.id === "confirm" &&
-                          "w-12 min-w-12 px-1 text-center",
+                          "w-12 min-w-12 px-1 text-center hidden sm:table-cell",
                       )}
                     >
                       {flexRender(
@@ -589,7 +589,7 @@ function CategoryCell({
         <Badge
           variant="secondary"
           className={cn(
-            "max-w-[14rem] text-xs font-medium py-0.5 px-2 h-auto min-h-6 leading-tight",
+            "max-w-[8rem] sm:max-w-[14rem] text-xs font-medium py-0.5 px-2 h-auto min-h-6 leading-tight",
             categoryId !== null &&
               !categoryConfirmed &&
               "ring-2 ring-amber-500/40",

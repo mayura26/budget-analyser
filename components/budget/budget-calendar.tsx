@@ -100,7 +100,7 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
       <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
         {cells.map(({ key: cellKey, dateStr }) => {
           if (!dateStr) {
-            return <div key={cellKey} className="bg-background min-h-20" />;
+            return <div key={cellKey} className="bg-background min-h-12 sm:min-h-20" />;
           }
 
           const events = occByDate.get(dateStr) ?? [];
@@ -110,7 +110,7 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
           const cell = (
             <div
               key={dateStr}
-              className={`bg-background min-h-20 p-1 ${isPast ? "opacity-50" : ""}`}
+              className={`bg-background min-h-12 sm:min-h-20 p-1 ${isPast ? "opacity-50" : ""}`}
             >
               <div className="flex justify-end">
                 <span
@@ -127,7 +127,7 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
                 {events.slice(0, 3).map((ev) => (
                   <div
                     key={`${ev.scheduleId}-${ev.name}-${ev.amount}-${dateStr}`}
-                    className={`truncate text-xs rounded px-1 py-0.5 ${
+                    className={`truncate text-[10px] sm:text-xs rounded px-1 py-0.5 ${
                       ev.amount > 0
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-700"

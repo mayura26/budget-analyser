@@ -135,7 +135,7 @@ export function LinkTransferPopover({
                 className="w-full text-left rounded border p-2 text-xs hover:bg-muted transition-colors disabled:opacity-50"
               >
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="font-medium truncate max-w-[140px]">
+                  <span className="font-medium truncate max-w-[100px] sm:max-w-[140px]">
                     {c.accountName}
                   </span>
                   <span
@@ -146,7 +146,7 @@ export function LinkTransferPopover({
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span className="truncate max-w-[140px]">
+                  <span className="truncate max-w-[100px] sm:max-w-[140px]">
                     {c.description}
                   </span>
                   <span>{formatDate(c.date)}</span>

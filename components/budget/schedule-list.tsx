@@ -123,7 +123,7 @@ export function ScheduleList({
             return (
               <div
                 key={s.id}
-                className={`rounded-lg border p-4 space-y-2 transition-opacity ${
+                className={`rounded-lg border p-3 sm:p-4 space-y-2 transition-opacity ${
                   s.isActive ? "" : "opacity-50"
                 }`}
               >
@@ -135,7 +135,7 @@ export function ScheduleList({
                     </Badge>
                   </div>
                   <span
-                    className={`text-lg font-semibold whitespace-nowrap ${
+                    className={`text-base sm:text-lg font-semibold whitespace-nowrap ${
                       isIncome ? "text-green-600" : "text-red-600"
                     }`}
                   >

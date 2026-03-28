@@ -88,7 +88,7 @@ export function CashFlowChart({ points, currentBalance }: Props) {
             </span>
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {HORIZONS.map((h) => (
             <Button
               key={h.value}

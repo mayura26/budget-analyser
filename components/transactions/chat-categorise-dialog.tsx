@@ -282,7 +282,7 @@ export function ChatCategoriseDialog({
           if (!isPending && !aiThinking) setOpen(v);
         }}
       >
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Chat &amp; Categorise</DialogTitle>
             <DialogDescription>
@@ -329,7 +329,7 @@ export function ChatCategoriseDialog({
               </div>
 
               {/* Chat messages */}
-              <div className="flex-1 overflow-y-auto space-y-2 min-h-0 max-h-52 pr-1">
+              <div className="flex-1 overflow-y-auto space-y-2 min-h-0 max-h-40 sm:max-h-52 pr-1">
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
