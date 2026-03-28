@@ -6,7 +6,12 @@ import { z } from "zod";
 import { assignableCategoryError } from "@/lib/categories/assignable";
 import { db } from "@/lib/db";
 import { refreshSubcategoryColorsForParent } from "@/lib/db/category-hierarchy-migrate";
-import { categories, categorisationRules } from "@/lib/db/schema";
+import { applyKeywordRulesToUnverifiedTransactions } from "@/lib/actions/transactions";
+import {
+  keywordRuleStub,
+  matchRule,
+} from "@/lib/categorisation/rule-matcher";
+import { categories, categorisationRules, transactions } from "@/lib/db/schema";
 import type { ActionResult } from "@/types";
 
 const CategorySchema = z.object({
@@ -285,3 +290,47 @@ export async function createRulesBulk(
   revalidatePath("/categories");
   return { success: true, data: { created } };
 }
+
+export async function previewUnverifiedMatchesForRules(
+  rules: { pattern: string; categoryId: number }[],
+): Promise<ActionResult<{ key: string; count: number }[]>> {
+  if (rules.length === 0) return { success: true, data: [] };
+
+  const rows = db
+    .select({ normalised: transactions.normalised })
+    .from(transactions)
+    .where(eq(transactions.categoryConfirmed, false))
+    .all();
+
+  const data = rules.map((r) => {
+    const stub = keywordRuleStub(r.pattern, r.categoryId);
+    const count = rows.filter((row) => matchRule(row.normalised, stub)).length;
+    return { key: `${r.pattern}::${r.categoryId}`, count };
+  });
+
+  return { success: true, data };
+}
+
+export async function createRulesBulkAndApplyToUnverified(
+  rules: { pattern: string; categoryId: number }[],
+): Promise<ActionResult<{ created: number; updated: number }>> {
+  const createdResult = await createRulesBulk(rules);
+  if (!createdResult.success) {
+    return { success: false, error: "Failed to create rules" };
+  }
+
+  const applyResult = await applyKeywordRulesToUnverifiedTransactions(rules);
+  if (!applyResult.success) {
+    return { success: false, error: applyResult.error };
+  }
+
+  revalidatePath("/transactions");
+  return {
+    success: true,
+    data: {
+      created: createdResult.data.created,
+      updated: applyResult.data.updated,
+    },
+  };
+}
+

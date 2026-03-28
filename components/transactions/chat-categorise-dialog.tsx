@@ -27,7 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createRulesBulk } from "@/lib/actions/categories";
+import {
+  createRulesBulk,
+  createRulesBulkAndApplyToUnverified,
+  previewUnverifiedMatchesForRules,
+} from "@/lib/actions/categories";
 import {
   applyCategorisations,
   getUncategorisedTransactions,
@@ -223,19 +227,32 @@ export function ChatCategoriseDialog({
       setState("done");
       return;
     }
-    const transferIds = new Set(
-      categories.filter((c) => c.type === "transfer").map((c) => c.id),
-    );
-    const rules = computeSuggestedRules(applied, transferIds);
-    if (rules.length > 0) {
-      setSuggestedRules(rules);
+    const rules = computeSuggestedRules(applied);
+    if (rules.length === 0) {
+      setState("done");
+      return;
+    }
+    startTransition(async () => {
+      const preview = await previewUnverifiedMatchesForRules(
+        rules.map((r) => ({ pattern: r.pattern, categoryId: r.categoryId })),
+      );
+      const merged =
+        preview.success && preview.data
+          ? rules.map((r) => {
+              const key = `${r.pattern}::${r.categoryId}`;
+              const row = preview.data.find((x) => x.key === key);
+              return {
+                ...r,
+                unverifiedMatchCount: row?.count ?? 0,
+              };
+            })
+          : rules.map((r) => ({ ...r, unverifiedMatchCount: 0 }));
+      setSuggestedRules(merged);
       setSelectedRules(
-        new Set(rules.map((r) => `${r.pattern}::${r.categoryId}`)),
+        new Set(merged.map((r) => `${r.pattern}::${r.categoryId}`)),
       );
       setState("suggestedRules");
-    } else {
-      setState("done");
-    }
+    });
   }
 
   function toggleRule(key: string) {
@@ -254,6 +271,22 @@ export function ChatCategoriseDialog({
 
     startTransition(async () => {
       await createRulesBulk(toCreate);
+      setState("done");
+    });
+  }
+
+  function handleCreateRulesAndApply() {
+    const toCreate = suggestedRules
+      .filter((r) => selectedRules.has(`${r.pattern}::${r.categoryId}`))
+      .map((r) => ({ pattern: r.pattern, categoryId: r.categoryId }));
+
+    startTransition(async () => {
+      const result = await createRulesBulkAndApplyToUnverified(toCreate);
+      if (!result.success) {
+        setErrorMsg(result.error ?? "Failed to create rules");
+        setState("error");
+        return;
+      }
       setState("done");
     });
   }
@@ -391,9 +424,7 @@ export function ChatCategoriseDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="suggested">Use suggested</SelectItem>
-                        {categories
-                          .filter((c) => c.type !== "transfer")
-                          .map((c) => (
+                        {categories.map((c) => (
                             <SelectItem key={c.id} value={String(c.id)}>
                               <CategoryNameParts
                                 name={c.name}
@@ -438,7 +469,8 @@ export function ChatCategoriseDialog({
             <div className="space-y-3 overflow-auto flex-1">
               <p className="text-sm text-muted-foreground">
                 These rules will auto-categorise matching transactions on future
-                imports:
+                imports. &quot;Unverified&quot; counts are existing unconfirmed
+                transactions that match each keyword today.
               </p>
               <div className="rounded-md border divide-y">
                 {suggestedRules.map((rule) => {
@@ -460,9 +492,14 @@ export function ChatCategoriseDialog({
                       </span>
                       <span className="text-muted-foreground text-sm">→</span>
                       <span className="text-sm">{rule.categoryName}</span>
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {rule.matchCount} txn{rule.matchCount !== 1 ? "s" : ""}
+                      <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                        {rule.matchCount} this session
                       </Badge>
+                      {(rule.unverifiedMatchCount ?? 0) > 0 ? (
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {rule.unverifiedMatchCount} unverified
+                        </Badge>
+                      ) : null}
                     </label>
                   );
                 })}
@@ -533,8 +570,10 @@ export function ChatCategoriseDialog({
                   Skip
                 </Button>
                 <Button
+                  variant="outline"
                   onClick={handleCreateRules}
                   disabled={selectedRuleCount === 0 || isPending}
+                  data-testid="create-rules-only-chat"
                 >
                   {isPending ? (
                     <>
@@ -542,7 +581,29 @@ export function ChatCategoriseDialog({
                       Creating…
                     </>
                   ) : (
-                    `Create ${selectedRuleCount} rule${selectedRuleCount !== 1 ? "s" : ""}`
+                    `Rules only (${selectedRuleCount})`
+                  )}
+                </Button>
+                <Button
+                  onClick={handleCreateRulesAndApply}
+                  disabled={
+                    selectedRuleCount === 0 ||
+                    isPending ||
+                    suggestedRules
+                      .filter((r) =>
+                        selectedRules.has(`${r.pattern}::${r.categoryId}`),
+                      )
+                      .every((r) => (r.unverifiedMatchCount ?? 0) === 0)
+                  }
+                  data-testid="create-rules-and-apply-chat"
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Working…
+                    </>
+                  ) : (
+                    "Create rules & update unverified"
                   )}
                 </Button>
               </>

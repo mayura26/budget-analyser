@@ -34,7 +34,7 @@ export async function categoriseWithAI(
 
   const byId = new Map(categories.map((c) => [c.id, c]));
   const categoryList = categories
-    .filter((c) => c.parentId != null && c.type !== "transfer")
+    .filter((c) => c.parentId != null)
     .map((c) => {
       const parent = c.parentId != null ? byId.get(c.parentId) : undefined;
       return formatCategoryForAI(c.id, c.name, parent?.name, c.type);

@@ -42,3 +42,22 @@ export function findMatchingRule(
   }
   return null;
 }
+
+/** In-memory rule for matching only (not persisted). */
+export function keywordRuleStub(
+  pattern: string,
+  categoryId: number,
+): CategorisationRule {
+  return {
+    id: 0,
+    categoryId,
+    pattern,
+    patternType: "keyword",
+    priority: 10,
+    confidence: 0.9,
+    isUserDefined: true,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+}
+

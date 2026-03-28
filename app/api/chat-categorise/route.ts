@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
   const byId = new Map(categories.map((c) => [c.id, c]));
   const categoryList = categories
-    .filter((c) => c.parentId != null && c.type !== "transfer")
+    .filter((c) => c.parentId != null)
     .map((c) => {
       const parent = c.parentId != null ? byId.get(c.parentId) : undefined;
       return formatCategoryForAI(c.id, c.name, parent?.name, c.type);
@@ -107,9 +107,11 @@ Transaction details:
 - Account: ${txn.accountName}
 
 Rules:
+- Use a transfer category only when the description clearly indicates moving money between accounts (not a purchase).
 - If you are >80% confident, state your suggestion with ONE brief reason, then ask "Is that right?"
 - If uncertain, ask ONE specific clarifying question (yes/no or short choice).
 - Keep every response to 1-2 sentences max.
+- After the user confirms, they may create a keyword rule and update other unverified transactions that match.
 - When you have decided on a final category, end your message with exactly: CATEGORY:[id]
   Example: "Categorised as Groceries. CATEGORY:3"
 - Do NOT include CATEGORY:[id] until you are ready to confirm the final answer.`;

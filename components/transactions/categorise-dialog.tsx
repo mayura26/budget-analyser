@@ -39,7 +39,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { createRulesBulk } from "@/lib/actions/categories";
+import {
+  createRulesBulk,
+  createRulesBulkAndApplyToUnverified,
+  previewUnverifiedMatchesForRules,
+} from "@/lib/actions/categories";
 import type {
   AISuggestionScope,
   SuggestionRow,
@@ -150,9 +154,6 @@ export function CategoriseDialog({
 
       // Compute rule suggestions from applied categorisations
       const categoryMap = new Map(categories.map((c) => [c.id, c]));
-      const transferIds = new Set(
-        categories.filter((c) => c.type === "transfer").map((c) => c.id),
-      );
 
       const applied = updates.map((u) => {
         const row = suggestions.find(
@@ -168,13 +169,27 @@ export function CategoriseDialog({
         };
       });
 
-      const rules = computeSuggestedRules(applied, transferIds);
+      const rules = computeSuggestedRules(applied);
 
       if (rules.length > 0) {
-        setSuggestedRules(rules);
+        const preview = await previewUnverifiedMatchesForRules(
+          rules.map((r) => ({ pattern: r.pattern, categoryId: r.categoryId })),
+        );
+        const merged =
+          preview.success && preview.data
+            ? rules.map((r) => {
+                const key = `${r.pattern}::${r.categoryId}`;
+                const row = preview.data.find((x) => x.key === key);
+                return {
+                  ...r,
+                  unverifiedMatchCount: row?.count ?? 0,
+                };
+              })
+            : rules.map((r) => ({ ...r, unverifiedMatchCount: 0 }));
+        setSuggestedRules(merged);
         // Pre-select all suggested rules
         setSelectedRules(
-          new Set(rules.map((r) => `${r.pattern}::${r.categoryId}`)),
+          new Set(merged.map((r) => `${r.pattern}::${r.categoryId}`)),
         );
         setState("suggestedRules");
       } else {
@@ -199,6 +214,22 @@ export function CategoriseDialog({
 
     startTransition(async () => {
       await createRulesBulk(toCreate);
+      setState("done");
+    });
+  }
+
+  function handleCreateRulesAndApply() {
+    const toCreate = suggestedRules
+      .filter((r) => selectedRules.has(`${r.pattern}::${r.categoryId}`))
+      .map((r) => ({ pattern: r.pattern, categoryId: r.categoryId }));
+
+    startTransition(async () => {
+      const result = await createRulesBulkAndApplyToUnverified(toCreate);
+      if (!result.success) {
+        setErrorMsg(result.error ?? "Failed to create rules");
+        setState("error");
+        return;
+      }
       setState("done");
     });
   }
@@ -445,7 +476,8 @@ export function CategoriseDialog({
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden">
               <p className="text-sm text-muted-foreground">
                 These rules will auto-categorise matching transactions on future
-                imports:
+                imports. &quot;Unverified&quot; counts are existing unconfirmed
+                transactions that match each keyword today.
               </p>
               <div className="rounded-md border divide-y">
                 {suggestedRules.map((rule) => {
@@ -472,10 +504,14 @@ export function CategoriseDialog({
                           variant="list"
                         />
                       </span>
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {rule.matchCount} transaction
-                        {rule.matchCount !== 1 ? "s" : ""}
+                      <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                        {rule.matchCount} this session
                       </Badge>
+                      {(rule.unverifiedMatchCount ?? 0) > 0 ? (
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {rule.unverifiedMatchCount} unverified
+                        </Badge>
+                      ) : null}
                     </label>
                   );
                 })}
@@ -530,8 +566,10 @@ export function CategoriseDialog({
                   Skip
                 </Button>
                 <Button
+                  variant="outline"
                   onClick={handleCreateRules}
                   disabled={selectedRuleCount === 0 || isPending}
+                  data-testid="create-rules-only-bulk"
                 >
                   {isPending ? (
                     <>
@@ -539,7 +577,29 @@ export function CategoriseDialog({
                       Creating…
                     </>
                   ) : (
-                    `Create ${selectedRuleCount} rule${selectedRuleCount !== 1 ? "s" : ""}`
+                    `Rules only (${selectedRuleCount})`
+                  )}
+                </Button>
+                <Button
+                  onClick={handleCreateRulesAndApply}
+                  disabled={
+                    selectedRuleCount === 0 ||
+                    isPending ||
+                    suggestedRules
+                      .filter((r) =>
+                        selectedRules.has(`${r.pattern}::${r.categoryId}`),
+                      )
+                      .every((r) => (r.unverifiedMatchCount ?? 0) === 0)
+                  }
+                  data-testid="create-rules-and-apply-bulk"
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Working…
+                    </>
+                  ) : (
+                    "Create rules & update unverified"
                   )}
                 </Button>
               </>

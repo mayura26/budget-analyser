@@ -10,7 +10,11 @@ import {
 } from "@/lib/categories/assignable";
 import { categoriseWithAI } from "@/lib/categorisation/ai-client";
 import { categoriseTransactions } from "@/lib/categorisation/engine";
-import { findMatchingRule } from "@/lib/categorisation/rule-matcher";
+import {
+  findMatchingRule,
+  keywordRuleStub,
+  matchRule,
+} from "@/lib/categorisation/rule-matcher";
 import { db } from "@/lib/db";
 import {
   accounts,
@@ -470,6 +474,67 @@ export async function applyCategorisations(
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   return { success: true, data: { applied } };
+}
+
+export async function applyKeywordRulesToUnverifiedTransactions(
+  rules: { pattern: string; categoryId: number }[],
+): Promise<ActionResult<{ updated: number }>> {
+  if (rules.length === 0) return { success: true, data: { updated: 0 } };
+
+  for (const r of rules) {
+    const err = assignableCategoryError(r.categoryId);
+    if (err) return { success: false, error: err };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const rows = db
+    .select({
+      id: transactions.id,
+      normalised: transactions.normalised,
+      linkedTransactionId: transactions.linkedTransactionId,
+    })
+    .from(transactions)
+    .where(eq(transactions.categoryConfirmed, false))
+    .all();
+
+  const updatedIds = new Set<number>();
+  let updated = 0;
+
+  for (const row of rows) {
+    if (updatedIds.has(row.id)) continue;
+
+    const rule = rules.find((r) =>
+      matchRule(row.normalised, keywordRuleStub(r.pattern, r.categoryId)),
+    );
+    if (!rule) continue;
+
+    const batchUpdate = {
+      categoryId: rule.categoryId,
+      categorySource: "rule" as const,
+      categoryConfirmed: true,
+      updatedAt: now,
+    };
+
+    db.update(transactions)
+      .set(batchUpdate)
+      .where(eq(transactions.id, row.id))
+      .run();
+    updatedIds.add(row.id);
+    updated++;
+
+    if (row.linkedTransactionId) {
+      db.update(transactions)
+        .set(batchUpdate)
+        .where(eq(transactions.id, row.linkedTransactionId))
+        .run();
+      updatedIds.add(row.linkedTransactionId);
+      updated++;
+    }
+  }
+
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  return { success: true, data: { updated } };
 }
 
 export type UncategorisedTransaction = {

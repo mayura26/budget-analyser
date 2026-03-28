@@ -3,6 +3,8 @@ export type SuggestedRule = {
   categoryId: number;
   categoryName: string;
   matchCount: number;
+  /** Unconfirmed transactions whose normalised text matches this keyword (current DB). */
+  unverifiedMatchCount?: number;
 };
 
 const RULE_BLOCKLIST = new Set([
@@ -27,30 +29,34 @@ const RULE_BLOCKLIST = new Set([
   "TRANSACTION",
 ]);
 
+/** First meaningful token for a keyword rule; prefers non-generic tokens, falls back for transfer-like strings. */
+function pickPatternToken(normalised: string): string | null {
+  const raw = normalised
+    .trim()
+    .split(/\s+/)
+    .filter((t) => t.length >= 4 && !/^\d+$/.test(t));
+  if (raw.length === 0) return null;
+  const preferred = raw.filter((t) => !RULE_BLOCKLIST.has(t));
+  const pick = preferred[0] ?? raw[0];
+  return pick ?? null;
+}
+
 export function computeSuggestedRules(
   applied: { normalised: string; categoryId: number; categoryName: string }[],
-  transferCategoryIds: Set<number>,
 ): SuggestedRule[] {
   const ruleMap = new Map<string, SuggestedRule>();
 
   for (const item of applied) {
-    if (transferCategoryIds.has(item.categoryId)) continue;
+    const pattern = pickPatternToken(item.normalised);
+    if (pattern == null) continue;
 
-    const tokens = item.normalised
-      .split(/\s+/)
-      .filter(
-        (t) => t.length >= 4 && !RULE_BLOCKLIST.has(t) && !/^\d+$/.test(t),
-      );
-
-    if (tokens.length === 0) continue;
-
-    const key = `${tokens[0]}::${item.categoryId}`;
+    const key = `${pattern}::${item.categoryId}`;
     const existing = ruleMap.get(key);
     if (existing) {
       existing.matchCount++;
     } else {
       ruleMap.set(key, {
-        pattern: tokens[0],
+        pattern,
         categoryId: item.categoryId,
         categoryName: item.categoryName,
         matchCount: 1,
