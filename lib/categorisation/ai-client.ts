@@ -1,5 +1,9 @@
 import OpenAI from "openai";
 import { formatCategoryForAI } from "@/lib/categories/display-name";
+import {
+  isOpenAIReasoningChatModel,
+  openAIModelOnlySupportsDefaultTemperature,
+} from "@/lib/openai/model-params";
 import type { Category } from "@/types";
 
 export type AICategorisationResult = {
@@ -16,13 +20,6 @@ type TransactionInput = {
   date: string;
   accountName?: string;
 };
-
-/** OpenAI o-series and codex-mini use reasoning params; they reject `temperature` / `top_p`. */
-function isOpenAIReasoningChatModel(model: string): boolean {
-  const m = model.toLowerCase();
-  if (/^o\d/.test(m)) return true;
-  return m === "codex-mini-latest";
-}
 
 export async function categoriseWithAI(
   transactions: TransactionInput[],
@@ -67,6 +64,7 @@ Example shape: {"results":[{"id":1,"categoryId":2,"categoryName":"Groceries","co
 Only return the JSON object, no other text.`;
 
   const reasoning = isOpenAIReasoningChatModel(model);
+  const defaultTempOnly = openAIModelOnlySupportsDefaultTemperature(model);
 
   const response = await client.chat.completions.create({
     model,
@@ -74,7 +72,9 @@ Only return the JSON object, no other text.`;
     response_format: { type: "json_object" },
     ...(reasoning
       ? { reasoning_effort: "medium" as const }
-      : { temperature: 0.1 }),
+      : defaultTempOnly
+        ? {}
+        : { temperature: 0.1 }),
   });
 
   const content = response.choices[0]?.message?.content ?? "{}";

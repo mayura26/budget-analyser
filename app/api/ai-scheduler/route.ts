@@ -8,12 +8,10 @@ import {
   settings,
   transactions,
 } from "@/lib/db/schema";
-
-function isOpenAIReasoningChatModel(model: string): boolean {
-  const m = model.toLowerCase();
-  if (/^o\d/.test(m)) return true;
-  return m === "codex-mini-latest";
-}
+import {
+  isOpenAIReasoningChatModel,
+  openAIModelOnlySupportsDefaultTemperature,
+} from "@/lib/openai/model-params";
 
 export async function POST() {
   const aiEnabledSetting = db
@@ -155,6 +153,7 @@ Only return the JSON object, no other text.`;
 
   const client = new OpenAI({ apiKey });
   const reasoning = isOpenAIReasoningChatModel(model);
+  const defaultTempOnly = openAIModelOnlySupportsDefaultTemperature(model);
 
   const response = await client.chat.completions.create({
     model,
@@ -162,7 +161,9 @@ Only return the JSON object, no other text.`;
     response_format: { type: "json_object" },
     ...(reasoning
       ? { reasoning_effort: "medium" as const }
-      : { temperature: 0.1 }),
+      : defaultTempOnly
+        ? {}
+        : { temperature: 0.1 }),
   });
 
   const content = response.choices[0]?.message?.content ?? "{}";

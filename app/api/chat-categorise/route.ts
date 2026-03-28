@@ -4,16 +4,13 @@ import OpenAI from "openai";
 import { formatCategoryForAI } from "@/lib/categories/display-name";
 import { db } from "@/lib/db";
 import { accounts, settings, transactions } from "@/lib/db/schema";
+import {
+  isOpenAIReasoningChatModel,
+  openAIModelOnlySupportsDefaultTemperature,
+} from "@/lib/openai/model-params";
 import type { Category } from "@/types";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
-
-/** OpenAI o-series and codex-mini use reasoning params; they reject `temperature` / `top_p`. */
-function isReasoningModel(model: string): boolean {
-  const m = model.toLowerCase();
-  if (/^o\d/.test(m)) return true;
-  return m === "codex-mini-latest";
-}
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -117,7 +114,8 @@ Rules:
 - Do NOT include CATEGORY:[id] until you are ready to confirm the final answer.`;
 
   const client = new OpenAI({ apiKey });
-  const reasoning = isReasoningModel(model);
+  const reasoning = isOpenAIReasoningChatModel(model);
+  const defaultTempOnly = openAIModelOnlySupportsDefaultTemperature(model);
 
   try {
     const response = await client.chat.completions.create({
@@ -137,7 +135,9 @@ Rules:
       ],
       ...(reasoning
         ? { reasoning_effort: "low" as const }
-        : { temperature: 0.3 }),
+        : defaultTempOnly
+          ? {}
+          : { temperature: 0.3 }),
     });
 
     const reply = response.choices[0]?.message?.content ?? "";
