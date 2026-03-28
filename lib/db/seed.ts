@@ -56,20 +56,6 @@ const DEFAULT_BANK_PROFILES = [
     isSystem: true,
   },
   {
-    name: "Coles Amex",
-    dateColumn: "Date",
-    descriptionColumn: "Description",
-    amountColumn: "Amount",
-    debitColumn: null,
-    creditColumn: null,
-    dateFormat: "DD/MM/YYYY",
-    skipRows: 0,
-    delimiter: ",",
-    negativeIsDebit: true,
-    extraMappings: null,
-    isSystem: true,
-  },
-  {
     name: "Coles",
     dateColumn: "Date",
     descriptionColumn: "Transaction Details",
@@ -158,6 +144,36 @@ export async function seedDatabase() {
       db.delete(bankProfiles).where(eq(bankProfiles.id, duplicate.id)).run();
     }
   }
+
+  // Legacy built-in "Coles Amex" was removed; merge any remaining row(s) into Coles.
+  const norm = (s: string) => s.trim();
+  for (let i = 0; i < 16; i++) {
+    const all = db.select().from(bankProfiles).all();
+    const colesTarget =
+      all.find((p) => norm(p.name) === "Coles" && p.isSystem) ??
+      all.find((p) => norm(p.name) === "Coles");
+    const legacyAmex = all.find((p) => norm(p.name) === "Coles Amex");
+    if (!legacyAmex) break;
+    if (colesTarget && legacyAmex.id !== colesTarget.id) {
+      db
+        .update(accounts)
+        .set({ bankProfileId: colesTarget.id })
+        .where(eq(accounts.bankProfileId, legacyAmex.id))
+        .run();
+      db.delete(bankProfiles).where(eq(bankProfiles.id, legacyAmex.id)).run();
+      continue;
+    }
+    if (!colesTarget && colesDefaults) {
+      db
+        .update(bankProfiles)
+        .set(colesDefaults)
+        .where(eq(bankProfiles.id, legacyAmex.id))
+        .run();
+      continue;
+    }
+    break;
+  }
+
   if (DEFAULT_BANK_PROFILES.length > 0) {
     if (existingProfiles.length === 0) {
       console.log("Seeded default bank profiles");

@@ -1,10 +1,15 @@
 "use client";
 
+import { CheckCircle } from "lucide-react";
 import { useActionState } from "react";
-import { saveSettings } from "@/lib/actions/settings";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -13,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle } from "lucide-react";
+import { saveSettings } from "@/lib/actions/settings";
 
 const MODELS = [
   { value: "gpt-4o-mini", label: "GPT-4o Mini (recommended)" },
@@ -52,14 +57,18 @@ export function SettingsForm({
       <CardHeader>
         <CardTitle>AI Categorisation</CardTitle>
         <CardDescription>
-          Configure your OpenAI API key via the <code>OPENAI_API_KEY</code> environment variable to enable automatic transaction categorisation.
+          Configure your OpenAI API key via the <code>OPENAI_API_KEY</code>{" "}
+          environment variable to enable automatic transaction categorisation.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">
           <div className="space-y-2">
             <Label>Model</Label>
-            <Select name="openai_model" defaultValue={defaultValues.openai_model}>
+            <Select
+              name="openai_model"
+              defaultValue={defaultValues.openai_model}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -73,17 +82,17 @@ export function SettingsForm({
             </Select>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <Label htmlFor="ai_enabled">Enable AI categorisation</Label>
-            <select
-              id="ai_enabled"
-              name="ai_enabled"
-              defaultValue={defaultValues.ai_enabled}
-              className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
-            >
-              <option value="false">Disabled</option>
-              <option value="true">Enabled</option>
-            </select>
+            <Select name="ai_enabled" defaultValue={defaultValues.ai_enabled}>
+              <SelectTrigger id="ai_enabled" className="w-full sm:w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">Disabled</SelectItem>
+                <SelectItem value="true">Enabled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {state?.success && (

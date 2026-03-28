@@ -19,6 +19,13 @@ test.describe('Settings', () => {
     await expect(page.getByRole('option', { name: /o3-mini \(reasoning\)/i })).toBeVisible();
   });
 
+  test('AI enabled select lists Disabled and Enabled', async ({ page }) => {
+    await page.goto('/settings');
+    await page.getByLabel('Enable AI categorisation').click();
+    await expect(page.getByRole('option', { name: 'Disabled' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Enabled' })).toBeVisible();
+  });
+
   test('save shows success message', async ({ page }) => {
     await page.goto('/settings');
     await page.getByRole('button', { name: 'Save settings' }).click();

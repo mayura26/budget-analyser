@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  findTransferCandidates,
   linkTransactions,
   unlinkTransaction,
   type TransferCandidate,
@@ -33,8 +32,13 @@ export function LinkTransferPopover({
     setOpen(v);
     if (v && !linkedTransactionId) {
       setLoading(true);
-      const result = await findTransferCandidates(transactionId);
-      setCandidates(result.success ? result.data : []);
+      try {
+        const res = await fetch(`/api/transfer-candidates?transactionId=${transactionId}`);
+        const json = await res.json();
+        setCandidates(res.ok ? (json.data as TransferCandidate[]) : []);
+      } catch {
+        setCandidates([]);
+      }
       setLoading(false);
     }
   }
