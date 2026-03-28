@@ -9,6 +9,7 @@
     "lint": "biome check",
     "format": "biome format --write",
     "backup:db": "bash ./scripts/backup-db.sh",
+    "db:reset": "tsx scripts/reset-db.ts",
     "pretest:e2e": "node -e \"const fs=require('fs');['./data/test.db','./data/test.db-wal','./data/test.db-shm'].forEach(f=>{try{fs.unlinkSync(f);console.log('Deleted '+f)}catch(e){}});\"",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
@@ -60,6 +61,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

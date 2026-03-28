@@ -1,50 +1,22 @@
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { eq, and, isNull, asc, sql } from "drizzle-orm";
 import { db } from "./index";
 import { categories } from "./schema";
 import { deriveSubcategoryColor } from "@/lib/categories/colors";
+import {
+  MAIN_GROUP_DEFAULTS,
+  MAIN_GROUP_NAMES,
+  DEFAULT_SUBS,
+  MAIN_RENAMES,
+  LEGACY_FLAT_TO_MAIN,
+  REPARENT_SUB_TO_MAIN,
+  SUB_NAME_UPGRADES,
+  allKnownMainNames,
+  type MainGroupName,
+} from "./category-taxonomy";
 
-/** Top-level group names (parent_id null). Must match seed defaults. */
-export const MAIN_GROUP_NAMES = [
-  "Money in",
-  "Living costs",
-  "Savings",
-  "Enjoyment",
-  "One-off & irregular",
-  "Transfers",
-] as const;
+export { MAIN_GROUP_NAMES, MAIN_GROUP_DEFAULTS };
 
-const LEGACY_FLAT_TO_MAIN: Record<string, (typeof MAIN_GROUP_NAMES)[number]> = {
-  Groceries: "Living costs",
-  Dining: "Living costs",
-  Transport: "Living costs",
-  Utilities: "Living costs",
-  Health: "Living costs",
-  Housing: "Living costs",
-  Insurance: "Living costs",
-  Entertainment: "Enjoyment",
-  Shopping: "Enjoyment",
-  Travel: "One-off & irregular",
-  Misc: "One-off & irregular",
-  Income: "Money in",
-  Transfer: "Transfers",
-  "Credit Card Payment": "Transfers",
-};
-
-export const MAIN_GROUP_DEFAULTS: {
-  name: (typeof MAIN_GROUP_NAMES)[number];
-  color: string;
-  icon: string;
-  type: "income" | "expense" | "transfer";
-}[] = [
-  { name: "Money in", color: "#10b981", icon: "Wallet", type: "income" },
-  { name: "Living costs", color: "#64748b", icon: "Home", type: "expense" },
-  { name: "Savings", color: "#0ea5e9", icon: "PiggyBank", type: "expense" },
-  { name: "Enjoyment", color: "#f59e0b", icon: "Sparkles", type: "expense" },
-  { name: "One-off & irregular", color: "#06b6d4", icon: "Plane", type: "expense" },
-  { name: "Transfers", color: "#6366f1", icon: "ArrowLeftRight", type: "transfer" },
-];
-
-function getMainIdByName(name: (typeof MAIN_GROUP_NAMES)[number]): number | undefined {
+function getMainIdByName(name: string): number | undefined {
   const row = db
     .select({ id: categories.id })
     .from(categories)
@@ -53,7 +25,125 @@ function getMainIdByName(name: (typeof MAIN_GROUP_NAMES)[number]): number | unde
   return row?.id;
 }
 
-/** Recompute sub-category colours under one main group (by main row id). */
+export function normalizeMainGroupNamesAndInsertMissing(): void {
+  for (const [oldName, newName] of Object.entries(MAIN_RENAMES)) {
+    const def = MAIN_GROUP_DEFAULTS.find((d) => d.name === newName);
+    if (!def) continue;
+    const row = db
+      .select()
+      .from(categories)
+      .where(and(eq(categories.name, oldName), isNull(categories.parentId)))
+      .get();
+    if (row) {
+      db.update(categories)
+        .set({
+          name: def.name,
+          color: def.color,
+          icon: def.icon,
+          type: def.type,
+        })
+        .where(eq(categories.id, row.id))
+        .run();
+    }
+  }
+
+  for (const def of MAIN_GROUP_DEFAULTS) {
+    const exists = db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.name, def.name), isNull(categories.parentId)))
+      .get();
+    if (!exists) {
+      db.insert(categories)
+        .values({
+          name: def.name,
+          color: def.color,
+          icon: def.icon,
+          parentId: null,
+          type: def.type,
+          isSystem: true,
+        })
+        .run();
+    }
+  }
+
+  for (const def of MAIN_GROUP_DEFAULTS) {
+    db.update(categories)
+      .set({
+        color: def.color,
+        icon: def.icon,
+        type: def.type,
+      })
+      .where(and(eq(categories.name, def.name), isNull(categories.parentId)))
+      .run();
+  }
+}
+
+export function applySubcategoryTaxonomyAndColours(): void {
+  for (const [oldName, newName] of Object.entries(SUB_NAME_UPGRADES)) {
+    const rows = db
+      .select()
+      .from(categories)
+      .where(
+        and(
+          eq(categories.name, oldName),
+          sql`${categories.parentId} IS NOT NULL`,
+          eq(categories.isSystem, true)
+        )
+      )
+      .all();
+    for (const row of rows) {
+      const clash = db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.name, newName),
+            eq(categories.parentId, row.parentId as number)
+          )
+        )
+        .get();
+      if (clash && clash.id !== row.id) continue;
+      db.update(categories).set({ name: newName }).where(eq(categories.id, row.id)).run();
+    }
+  }
+
+  for (const { subName, targetMain } of REPARENT_SUB_TO_MAIN) {
+    const mainId = getMainIdByName(targetMain);
+    if (!mainId) continue;
+    db.update(categories)
+      .set({ parentId: mainId })
+      .where(
+        and(
+          eq(categories.name, subName),
+          eq(categories.isSystem, true),
+          sql`${categories.parentId} IS NOT NULL`
+        )
+      )
+      .run();
+  }
+
+  for (const sub of DEFAULT_SUBS) {
+    const pid = getMainIdByName(sub.main);
+    if (!pid) continue;
+    const row = db
+      .select()
+      .from(categories)
+      .where(and(eq(categories.name, sub.name), eq(categories.parentId, pid)))
+      .get();
+    if (row) {
+      db.update(categories)
+        .set({
+          color: sub.color,
+          icon: sub.icon,
+          type: sub.type,
+        })
+        .where(eq(categories.id, row.id))
+        .run();
+    }
+  }
+}
+
 export function refreshSubcategoryColorsForParent(mainId: number): void {
   const main = db.select().from(categories).where(eq(categories.id, mainId)).get();
   if (!main || main.parentId !== null) return;
@@ -69,7 +159,6 @@ export function refreshSubcategoryColorsForParent(mainId: number): void {
   });
 }
 
-/** Recompute sub-category colours from each main group's base colour. */
 export function refreshSubcategoryColorsForAllMains(): void {
   const mains = db
     .select()
@@ -81,15 +170,11 @@ export function refreshSubcategoryColorsForAllMains(): void {
   }
 }
 
-/**
- * One-time upgrade: flat legacy rows (parent null, not a main group name) get a parent main row
- * and derived colours.
- */
 export function migrateLegacyFlatCategoriesIfNeeded(): void {
   const all = db.select().from(categories).all();
   if (all.length === 0) return;
 
-  const mainNameSet = new Set<string>(MAIN_GROUP_NAMES);
+  const mainNameSet = allKnownMainNames();
   const needsLegacy = all.some(
     (c) => c.parentId === null && !mainNameSet.has(c.name)
   );
@@ -118,12 +203,10 @@ export function migrateLegacyFlatCategoriesIfNeeded(): void {
   const orphans = db.select().from(categories).where(isNull(categories.parentId)).all();
   for (const cat of orphans) {
     if (mainNameSet.has(cat.name)) continue;
-    const mainName = (LEGACY_FLAT_TO_MAIN[cat.name] ?? "Living costs") as (typeof MAIN_GROUP_NAMES)[number];
+    const mainName = LEGACY_FLAT_TO_MAIN[cat.name] ?? ("Living Costs" as MainGroupName);
     const mainId = getMainIdByName(mainName);
     if (mainId) {
       db.update(categories).set({ parentId: mainId }).where(eq(categories.id, cat.id)).run();
     }
   }
-
-  refreshSubcategoryColorsForAllMains();
 }

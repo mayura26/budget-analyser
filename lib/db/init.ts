@@ -1,6 +1,10 @@
 import { runMigrations } from "./migrate";
 import { seedDatabase } from "./seed";
-import { migrateLegacyFlatCategoriesIfNeeded } from "./category-hierarchy-migrate";
+import {
+  migrateLegacyFlatCategoriesIfNeeded,
+  normalizeMainGroupNamesAndInsertMissing,
+  applySubcategoryTaxonomyAndColours,
+} from "./category-hierarchy-migrate";
 
 let initialized = false;
 
@@ -9,7 +13,9 @@ export function initializeDatabase() {
   initialized = true;
   try {
     runMigrations();
+    normalizeMainGroupNamesAndInsertMissing();
     migrateLegacyFlatCategoriesIfNeeded();
+    applySubcategoryTaxonomyAndColours();
     seedDatabase();
   } catch (err) {
     console.error("Database initialization failed:", err);

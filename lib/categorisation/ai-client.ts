@@ -31,9 +31,14 @@ export async function categoriseWithAI(
 ): Promise<AICategorisationResult[]> {
   const client = new OpenAI({ apiKey });
 
+  const byId = new Map(categories.map((c) => [c.id, c]));
   const categoryList = categories
     .filter((c) => c.parentId != null && c.type !== "transfer")
-    .map((c) => `${c.id}: ${c.name} (${c.type})`)
+    .map((c) => {
+      const parent = c.parentId != null ? byId.get(c.parentId) : undefined;
+      const group = parent?.name ? ` — group: ${parent.name}` : "";
+      return `${c.id}: ${c.name}${group} (${c.type})`;
+    })
     .join("\n");
 
   const transactionList = transactions

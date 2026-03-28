@@ -1,38 +1,9 @@
 import { db } from "./index";
 import { categories, bankProfiles, accounts } from "./schema";
 import { and, eq, isNull } from "drizzle-orm";
-import {
-  MAIN_GROUP_DEFAULTS,
-  MAIN_GROUP_NAMES,
-  refreshSubcategoryColorsForAllMains,
-} from "./category-hierarchy-migrate";
-
-type MainName = (typeof MAIN_GROUP_NAMES)[number];
-
-const DEFAULT_SUBS: {
-  name: string;
-  main: MainName;
-  icon: string;
-  type: "income" | "expense" | "transfer";
-}[] = [
-  { name: "Income", main: "Money in", icon: "TrendingUp", type: "income" },
-  { name: "Gifts", main: "Money in", icon: "Gift", type: "income" },
-  { name: "Groceries", main: "Living costs", icon: "ShoppingCart", type: "expense" },
-  { name: "Dining", main: "Living costs", icon: "Utensils", type: "expense" },
-  { name: "Transport", main: "Living costs", icon: "Car", type: "expense" },
-  { name: "Utilities", main: "Living costs", icon: "Zap", type: "expense" },
-  { name: "Health", main: "Living costs", icon: "Heart", type: "expense" },
-  { name: "Housing", main: "Living costs", icon: "Home", type: "expense" },
-  { name: "Insurance", main: "Living costs", icon: "Shield", type: "expense" },
-  { name: "Investments", main: "Savings", icon: "LineChart", type: "expense" },
-  { name: "Entertainment", main: "Enjoyment", icon: "Film", type: "expense" },
-  { name: "Shopping", main: "Enjoyment", icon: "ShoppingBag", type: "expense" },
-  { name: "Travel", main: "One-off & irregular", icon: "Plane", type: "expense" },
-  { name: "Holidays", main: "One-off & irregular", icon: "Palmtree", type: "expense" },
-  { name: "Misc", main: "One-off & irregular", icon: "HelpCircle", type: "expense" },
-  { name: "Transfer", main: "Transfers", icon: "ArrowLeftRight", type: "transfer" },
-  { name: "Credit Card Payment", main: "Transfers", icon: "CreditCard", type: "transfer" },
-];
+import { MAIN_GROUP_DEFAULTS, DEFAULT_SUBS } from "./category-taxonomy";
+import type { MainGroupName } from "./category-taxonomy";
+import { applySubcategoryTaxonomyAndColours } from "./category-hierarchy-migrate";
 
 function ensureSystemCategories(): void {
   let inserted = false;
@@ -48,7 +19,7 @@ function ensureSystemCategories(): void {
     }
   }
 
-  const mainId = (name: MainName): number | undefined =>
+  const mainId = (name: MainGroupName): number | undefined =>
     db
       .select({ id: categories.id })
       .from(categories)
@@ -69,7 +40,7 @@ function ensureSystemCategories(): void {
         icon: sub.icon,
         type: sub.type,
         parentId: pid,
-        color: "#6366f1",
+        color: sub.color,
         isSystem: true,
       }).run();
       inserted = true;
@@ -77,7 +48,7 @@ function ensureSystemCategories(): void {
   }
 
   if (inserted) {
-    refreshSubcategoryColorsForAllMains();
+    applySubcategoryTaxonomyAndColours();
   }
 }
 

@@ -11,6 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CategoryTypeBadge } from "@/components/categories/category-type-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -109,9 +110,7 @@ export function CategoryList({
                   style={{ backgroundColor: main.color }}
                 />
                 <h2 className="text-base font-semibold">{main.name}</h2>
-                <Badge variant="outline" className="text-xs">
-                  {main.type}
-                </Badge>
+                <CategoryTypeBadge type={main.type} className="text-[10px]" />
                 <div className="ml-auto flex items-center gap-1">
                   <EditCategoryDialog category={main} mains={mains} isMain />
                   {!main.isSystem && (
@@ -158,9 +157,7 @@ export function CategoryList({
                               <CardTitle className="text-sm font-medium truncate">
                                 {cat.name}
                               </CardTitle>
-                              <Badge variant="outline" className="text-xs shrink-0">
-                                {cat.type}
-                              </Badge>
+                              <CategoryTypeBadge type={cat.type} className="text-[10px] shrink-0" />
                             </div>
                             <div
                               className="flex shrink-0 items-center gap-1"
