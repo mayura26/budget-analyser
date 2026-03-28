@@ -1,15 +1,19 @@
 "use client";
 
+import { AlertCircle, CheckCircle, Loader2, Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
+import { CategoryNameParts } from "@/components/categories/category-name-parts";
+import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -17,19 +21,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getAISuggestions, applyCategorisations } from "@/lib/actions/transactions";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { createRulesBulk } from "@/lib/actions/categories";
 import type { SuggestionRow } from "@/lib/actions/transactions";
-import { computeSuggestedRules } from "@/lib/categorisation/rule-suggester";
+import {
+  applyCategorisations,
+  getAISuggestions,
+} from "@/lib/actions/transactions";
 import type { SuggestedRule } from "@/lib/categorisation/rule-suggester";
+import { computeSuggestedRules } from "@/lib/categorisation/rule-suggester";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import type { Category } from "@/types";
 
-type DialogState = "idle" | "loading" | "review" | "applying" | "suggestedRules" | "done" | "error";
+type DialogState =
+  | "idle"
+  | "loading"
+  | "review"
+  | "applying"
+  | "suggestedRules"
+  | "done"
+  | "error";
 
 export function CategoriseDialog({
   uncategorisedCount,
@@ -43,7 +59,9 @@ export function CategoriseDialog({
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<DialogState>("idle");
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
-  const [selections, setSelections] = useState<Record<number, number | null>>({});
+  const [selections, setSelections] = useState<Record<number, number | null>>(
+    {},
+  );
   const [appliedCount, setAppliedCount] = useState(0);
   const [suggestedRules, setSuggestedRules] = useState<SuggestedRule[]>([]);
   const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set());
@@ -106,11 +124,13 @@ export function CategoriseDialog({
       // Compute rule suggestions from applied categorisations
       const categoryMap = new Map(categories.map((c) => [c.id, c]));
       const transferIds = new Set(
-        categories.filter((c) => c.type === "transfer").map((c) => c.id)
+        categories.filter((c) => c.type === "transfer").map((c) => c.id),
       );
 
       const applied = updates.map((u) => {
-        const row = suggestions.find((s) => s.transactionId === u.transactionId)!;
+        const row = suggestions.find(
+          (s) => s.transactionId === u.transactionId,
+        )!;
         return {
           normalised: row.normalised,
           categoryId: u.categoryId,
@@ -123,7 +143,9 @@ export function CategoriseDialog({
       if (rules.length > 0) {
         setSuggestedRules(rules);
         // Pre-select all suggested rules
-        setSelectedRules(new Set(rules.map((r) => `${r.pattern}::${r.categoryId}`)));
+        setSelectedRules(
+          new Set(rules.map((r) => `${r.pattern}::${r.categoryId}`)),
+        );
         setState("suggestedRules");
       } else {
         setState("done");
@@ -151,12 +173,22 @@ export function CategoriseDialog({
     });
   }
 
-  const selectedCount = Object.values(selections).filter((v) => v != null).length;
+  const selectedCount = Object.values(selections).filter(
+    (v) => v != null,
+  ).length;
   const selectedRuleCount = selectedRules.size;
 
   const sourceLabel = (source: SuggestionRow["source"]) => {
-    if (source === "ai") return <Badge className="text-xs bg-blue-100 text-blue-800 border-0">AI</Badge>;
-    if (source === "rule") return <Badge className="text-xs bg-purple-100 text-purple-800 border-0">Rule</Badge>;
+    if (source === "ai")
+      return (
+        <Badge className="text-xs bg-blue-100 text-blue-800 border-0">AI</Badge>
+      );
+    if (source === "rule")
+      return (
+        <Badge className="text-xs bg-purple-100 text-purple-800 border-0">
+          Rule
+        </Badge>
+      );
     return null;
   };
 
@@ -167,15 +199,22 @@ export function CategoriseDialog({
         Categorise {uncategorisedCount} uncategorised
       </Button>
 
-      <Dialog open={open} onOpenChange={(v) => { if (!isPending) setOpen(v); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!isPending) setOpen(v);
+        }}
+      >
         <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
             <DialogTitle>AI Categorisation</DialogTitle>
             <DialogDescription>
               {state === "loading" && "Asking AI to suggest categories…"}
-              {state === "review" && `${suggestions.length} transactions — review and adjust before applying.`}
+              {state === "review" &&
+                `${suggestions.length} transactions — review and adjust before applying.`}
               {state === "applying" && "Applying categories…"}
-              {state === "suggestedRules" && `${appliedCount} categories applied — create rules for future imports?`}
+              {state === "suggestedRules" &&
+                `${appliedCount} categories applied — create rules for future imports?`}
               {state === "done" && `${appliedCount} transactions categorised.`}
               {state === "error" && errorMsg}
             </DialogDescription>
@@ -185,7 +224,9 @@ export function CategoriseDialog({
           {state === "loading" && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Processing {uncategorisedCount} transactions…</p>
+              <p className="text-sm text-muted-foreground">
+                Processing {uncategorisedCount} transactions…
+              </p>
             </div>
           )}
 
@@ -195,17 +236,32 @@ export function CategoriseDialog({
               <table className="w-full table-fixed text-sm">
                 <thead className="sticky top-0 z-1 border-b bg-muted/80 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[11%] px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                    <th className="w-[32%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Description</th>
-                    <th className="w-[14%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Account</th>
-                    <th className="w-[12%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Amount</th>
-                    <th className="w-[23%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Category</th>
-                    <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground">Source</th>
+                    <th className="w-[11%] px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      Date
+                    </th>
+                    <th className="w-[32%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                      Description
+                    </th>
+                    <th className="w-[14%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                      Account
+                    </th>
+                    <th className="w-[12%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      Amount
+                    </th>
+                    <th className="w-[23%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                      Category
+                    </th>
+                    <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                      Source
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {suggestions.map((row) => (
-                    <tr key={row.transactionId} className="border-t border-border">
+                    <tr
+                      key={row.transactionId}
+                      className="border-t border-border"
+                    >
                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap align-middle">
                         {formatDate(row.date)}
                       </td>
@@ -213,7 +269,9 @@ export function CategoriseDialog({
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <p className="truncate cursor-default">{row.description}</p>
+                              <p className="truncate cursor-default">
+                                {row.description}
+                              </p>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
                               {row.description}
@@ -222,22 +280,35 @@ export function CategoriseDialog({
                         </TooltipProvider>
                       </td>
                       <td className="min-w-0 px-3 py-2 align-middle">
-                        <p className="truncate text-muted-foreground text-xs">{row.accountName}</p>
+                        <p className="truncate text-muted-foreground text-xs">
+                          {row.accountName}
+                        </p>
                       </td>
-                      <td className={`px-3 py-2 text-right font-medium whitespace-nowrap align-middle ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}>
-                        {row.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(row.amount))}
+                      <td
+                        className={`px-3 py-2 text-right font-medium whitespace-nowrap align-middle ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {row.amount < 0 ? "-" : "+"}
+                        {formatCurrency(Math.abs(row.amount))}
                       </td>
                       <td className="min-w-0 px-3 py-2 align-middle">
                         <Select
-                          value={selections[row.transactionId] != null ? String(selections[row.transactionId]) : "none"}
-                          onValueChange={(v) => handleCategoryChange(row.transactionId, v)}
+                          value={
+                            selections[row.transactionId] != null
+                              ? String(selections[row.transactionId])
+                              : "none"
+                          }
+                          onValueChange={(v) =>
+                            handleCategoryChange(row.transactionId, v)
+                          }
                         >
                           <SelectTrigger className="h-7 w-full min-w-0 text-xs">
                             <SelectValue placeholder="Pick category" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">
-                              <span className="text-muted-foreground">Not processed</span>
+                              <span className="text-muted-foreground">
+                                Not processed
+                              </span>
                             </SelectItem>
                             {categoryMains && categoryMains.length > 0 ? (
                               <CategorySelectGrouped
@@ -247,7 +318,10 @@ export function CategoriseDialog({
                             ) : (
                               categories.map((c) => (
                                 <SelectItem key={c.id} value={String(c.id)}>
-                                  {c.name}
+                                  <CategoryNameParts
+                                    name={c.name}
+                                    variant="select"
+                                  />
                                 </SelectItem>
                               ))
                             )}
@@ -268,7 +342,9 @@ export function CategoriseDialog({
           {state === "applying" && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Saving {selectedCount} categories…</p>
+              <p className="text-sm text-muted-foreground">
+                Saving {selectedCount} categories…
+              </p>
             </div>
           )}
 
@@ -276,7 +352,8 @@ export function CategoriseDialog({
           {state === "suggestedRules" && (
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden">
               <p className="text-sm text-muted-foreground">
-                These rules will auto-categorise matching transactions on future imports:
+                These rules will auto-categorise matching transactions on future
+                imports:
               </p>
               <div className="rounded-md border divide-y">
                 {suggestedRules.map((rule) => {
@@ -293,11 +370,19 @@ export function CategoriseDialog({
                         onChange={() => toggleRule(key)}
                         className="h-4 w-4 rounded"
                       />
-                      <span className="font-mono text-sm font-medium">"{rule.pattern}"</span>
+                      <span className="font-mono text-sm font-medium">
+                        "{rule.pattern}"
+                      </span>
                       <span className="text-muted-foreground text-sm">→</span>
-                      <span className="text-sm">{rule.categoryName}</span>
+                      <span className="text-sm min-w-0">
+                        <CategoryNameParts
+                          name={rule.categoryName}
+                          variant="list"
+                        />
+                      </span>
                       <Badge variant="secondary" className="ml-auto text-xs">
-                        {rule.matchCount} transaction{rule.matchCount !== 1 ? "s" : ""}
+                        {rule.matchCount} transaction
+                        {rule.matchCount !== 1 ? "s" : ""}
                       </Badge>
                     </label>
                   );
@@ -310,7 +395,9 @@ export function CategoriseDialog({
           {state === "done" && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <CheckCircle className="h-10 w-10 text-green-500" />
-              <p className="text-base font-semibold">{appliedCount} transactions categorised</p>
+              <p className="text-base font-semibold">
+                {appliedCount} transactions categorised
+              </p>
             </div>
           )}
 
@@ -320,7 +407,8 @@ export function CategoriseDialog({
               <AlertCircle className="h-10 w-10 text-destructive" />
               <p className="text-sm text-destructive">{errorMsg}</p>
               <p className="text-xs text-muted-foreground">
-                Make sure <code>OPENAI_API_KEY</code> is set in your environment.
+                Make sure <code>OPENAI_API_KEY</code> is set in your
+                environment.
               </p>
             </div>
           )}
@@ -328,17 +416,39 @@ export function CategoriseDialog({
           <DialogFooter className="shrink-0">
             {state === "review" && (
               <>
-                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={handleApply} disabled={selectedCount === 0 || isPending}>
-                  Apply {selectedCount} suggestion{selectedCount !== 1 ? "s" : ""}
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleApply}
+                  disabled={selectedCount === 0 || isPending}
+                >
+                  Apply {selectedCount} suggestion
+                  {selectedCount !== 1 ? "s" : ""}
                 </Button>
               </>
             )}
             {state === "suggestedRules" && (
               <>
-                <Button variant="outline" onClick={() => setState("done")} disabled={isPending}>Skip</Button>
-                <Button onClick={handleCreateRules} disabled={selectedRuleCount === 0 || isPending}>
-                  {isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</> : `Create ${selectedRuleCount} rule${selectedRuleCount !== 1 ? "s" : ""}`}
+                <Button
+                  variant="outline"
+                  onClick={() => setState("done")}
+                  disabled={isPending}
+                >
+                  Skip
+                </Button>
+                <Button
+                  onClick={handleCreateRules}
+                  disabled={selectedRuleCount === 0 || isPending}
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating…
+                    </>
+                  ) : (
+                    `Create ${selectedRuleCount} rule${selectedRuleCount !== 1 ? "s" : ""}`
+                  )}
                 </Button>
               </>
             )}
@@ -346,7 +456,9 @@ export function CategoriseDialog({
               <Button onClick={() => setOpen(false)}>Close</Button>
             )}
             {state === "error" && (
-              <Button variant="outline" onClick={() => setOpen(false)}>Close</Button>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Close
+              </Button>
             )}
           </DialogFooter>
         </DialogContent>

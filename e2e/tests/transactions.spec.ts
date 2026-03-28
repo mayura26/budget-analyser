@@ -42,7 +42,7 @@ test.describe('Transactions', () => {
 
   test('table columns render', async ({ page }) => {
     await page.goto('/transactions');
-    for (const col of ['Date', 'Description', 'Account', 'Category', 'OK', 'Amount']) {
+    for (const col of ['Date', 'Description', 'Account', 'Category', 'Verified', 'Amount']) {
       await expect(page.getByRole('columnheader', { name: col })).toBeVisible();
     }
   });

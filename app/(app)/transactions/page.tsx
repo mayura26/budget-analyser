@@ -125,7 +125,7 @@ export default async function TransactionsPage({
           {needsReviewCount > 0 && uncategorisedCount === 0 && (
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
               Bulk AI categorise only appears when some transactions have no category.
-              These rows already have a suggested category — tick OK to confirm, or{" "}
+              These rows already have a suggested category — mark each as verified in the Verified column, or{" "}
               <Link
                 href="/transactions?needsReview=1"
                 className="text-primary underline underline-offset-2 hover:underline"

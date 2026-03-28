@@ -9,9 +9,20 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  BadgeCheck,
+  CircleAlert,
+  CircleCheck,
+  Minus,
+  Trash2,
+} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { CategoryNameParts } from "@/components/categories/category-name-parts";
+import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import { LinkTransferPopover } from "@/components/transactions/link-transfer-popover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,8 +47,8 @@ import {
   setTransactionCategoryConfirmed,
   updateTransactionCategory,
 } from "@/lib/actions/transactions";
+import { parseCategoryDisplayName } from "@/lib/categories/display-name";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import type { Account, Category } from "@/types";
 
 type Row = {
@@ -59,6 +70,20 @@ type Row = {
 };
 
 const col = createColumnHelper<Row>();
+
+function categoryTitleFromList(categories: Category[], id: number | null) {
+  if (id == null) return "";
+  const c = categories.find((x) => x.id === id);
+  return c ? parseCategoryDisplayName(c.name).title : "";
+}
+
+function categoryFilterTriggerLabel(categories: Category[], value: string) {
+  if (value === "all") return "All categories";
+  if (value === "none") return "Not processed";
+  const id = Number.parseInt(value, 10);
+  if (Number.isNaN(id)) return "All categories";
+  return categoryTitleFromList(categories, id) || "Unknown";
+}
 
 export function TransactionTable({
   rows,
@@ -166,8 +191,11 @@ export function TransactionTable({
     col.display({
       id: "confirm",
       header: () => (
-        <span className="text-muted-foreground" title="Confirm category">
-          OK
+        <span
+          className="inline-flex flex-col items-center justify-center text-muted-foreground"
+          title="Category verified"
+        >
+          <BadgeCheck className="h-4 w-4 shrink-0" aria-hidden />
         </span>
       ),
       cell: (info) => (
@@ -274,18 +302,35 @@ export function TransactionTable({
             updateFilter("categoryId", v === "all" ? undefined : v)
           }
         >
-          <SelectTrigger className="h-8 text-sm w-full sm:w-44">
-            <SelectValue placeholder="All categories" />
+          <SelectTrigger
+            className="h-8 text-sm w-full sm:w-44"
+            title={(() => {
+              const v = currentFilters.categoryId;
+              if (!v || v === "all" || v === "none") return undefined;
+              const id = Number.parseInt(v, 10);
+              if (Number.isNaN(id)) return undefined;
+              return categories.find((c) => c.id === id)?.name;
+            })()}
+          >
+            <span className="truncate">
+              {categoryFilterTriggerLabel(
+                categories,
+                currentFilters.categoryId ?? "all",
+              )}
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
             <SelectItem value="none">Not processed</SelectItem>
             {categoryMains && categoryMains.length > 0 ? (
-              <CategorySelectGrouped categories={categories} mains={categoryMains} />
+              <CategorySelectGrouped
+                categories={categories}
+                mains={categoryMains}
+              />
             ) : (
               categories.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
-                  {c.name}
+                  <CategoryNameParts name={c.name} variant="select" />
                 </SelectItem>
               ))
             )}
@@ -320,11 +365,15 @@ export function TransactionTable({
                 {hg.headers.map((header) => (
                   <TableHead
                     key={header.id}
+                    aria-label={
+                      header.column.id === "confirm" ? "Verified" : undefined
+                    }
                     className={cn(
                       "h-9 text-xs",
                       header.column.id === "accountName" &&
                         "hidden sm:table-cell",
-                      header.column.id === "confirm" && "w-10 px-1 text-center",
+                      header.column.id === "confirm" &&
+                        "w-12 min-w-12 px-1 text-center",
                     )}
                   >
                     {flexRender(
@@ -357,7 +406,8 @@ export function TransactionTable({
                         cell.column.id === "accountName" &&
                           "hidden sm:table-cell",
                         cell.column.id === "description" && "align-top",
-                        cell.column.id === "confirm" && "w-10 px-1 text-center",
+                        cell.column.id === "confirm" &&
+                          "w-12 min-w-12 px-1 text-center",
                       )}
                     >
                       {flexRender(
@@ -391,22 +441,70 @@ function ConfirmCell({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const disabled = categoryId === null;
+  const verified = Boolean(categoryId && categoryConfirmed);
+  const needsAttention = categoryId !== null && !categoryConfirmed;
 
   return (
-    <input
-      type="checkbox"
-      data-testid="confirm-category"
-      title={disabled ? "Set a category first" : "Confirm category"}
-      disabled={disabled || pending}
-      checked={Boolean(categoryId && categoryConfirmed)}
-      onChange={async (e) => {
-        setPending(true);
-        await setTransactionCategoryConfirmed(transactionId, e.target.checked);
-        router.refresh();
-        setPending(false);
-      }}
-      className="h-4 w-4 rounded border-input accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-    />
+    <label
+      className={cn(
+        "relative flex items-center justify-center rounded-md min-h-9 min-w-9 -my-0.5 mx-auto transition-colors has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background",
+        disabled && "cursor-not-allowed opacity-60",
+        !disabled &&
+          needsAttention &&
+          "bg-amber-500/15 ring-1 ring-amber-500/50 dark:bg-amber-500/20",
+        !disabled && verified && "bg-emerald-500/10 dark:bg-emerald-500/15",
+        !disabled && !pending && "cursor-pointer",
+        pending && "opacity-70",
+      )}
+      title={
+        disabled
+          ? "Set a category first"
+          : verified
+            ? "Category verified — click to unmark"
+            : "Mark category as verified"
+      }
+    >
+      <input
+        type="checkbox"
+        data-testid="confirm-category"
+        aria-label={
+          disabled
+            ? "Set a category before marking as verified"
+            : verified
+              ? "Category verified"
+              : "Mark category as verified"
+        }
+        disabled={disabled || pending}
+        checked={verified}
+        onChange={async (e) => {
+          setPending(true);
+          await setTransactionCategoryConfirmed(
+            transactionId,
+            e.target.checked,
+          );
+          router.refresh();
+          setPending(false);
+        }}
+        className="sr-only"
+      />
+      <span className="pointer-events-none flex items-center justify-center">
+        {disabled ? (
+          <Minus className="h-4 w-4 text-muted-foreground/80" aria-hidden />
+        ) : verified ? (
+          <CircleCheck
+            className="h-[18px] w-[18px] text-emerald-600 dark:text-emerald-400"
+            aria-hidden
+            strokeWidth={2}
+          />
+        ) : (
+          <CircleAlert
+            className="h-[18px] w-[18px] text-amber-600 dark:text-amber-400"
+            aria-hidden
+            strokeWidth={2}
+          />
+        )}
+      </span>
+    </label>
   );
 }
 
@@ -437,24 +535,38 @@ function CategoryCell({
         onValueChange={async (v) => {
           setPending(true);
           setEditing(false);
-          const newCategoryId = v === "none" ? null : parseInt(v, 10);
+          const newCategoryId = v === "none" ? null : Number.parseInt(v, 10);
           await updateTransactionCategory(transactionId, newCategoryId);
           setPending(false);
         }}
         open
         onOpenChange={(open) => !open && setEditing(false)}
       >
-        <SelectTrigger className="h-7 text-xs w-36">
-          <SelectValue />
+        <SelectTrigger
+          className="h-7 text-xs w-36"
+          title={
+            categoryId != null
+              ? (categories.find((c) => c.id === categoryId)?.name ?? undefined)
+              : undefined
+          }
+        >
+          <span className="truncate">
+            {categoryId == null
+              ? "Not processed"
+              : categoryTitleFromList(categories, categoryId) || "Unknown"}
+          </span>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="none">Not processed</SelectItem>
           {categoryMains && categoryMains.length > 0 ? (
-            <CategorySelectGrouped categories={categories} mains={categoryMains} />
+            <CategorySelectGrouped
+              categories={categories}
+              mains={categoryMains}
+            />
           ) : (
             categories.map((c) => (
               <SelectItem key={c.id} value={String(c.id)}>
-                {c.name}
+                <CategoryNameParts name={c.name} variant="select" />
               </SelectItem>
             ))
           )}
@@ -468,13 +580,14 @@ function CategoryCell({
       type="button"
       onClick={() => setEditing(true)}
       disabled={pending}
+      title={categoryName ?? undefined}
       className="hover:opacity-80 transition-opacity"
     >
       {categoryName ? (
         <Badge
           variant="secondary"
           className={cn(
-            "text-xs font-normal",
+            "max-w-[14rem] text-xs font-medium py-0.5 px-2 h-auto min-h-6 leading-tight",
             categoryId !== null &&
               !categoryConfirmed &&
               "ring-2 ring-amber-500/40",
@@ -484,7 +597,9 @@ function CategoryCell({
             color: categoryColor ?? undefined,
           }}
         >
-          {categoryName}
+          <span className="truncate">
+            {parseCategoryDisplayName(categoryName).title}
+          </span>
         </Badge>
       ) : (
         <span className="text-xs text-muted-foreground italic">

@@ -1,19 +1,13 @@
 "use client";
 
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import {
-  deleteCategory,
-  createCategory,
-  deleteRule,
-  createRule,
-  updateCategory,
-} from "@/lib/actions/categories";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { CategoryColorField } from "@/components/categories/category-color-field";
+import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { CategoryTypeBadge } from "@/components/categories/category-type-badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +15,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -28,9 +24,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
-import type { Category, CategorisationRule } from "@/types";
+import {
+  createCategory,
+  createRule,
+  deleteCategory,
+  deleteRule,
+  updateCategory,
+} from "@/lib/actions/categories";
 import { deriveSubcategoryColor } from "@/lib/categories/colors";
+import type { CategorisationRule, Category } from "@/types";
 
 type CategoryWithCount = Category & { ruleCount: number };
 
@@ -53,7 +55,7 @@ export function CategoryList({
         acc[rule.categoryId].push(rule);
         return acc;
       }, {}),
-    [rules]
+    [rules],
   );
 
   const mains = useMemo(
@@ -61,7 +63,7 @@ export function CategoryList({
       categories
         .filter((c) => c.parentId === null)
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [categories]
+    [categories],
   );
 
   const subsByMain = useMemo(() => {
@@ -80,10 +82,8 @@ export function CategoryList({
   const mainIds = useMemo(() => new Set(mains.map((m) => m.id)), [mains]);
   const orphanSubs = useMemo(
     () =>
-      categories.filter(
-        (c) => c.parentId != null && !mainIds.has(c.parentId)
-      ),
-    [categories, mainIds]
+      categories.filter((c) => c.parentId != null && !mainIds.has(c.parentId)),
+    [categories, mainIds],
   );
 
   return (
@@ -109,7 +109,13 @@ export function CategoryList({
                   className="h-4 w-4 shrink-0 rounded-full border border-border"
                   style={{ backgroundColor: main.color }}
                 />
-                <h2 className="text-base font-semibold">{main.name}</h2>
+                <h2 className="text-base min-w-0">
+                  <CategoryNameParts
+                    name={main.name}
+                    variant="list"
+                    listTitleWeight="semibold"
+                  />
+                </h2>
                 <CategoryTypeBadge type={main.type} className="text-[10px]" />
                 <div className="ml-auto flex items-center gap-1">
                   <EditCategoryDialog category={main} mains={mains} isMain />
@@ -129,7 +135,8 @@ export function CategoryList({
               <div className="space-y-2 pl-2 sm:pl-4">
                 {subs.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No sub-categories yet — use &quot;Add sub-category&quot; to add one.
+                    No sub-categories yet — use &quot;Add sub-category&quot; to
+                    add one.
                   </p>
                 ) : (
                   subs.map((cat) => {
@@ -154,10 +161,16 @@ export function CategoryList({
                                 className="h-3 w-3 shrink-0 rounded-full"
                                 style={{ backgroundColor: cat.color }}
                               />
-                              <CardTitle className="text-sm font-medium truncate">
-                                {cat.name}
+                              <CardTitle className="text-sm min-w-0 flex-1">
+                                <CategoryNameParts
+                                  name={cat.name}
+                                  variant="list"
+                                />
                               </CardTitle>
-                              <CategoryTypeBadge type={cat.type} className="text-[10px] shrink-0" />
+                              <CategoryTypeBadge
+                                type={cat.type}
+                                className="text-[10px] shrink-0"
+                              />
                             </div>
                             <div
                               className="flex shrink-0 items-center gap-1"
@@ -258,7 +271,9 @@ export function CategoryList({
             </p>
             <ul className="mt-2 text-sm text-muted-foreground list-disc pl-5">
               {orphanSubs.map((c) => (
-                <li key={c.id}>{c.name}</li>
+                <li key={c.id}>
+                  <CategoryNameParts name={c.name} variant="list" />
+                </li>
               ))}
             </ul>
           </div>
@@ -268,9 +283,7 @@ export function CategoryList({
       {addRuleFor !== null && (
         <AddRuleDialog
           categoryId={addRuleFor}
-          categoryName={
-            categories.find((c) => c.id === addRuleFor)?.name ?? ""
-          }
+          categoryName={categories.find((c) => c.id === addRuleFor)?.name ?? ""}
           onClose={() => setAddRuleFor(null)}
         />
       )}
@@ -326,7 +339,12 @@ function AddMainGroupDialog() {
           </div>
           <div className="space-y-2">
             <Label>Colour</Label>
-            <Input name="color" type="color" defaultValue="#6366f1" className="h-9 w-full" />
+            <Input
+              name="color"
+              type="color"
+              defaultValue="#6366f1"
+              className="h-9 w-full"
+            />
           </div>
           <Button type="submit" className="w-full" disabled={pending}>
             Create
@@ -406,18 +424,16 @@ function AddSubCategoryDialog({
           <p className="text-xs text-muted-foreground">
             Type matches the main group: <strong>{type}</strong>
           </p>
-          <div className="space-y-2">
-            <Label>Colour</Label>
-            <Input
-              name="color"
-              type="color"
-              key={parentId || "none"}
-              defaultValue={defaultColor}
-              className="h-9 w-full"
-              disabled={!parentId}
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={pending || !parentId}>
+          <CategoryColorField
+            key={parentId || "none"}
+            defaultValue={defaultColor}
+            disabled={!parentId}
+          />
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={pending || !parentId}
+          >
             Create
           </Button>
         </form>
@@ -453,12 +469,17 @@ function EditCategoryDialog({
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{isMain ? "Edit main group" : "Edit sub-category"}</DialogTitle>
+          <DialogTitle>
+            {isMain ? "Edit main group" : "Edit sub-category"}
+          </DialogTitle>
         </DialogHeader>
         <form
           action={async (fd) => {
             setPending(true);
-            fd.set("type", isMain ? type : (selectedMain?.type ?? category.type));
+            fd.set(
+              "type",
+              isMain ? type : (selectedMain?.type ?? category.type),
+            );
             if (!isMain) fd.set("parentId", parentId);
             const result = await updateCategory(category.id, null, fd);
             setPending(false);
@@ -507,15 +528,7 @@ function EditCategoryDialog({
               </p>
             </div>
           )}
-          <div className="space-y-2">
-            <Label>Colour</Label>
-            <Input
-              name="color"
-              type="color"
-              defaultValue={category.color}
-              className="h-9 w-full"
-            />
-          </div>
+          <CategoryColorField key={category.id} defaultValue={category.color} />
           <Button type="submit" className="w-full" disabled={pending}>
             Save
           </Button>

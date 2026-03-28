@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { formatCategoryForAI } from "@/lib/categories/display-name";
 import type { Category } from "@/types";
 
 export type AICategorisationResult = {
@@ -27,7 +28,7 @@ export async function categoriseWithAI(
   transactions: TransactionInput[],
   categories: Category[],
   apiKey: string,
-  model = "gpt-4o-mini"
+  model = "gpt-4o-mini",
 ): Promise<AICategorisationResult[]> {
   const client = new OpenAI({ apiKey });
 
@@ -36,15 +37,14 @@ export async function categoriseWithAI(
     .filter((c) => c.parentId != null && c.type !== "transfer")
     .map((c) => {
       const parent = c.parentId != null ? byId.get(c.parentId) : undefined;
-      const group = parent?.name ? ` — group: ${parent.name}` : "";
-      return `${c.id}: ${c.name}${group} (${c.type})`;
+      return formatCategoryForAI(c.id, c.name, parent?.name, c.type);
     })
     .join("\n");
 
   const transactionList = transactions
     .map(
       (t) =>
-        `ID ${t.id}: "${t.normalised}" | AUD ${t.amount.toFixed(2)} | ${t.date}${t.accountName ? ` | ${t.accountName}` : ""}`
+        `ID ${t.id}: "${t.normalised}" | AUD ${t.amount.toFixed(2)} | ${t.date}${t.accountName ? ` | ${t.accountName}` : ""}`,
     )
     .join("\n");
 
@@ -83,7 +83,7 @@ Only return the JSON object, no other text.`;
     const parsed = JSON.parse(content);
     const results: AICategorisationResult[] = Array.isArray(parsed)
       ? parsed
-      : parsed.results ?? parsed.transactions ?? [];
+      : (parsed.results ?? parsed.transactions ?? []);
 
     return results.map((r: Record<string, unknown>) => ({
       transactionId: r.id as number,

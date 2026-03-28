@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { CategoryNameParts } from "@/components/categories/category-name-parts";
+import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,12 +19,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createScheduledTransaction,
   updateScheduledTransaction,
 } from "@/lib/actions/scheduled";
-import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
-import type { ScheduledTransaction, Account, Category, ActionResult } from "@/types";
+import type {
+  Account,
+  ActionResult,
+  Category,
+  ScheduledTransaction,
+} from "@/types";
 
 interface Props {
   open: boolean;
@@ -79,9 +85,15 @@ export function ScheduleDialog({
   const action = isEdit ? boundUpdate! : createScheduledTransaction;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
-    action as (state: ActionResult | null, payload: FormData) => Promise<ActionResult | null>,
-    null
+  const [state, formAction, pending] = useActionState<
+    ActionResult | null,
+    FormData
+  >(
+    action as (
+      state: ActionResult | null,
+      payload: FormData,
+    ) => Promise<ActionResult | null>,
+    null,
   );
 
   useEffect(() => {
@@ -218,11 +230,14 @@ export function ScheduleDialog({
               </SelectTrigger>
               <SelectContent>
                 {categoryMains && categoryMains.length > 0 ? (
-                  <CategorySelectGrouped categories={categories} mains={categoryMains} />
+                  <CategorySelectGrouped
+                    categories={categories}
+                    mains={categoryMains}
+                  />
                 ) : (
                   categories.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
+                      <CategoryNameParts name={c.name} variant="select" />
                     </SelectItem>
                   ))
                 )}
@@ -245,7 +260,11 @@ export function ScheduleDialog({
           )}
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>

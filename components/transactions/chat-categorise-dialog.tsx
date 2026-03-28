@@ -1,17 +1,25 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
+import {
+  CheckCircle,
+  Loader2,
+  MessageSquare,
+  Send,
+  SkipForward,
+} from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { CategoryNameParts } from "@/components/categories/category-name-parts";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -19,19 +27,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, MessageSquare, CheckCircle, Send, SkipForward } from "lucide-react";
+import { createRulesBulk } from "@/lib/actions/categories";
 import {
-  getUncategorisedTransactions,
   applyCategorisations,
+  getUncategorisedTransactions,
   type UncategorisedTransaction,
 } from "@/lib/actions/transactions";
-import { createRulesBulk } from "@/lib/actions/categories";
-import { computeSuggestedRules, type SuggestedRule } from "@/lib/categorisation/rule-suggester";
+import {
+  computeSuggestedRules,
+  type SuggestedRule,
+} from "@/lib/categorisation/rule-suggester";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category } from "@/types";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
-type DialogState = "idle" | "loading" | "chatting" | "saving" | "suggestedRules" | "done" | "error";
+type DialogState =
+  | "idle"
+  | "loading"
+  | "chatting"
+  | "saving"
+  | "suggestedRules"
+  | "done"
+  | "error";
 
 type Applied = { normalised: string; categoryId: number; categoryName: string };
 
@@ -44,15 +61,23 @@ export function ChatCategoriseDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<DialogState>("idle");
-  const [transactions, setTransactions] = useState<UncategorisedTransaction[]>([]);
+  const [transactions, setTransactions] = useState<UncategorisedTransaction[]>(
+    [],
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [aiThinking, setAiThinking] = useState(false);
-  const [suggestedCategoryId, setSuggestedCategoryId] = useState<number | null>(null);
-  const [suggestedCategoryName, setSuggestedCategoryName] = useState<string | null>(null);
+  const [suggestedCategoryId, setSuggestedCategoryId] = useState<number | null>(
+    null,
+  );
+  const [suggestedCategoryName, setSuggestedCategoryName] = useState<
+    string | null
+  >(null);
   const [isConfident, setIsConfident] = useState(false);
-  const [overrideCategoryId, setOverrideCategoryId] = useState<number | null>(null);
+  const [overrideCategoryId, setOverrideCategoryId] = useState<number | null>(
+    null,
+  );
   const [appliedItems, setAppliedItems] = useState<Applied[]>([]);
   const [appliedCount, setAppliedCount] = useState(0);
   const [suggestedRules, setSuggestedRules] = useState<SuggestedRule[]>([]);
@@ -90,7 +115,7 @@ export function ChatCategoriseDialog({
   async function askAI(
     txn: UncategorisedTransaction,
     history: ChatMessage[],
-    cats: Category[]
+    cats: Category[],
   ) {
     setAiThinking(true);
     setSuggestedCategoryId(null);
@@ -102,7 +127,11 @@ export function ChatCategoriseDialog({
       const res = await fetch("/api/chat-categorise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transactionId: txn.id, messages: history, categories: cats }),
+        body: JSON.stringify({
+          transactionId: txn.id,
+          messages: history,
+          categories: cats,
+        }),
       });
       const json = await res.json();
 
@@ -130,7 +159,10 @@ export function ChatCategoriseDialog({
     if (!userInput.trim() || aiThinking) return;
     const text = userInput.trim();
     setUserInput("");
-    const newMessages: ChatMessage[] = [...messages, { role: "user", content: text }];
+    const newMessages: ChatMessage[] = [
+      ...messages,
+      { role: "user", content: text },
+    ];
     setMessages(newMessages);
     const txn = transactions[currentIndex];
     await askAI(txn, newMessages, categories);
@@ -150,7 +182,9 @@ export function ChatCategoriseDialog({
 
     setState("saving");
     startTransition(async () => {
-      await applyCategorisations([{ transactionId: txn.id, categoryId: finalCategoryId, source: "ai" }]);
+      await applyCategorisations([
+        { transactionId: txn.id, categoryId: finalCategoryId, source: "ai" },
+      ]);
       const updatedApplied = [...appliedItems, newApplied];
       setAppliedItems(updatedApplied);
       setAppliedCount((n) => n + 1);
@@ -184,12 +218,14 @@ export function ChatCategoriseDialog({
       return;
     }
     const transferIds = new Set(
-      categories.filter((c) => c.type === "transfer").map((c) => c.id)
+      categories.filter((c) => c.type === "transfer").map((c) => c.id),
     );
     const rules = computeSuggestedRules(applied, transferIds);
     if (rules.length > 0) {
       setSuggestedRules(rules);
-      setSelectedRules(new Set(rules.map((r) => `${r.pattern}::${r.categoryId}`)));
+      setSelectedRules(
+        new Set(rules.map((r) => `${r.pattern}::${r.categoryId}`)),
+      );
       setState("suggestedRules");
     } else {
       setState("done");
@@ -234,17 +270,24 @@ export function ChatCategoriseDialog({
         Chat &amp; Categorise
       </Button>
 
-      <Dialog open={open} onOpenChange={(v) => { if (!isPending && !aiThinking) setOpen(v); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!isPending && !aiThinking) setOpen(v);
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Chat &amp; Categorise</DialogTitle>
             <DialogDescription>
               {state === "loading" && "Loading uncategorised transactions…"}
-              {(state === "chatting" || state === "saving") && transactions.length > 0 && (
-                `Transaction ${currentIndex + 1} of ${transactions.length}`
-              )}
-              {state === "suggestedRules" && `${appliedCount} categorised — create rules for future imports?`}
-              {state === "done" && `${appliedCount} transaction${appliedCount !== 1 ? "s" : ""} categorised.`}
+              {(state === "chatting" || state === "saving") &&
+                transactions.length > 0 &&
+                `Transaction ${currentIndex + 1} of ${transactions.length}`}
+              {state === "suggestedRules" &&
+                `${appliedCount} categorised — create rules for future imports?`}
+              {state === "done" &&
+                `${appliedCount} transaction${appliedCount !== 1 ? "s" : ""} categorised.`}
               {state === "error" && errorMsg}
             </DialogDescription>
           </DialogHeader>
@@ -262,7 +305,9 @@ export function ChatCategoriseDialog({
               {/* Transaction card */}
               <div className="rounded-md border bg-muted/40 px-4 py-3 space-y-1">
                 <div className="flex justify-between items-start gap-2">
-                  <p className="text-sm font-medium leading-snug">{currentTxn.description}</p>
+                  <p className="text-sm font-medium leading-snug">
+                    {currentTxn.description}
+                  </p>
                   <span
                     className={`text-sm font-semibold whitespace-nowrap ${
                       currentTxn.amount < 0 ? "text-red-600" : "text-green-600"
@@ -311,15 +356,28 @@ export function ChatCategoriseDialog({
                 <div className="rounded-md border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900 px-3 py-2.5 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Suggested:</span>
-                      <Badge className="text-xs bg-green-100 text-green-800 border-0 dark:bg-green-900 dark:text-green-200">
-                        {displayCategory}
+                      <span className="text-xs text-muted-foreground">
+                        Suggested:
+                      </span>
+                      <Badge className="text-xs bg-green-100 text-green-800 border-0 dark:bg-green-900 dark:text-green-200 max-w-[min(100%,14rem)] flex-col items-start h-auto py-1">
+                        {displayCategory ? (
+                          <CategoryNameParts
+                            name={displayCategory}
+                            variant="badge"
+                          />
+                        ) : null}
                       </Badge>
                     </div>
                     <Select
-                      value={overrideCategoryId ? String(overrideCategoryId) : "suggested"}
+                      value={
+                        overrideCategoryId
+                          ? String(overrideCategoryId)
+                          : "suggested"
+                      }
                       onValueChange={(v) =>
-                        setOverrideCategoryId(v === "suggested" ? null : parseInt(v, 10))
+                        setOverrideCategoryId(
+                          v === "suggested" ? null : parseInt(v, 10),
+                        )
                       }
                     >
                       <SelectTrigger className="h-6 text-xs w-auto gap-1 border-0 shadow-none bg-transparent text-muted-foreground hover:text-foreground">
@@ -331,7 +389,10 @@ export function ChatCategoriseDialog({
                           .filter((c) => c.type !== "transfer")
                           .map((c) => (
                             <SelectItem key={c.id} value={String(c.id)}>
-                              {c.name}
+                              <CategoryNameParts
+                                name={c.name}
+                                variant="select"
+                              />
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -348,7 +409,9 @@ export function ChatCategoriseDialog({
                     placeholder="Type your response…"
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSend();
+                    }}
                     className="h-8 text-sm flex-1"
                   />
                   <Button
@@ -368,7 +431,8 @@ export function ChatCategoriseDialog({
           {state === "suggestedRules" && (
             <div className="space-y-3 overflow-auto flex-1">
               <p className="text-sm text-muted-foreground">
-                These rules will auto-categorise matching transactions on future imports:
+                These rules will auto-categorise matching transactions on future
+                imports:
               </p>
               <div className="rounded-md border divide-y">
                 {suggestedRules.map((rule) => {
@@ -385,7 +449,9 @@ export function ChatCategoriseDialog({
                         onChange={() => toggleRule(key)}
                         className="h-4 w-4 rounded"
                       />
-                      <span className="font-mono text-sm font-medium">"{rule.pattern}"</span>
+                      <span className="font-mono text-sm font-medium">
+                        "{rule.pattern}"
+                      </span>
                       <span className="text-muted-foreground text-sm">→</span>
                       <span className="text-sm">{rule.categoryName}</span>
                       <Badge variant="secondary" className="ml-auto text-xs">
@@ -415,7 +481,8 @@ export function ChatCategoriseDialog({
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <p className="text-sm text-destructive">{errorMsg}</p>
               <p className="text-xs text-muted-foreground">
-                Make sure <code>OPENAI_API_KEY</code> is set and AI is enabled in Settings.
+                Make sure <code>OPENAI_API_KEY</code> is set and AI is enabled
+                in Settings.
               </p>
             </div>
           )}
@@ -437,10 +504,14 @@ export function ChatCategoriseDialog({
                   <Button
                     size="sm"
                     onClick={handleConfirm}
-                    disabled={isPending || (!suggestedCategoryId && !overrideCategoryId)}
+                    disabled={
+                      isPending || (!suggestedCategoryId && !overrideCategoryId)
+                    }
                     data-testid="confirm-category-chat"
                   >
-                    {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                    {isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    ) : null}
                     Confirm
                   </Button>
                 )}
@@ -448,12 +519,22 @@ export function ChatCategoriseDialog({
             )}
             {state === "suggestedRules" && (
               <>
-                <Button variant="outline" onClick={() => setState("done")} disabled={isPending}>
+                <Button
+                  variant="outline"
+                  onClick={() => setState("done")}
+                  disabled={isPending}
+                >
                   Skip
                 </Button>
-                <Button onClick={handleCreateRules} disabled={selectedRuleCount === 0 || isPending}>
+                <Button
+                  onClick={handleCreateRules}
+                  disabled={selectedRuleCount === 0 || isPending}
+                >
                   {isPending ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</>
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating…
+                    </>
                   ) : (
                     `Create ${selectedRuleCount} rule${selectedRuleCount !== 1 ? "s" : ""}`
                   )}

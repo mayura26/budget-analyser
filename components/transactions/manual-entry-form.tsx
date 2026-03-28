@@ -1,14 +1,15 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createManualTransaction } from "@/lib/actions/transactions";
+import { useActionState, useEffect } from "react";
+import { CategoryOptgroupNative } from "@/components/categories/category-select-grouped";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CategoryOptgroupNative } from "@/components/categories/category-select-grouped";
-import type { Account, Category, ActionResult } from "@/types";
+import { createManualTransaction } from "@/lib/actions/transactions";
+import { formatCategoryOptionPlainText } from "@/lib/categories/display-name";
+import type { Account, ActionResult, Category } from "@/types";
 
 export function ManualTransactionForm({
   accounts,
@@ -23,9 +24,9 @@ export function ManualTransactionForm({
   const [state, formAction, pending] = useActionState(
     createManualTransaction as (
       state: ActionResult<{ id: number }> | null,
-      formData: FormData
+      formData: FormData,
     ) => Promise<ActionResult<{ id: number }>>,
-    null
+    null,
   );
 
   useEffect(() => {
@@ -45,7 +46,9 @@ export function ManualTransactionForm({
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
         >
           {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
           ))}
         </select>
       </div>
@@ -63,7 +66,12 @@ export function ManualTransactionForm({
 
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
-        <Input id="description" name="description" required placeholder="e.g. Coffee at Starbucks" />
+        <Input
+          id="description"
+          name="description"
+          required
+          placeholder="e.g. Coffee at Starbucks"
+        />
       </div>
 
       <div className="space-y-2">
@@ -87,11 +95,14 @@ export function ManualTransactionForm({
         >
           <option value="">Auto-categorise</option>
           {categoryMains && categoryMains.length > 0 ? (
-            <CategoryOptgroupNative categories={categories} mains={categoryMains} />
+            <CategoryOptgroupNative
+              categories={categories}
+              mains={categoryMains}
+            />
           ) : (
             categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {formatCategoryOptionPlainText(c.name)}
               </option>
             ))
           )}
@@ -100,7 +111,12 @@ export function ManualTransactionForm({
 
       <div className="space-y-2">
         <Label htmlFor="notes">Notes (optional)</Label>
-        <Textarea id="notes" name="notes" rows={2} placeholder="Any additional notes…" />
+        <Textarea
+          id="notes"
+          name="notes"
+          rows={2}
+          placeholder="Any additional notes…"
+        />
       </div>
 
       {state && !state.success && (
@@ -111,7 +127,11 @@ export function ManualTransactionForm({
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save transaction"}
         </Button>
-        <Button type="button" variant="outline" onClick={() => window.history.back()}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => window.history.back()}
+        >
           Cancel
         </Button>
       </div>
