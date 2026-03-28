@@ -78,12 +78,22 @@ export function ImportWizard({
   }
 
   async function handleConfirm() {
-    if (!preview) return;
+    if (!preview || !file) return;
     setLoading(true);
     setError(null);
 
     try {
-      const result = await confirmImport(preview);
+      const formData = new FormData();
+      formData.set("accountId", accountId);
+      formData.set("bankProfileId", profileId);
+      formData.set("filename", file.name);
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        formData.set("pdfFile", file);
+      } else {
+        formData.set("csvContent", await file.text());
+      }
+
+      const result = await confirmImport(formData);
       if (!result.success) {
         setError(result.error);
       } else {

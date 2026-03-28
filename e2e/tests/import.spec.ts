@@ -10,6 +10,7 @@ const monzoTransfersCsv = path.join(
 );
 const colesCsv = path.join(__dirname, "../fixtures/coles.csv");
 const commbankPdf = path.join(__dirname, "../fixtures/commbank-statement.pdf");
+const commbank105Csv = path.join(__dirname, "../fixtures/commbank-105.csv");
 
 test.describe("Import", () => {
   test.beforeAll(async ({ browser }) => {
@@ -44,6 +45,29 @@ test.describe("Import", () => {
     await expect(page.getByText("4 new")).toBeVisible();
     await expect(page.getByText("0 duplicate")).toBeVisible();
     await expect(page.locator("tbody tr")).toHaveCount(4);
+  });
+
+  test("CSV with more than 100 rows imports all on confirm", async ({
+    page,
+  }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+    await page.locator("#csv-file").setInputFiles(commbank105Csv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("105 new")).toBeVisible();
+    // Preview table only shows the first 100 rows; full count is in the badge.
+    await expect(page.locator("tbody tr")).toHaveCount(100);
+
+    await page
+      .getByRole("button", { name: /Import 105 transactions/i })
+      .click();
+    await expect(page.getByText("Import complete!")).toBeVisible();
+    await expect(page.getByText(/105 transactions imported/i)).toBeVisible();
   });
 
   test("confirm import shows success", async ({ page }) => {

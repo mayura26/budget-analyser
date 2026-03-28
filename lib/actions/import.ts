@@ -27,9 +27,21 @@ const PreviewSchema = z.object({
   filename: z.string(),
 });
 
-export async function previewImport(
+const PREVIEW_TABLE_ROW_LIMIT = 100;
+
+type BuiltImportPreview = {
+  accountId: number;
+  filename: string;
+  previewRows: PreviewRow[];
+  newRows: PreviewRow[];
+  duplicateRows: PreviewRow[];
+  dateRangeStart: string;
+  dateRangeEnd: string;
+};
+
+async function buildImportPreview(
   formData: FormData,
-): Promise<ActionResult<ImportPreview>> {
+): Promise<ActionResult<BuiltImportPreview>> {
   const parsed = PreviewSchema.safeParse({
     accountId: formData.get("accountId"),
     bankProfileId: formData.get("bankProfileId"),
@@ -65,7 +77,6 @@ export async function previewImport(
     if (!csvContent)
       return { success: false, error: "No file content provided" };
 
-    // Load bank profile
     const profile = db
       .select()
       .from(bankProfiles)
@@ -78,7 +89,6 @@ export async function previewImport(
     rows = csvResult.rows;
     errors = csvResult.errors;
 
-    // If parsing yields no rows, try to auto-detect a built-in profile from the header.
     if (rows.length === 0) {
       const firstNonEmptyLine =
         csvContent
@@ -116,7 +126,6 @@ export async function previewImport(
     };
   }
 
-  // Generate fingerprints
   const previewRows: PreviewRow[] = rows.map((row) => {
     const normalised = normaliseDescription(row.description);
     const fingerprint = generateFingerprint(
@@ -128,11 +137,8 @@ export async function previewImport(
     return { ...row, normalised, fingerprint, isDuplicate: false };
   });
 
-  // Check for duplicates in DB
   const fingerprints = previewRows.map((r) => r.fingerprint);
   const existingChunks: string[] = [];
-
-  // SQLite has a limit on IN clause size, batch it
   const chunkSize = 500;
   for (let i = 0; i < fingerprints.length; i += chunkSize) {
     const chunk = fingerprints.slice(i, i + chunkSize);
@@ -151,7 +157,6 @@ export async function previewImport(
 
   const newRows = previewRows.filter((r) => !r.isDuplicate);
   const duplicateRows = previewRows.filter((r) => r.isDuplicate);
-
   const dates = previewRows.map((r) => r.date).sort();
 
   return {
@@ -159,44 +164,83 @@ export async function previewImport(
     data: {
       accountId,
       filename,
-      rows: previewRows.slice(0, 100),
-      totalRows: previewRows.length,
-      newCount: newRows.length,
-      duplicateCount: duplicateRows.length,
+      previewRows,
+      newRows,
+      duplicateRows,
       dateRangeStart: dates[0] ?? "",
       dateRangeEnd: dates[dates.length - 1] ?? "",
     },
   };
 }
 
+export async function previewImport(
+  formData: FormData,
+): Promise<ActionResult<ImportPreview>> {
+  const built = await buildImportPreview(formData);
+  if (!built.success) return built;
+
+  const {
+    accountId,
+    filename,
+    previewRows,
+    newRows,
+    duplicateRows,
+    dateRangeStart,
+    dateRangeEnd,
+  } = built.data;
+
+  return {
+    success: true,
+    data: {
+      accountId,
+      filename,
+      rows: previewRows.slice(0, PREVIEW_TABLE_ROW_LIMIT),
+      totalRows: previewRows.length,
+      newCount: newRows.length,
+      duplicateCount: duplicateRows.length,
+      dateRangeStart,
+      dateRangeEnd,
+    },
+  };
+}
+
 export async function confirmImport(
-  preview: ImportPreview,
+  formData: FormData,
 ): Promise<
   ActionResult<{ batchId: number; imported: number; skipped: number }>
 > {
-  const newRows = preview.rows.filter((r) => !r.isDuplicate);
+  const built = await buildImportPreview(formData);
+  if (!built.success) return built;
+
+  const {
+    accountId,
+    filename,
+    newRows,
+    duplicateRows,
+    dateRangeStart,
+    dateRangeEnd,
+    previewRows,
+  } = built.data;
 
   if (newRows.length === 0) {
     return { success: false, error: "No new transactions to import" };
   }
 
-  // Create import batch
   const batch = db
     .insert(importBatches)
     .values({
-      accountId: preview.accountId,
-      filename: preview.filename,
-      rowCount: preview.totalRows,
+      accountId,
+      filename,
+      rowCount: previewRows.length,
       importedCount: newRows.length,
-      skippedCount: preview.duplicateCount,
-      dateRangeStart: preview.dateRangeStart,
-      dateRangeEnd: preview.dateRangeEnd,
+      skippedCount: duplicateRows.length,
+      dateRangeStart,
+      dateRangeEnd,
       status: "completed",
     })
     .returning({ id: importBatches.id })
     .get();
 
-  // Insert all new transactions in a transaction
   const insertedIds: number[] = [];
 
   db.transaction((tx) => {
@@ -205,7 +249,7 @@ export async function confirmImport(
         const result = tx
           .insert(transactions)
           .values({
-            accountId: preview.accountId,
+            accountId,
             importBatchId: batch.id,
             fingerprint: row.fingerprint,
             date: row.date,
@@ -224,7 +268,6 @@ export async function confirmImport(
     }
   });
 
-  // Auto-categorise
   if (insertedIds.length > 0) {
     await categoriseTransactions(insertedIds);
   }
@@ -238,7 +281,7 @@ export async function confirmImport(
     data: {
       batchId: batch.id,
       imported: insertedIds.length,
-      skipped: preview.duplicateCount + (newRows.length - insertedIds.length),
+      skipped: duplicateRows.length + (newRows.length - insertedIds.length),
     },
   };
 }
