@@ -7,7 +7,6 @@ import {
   MAIN_GROUP_DEFAULTS,
   MAIN_GROUP_NAMES,
   MAIN_RENAMES,
-  type MainGroupName,
   REPARENT_SUB_TO_MAIN,
   SUB_NAME_UPGRADES,
 } from "./category-taxonomy";
@@ -227,7 +226,10 @@ export function migrateLegacyFlatCategoriesIfNeeded(): void {
 
   const mainNameSet = allKnownMainNames();
   const needsLegacy = all.some(
-    (c) => c.parentId === null && !mainNameSet.has(c.name),
+    (c) =>
+      c.parentId === null &&
+      !mainNameSet.has(c.name) &&
+      Object.hasOwn(LEGACY_FLAT_TO_MAIN, c.name),
   );
   if (!needsLegacy) return;
 
@@ -259,8 +261,8 @@ export function migrateLegacyFlatCategoriesIfNeeded(): void {
     .all();
   for (const cat of orphans) {
     if (mainNameSet.has(cat.name)) continue;
-    const mainName =
-      LEGACY_FLAT_TO_MAIN[cat.name] ?? ("Living Costs" as MainGroupName);
+    const mainName = LEGACY_FLAT_TO_MAIN[cat.name];
+    if (mainName === undefined) continue;
     const mainId = getMainIdByName(mainName);
     if (mainId) {
       db.update(categories)
