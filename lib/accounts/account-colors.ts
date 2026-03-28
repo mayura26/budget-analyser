@@ -13,15 +13,18 @@ export function recomputeAccountColorsForGroup(groupId: number): void {
   if (!group) return;
 
   const rows = db
-    .select({ id: accounts.id })
+    .select({ id: accounts.id, colorCustom: accounts.colorCustom })
     .from(accounts)
     .where(eq(accounts.groupId, groupId))
     .orderBy(asc(accounts.id))
     .all();
 
-  for (let i = 0; i < rows.length; i++) {
-    const color = deriveAccountGroupMemberColor(group.color, i);
-    db.update(accounts).set({ color }).where(eq(accounts.id, rows[i].id)).run();
+  let derivedIdx = 0;
+  for (const row of rows) {
+    if (row.colorCustom) continue;
+    const color = deriveAccountGroupMemberColor(group.color, derivedIdx);
+    derivedIdx += 1;
+    db.update(accounts).set({ color }).where(eq(accounts.id, row.id)).run();
   }
 }
 

@@ -130,6 +130,24 @@ test.describe("Accounts", () => {
     expect(bg1).not.toBe(bg2);
   });
 
+  test("grouped account can pick own colour", async ({ page }) => {
+    await page.goto("/accounts");
+    await page.getByRole("button", { name: "Add account" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="name"]').fill("Custom Colour");
+    await dialog.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: "Test Bank" }).click();
+
+    await dialog.getByRole("checkbox", { name: /pick my own colour/i }).check();
+    await dialog.getByRole("button", { name: "Colour #f59e0b" }).click();
+
+    await dialog.getByRole("button", { name: "Create account" }).click();
+
+    await expect(page.getByText("Custom Colour")).toBeVisible();
+  });
+
   test("rename group inline", async ({ page }) => {
     await page.goto("/accounts");
     await page.waitForSelector("text=Test Bank");
@@ -176,7 +194,7 @@ test.describe("Accounts", () => {
 
   test("cleanup: delete grouped test accounts", async ({ page }) => {
     await page.goto("/accounts");
-    for (const name of ["Second In Group", "Test Savings"]) {
+    for (const name of ["Second In Group", "Test Savings", "Custom Colour"]) {
       const title = page.getByText(name, { exact: true });
       if ((await title.count()) === 0) continue;
       const card = page.locator(".rounded-lg").filter({ hasText: name });

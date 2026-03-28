@@ -26,6 +26,7 @@ export default function AccountsPage() {
       name: accounts.name,
       currency: accounts.currency,
       color: accounts.color,
+      colorCustom: accounts.colorCustom,
       bankProfileId: accounts.bankProfileId,
       groupId: accounts.groupId,
       bankProfileName: sql<string>`${bankProfiles.name}`,
@@ -84,6 +85,7 @@ export default function AccountsPage() {
                   groupId: account.groupId,
                   currency: account.currency,
                   color: account.color,
+                  colorCustom: account.colorCustom,
                   createdAt: 0,
                 }}
               />

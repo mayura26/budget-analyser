@@ -23,15 +23,15 @@ const FAMILY_ARCS: Record<
   | { kind: "linear"; a: number; b: number }
   | { kind: "wrap"; start: number; len: number }
 > = {
-  redPink: { kind: "wrap", start: 325, len: 57 },
-  yellowOrange: { kind: "linear", a: 28, b: 98 },
-  greenTeal: { kind: "linear", a: 102, b: 198 },
-  bluePurple: { kind: "linear", a: 205, b: 318 },
+  redPink: { kind: "wrap", start: 322, len: 62 },
+  yellowOrange: { kind: "linear", a: 24, b: 102 },
+  greenTeal: { kind: "linear", a: 98, b: 199 },
+  bluePurple: { kind: "linear", a: 200, b: 308 },
 };
 
 function classifyHueFamily(hDeg: number, s: number): HueFamily {
   if (s < NEUTRAL_S_MAX) return "neutral";
-  if (hDeg >= 325 || hDeg < 22) return "redPink";
+  if (hDeg >= 322 || hDeg < 22) return "redPink";
   if (hDeg < 100) return "yellowOrange";
   if (hDeg < 200) return "greenTeal";
   return "bluePurple";
@@ -94,18 +94,22 @@ export function deriveAccountGroupMemberColor(
   }
 
   const t0 = anchorTOnArc(family, hDeg);
-  const step = 0.085;
-  const t = clamp(t0 + i * step, 0, 1);
+  /** ~0.2 t ≈ 20–24° on typical bands — visible on small swatches; alternate ± so we use both ends. */
+  const stepT = 0.2;
+  const k = i;
+  const dir = k % 2 === 1 ? 1 : -1;
+  const wave = Math.ceil(k / 2);
+  const t = clamp(t0 + dir * wave * stepT, 0, 1);
   const hOutDeg = hueFromT(family, t);
   const hNorm = hOutDeg / 360;
 
   const j = i - 1;
   const l = clamp(
-    hsl.l + 0.04 * (j % 4) - 0.02 * Math.floor(j / 4),
+    hsl.l + 0.055 * (j % 4) - 0.03 * Math.floor(j / 4),
     0.22,
     0.88,
   );
-  const s = clamp(hsl.s - 0.03 * (j % 3), 0.25, 0.95);
+  const s = clamp(hsl.s - 0.045 * (j % 3), 0.25, 0.95);
   const out = hslToRgb(hNorm, s, l);
   return rgbToHex(out.r, out.g, out.b);
 }

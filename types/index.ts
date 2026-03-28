@@ -23,6 +23,8 @@ export type Account = {
   groupId: number | null;
   currency: string;
   color: string;
+  /** When true and `groupId` is set, `color` is user-chosen; otherwise it follows the group. */
+  colorCustom: boolean;
   createdAt: number;
 };
 

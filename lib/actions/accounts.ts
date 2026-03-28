@@ -43,11 +43,28 @@ export async function createAccount(
   }
 
   const groupId = parsed.data.groupId ?? null;
-  const color = groupId != null ? "#6366f1" : parsed.data.color;
+  const colorCustom = formData.get("colorCustom") === "1";
+  let color: string;
+  let colorCustomFlag = false;
+  if (groupId == null) {
+    color = parsed.data.color;
+  } else if (colorCustom) {
+    color = parsed.data.color;
+    colorCustomFlag = true;
+  } else {
+    color = "#6366f1";
+  }
 
   const result = db
     .insert(accounts)
-    .values({ ...parsed.data, groupId, color })
+    .values({
+      name: parsed.data.name,
+      bankProfileId: parsed.data.bankProfileId ?? null,
+      groupId,
+      currency: parsed.data.currency,
+      color,
+      colorCustom: colorCustomFlag,
+    })
     .returning({ id: accounts.id })
     .get();
 
@@ -91,6 +108,7 @@ export async function updateAccount(
 
   const newGroupId = parsed.data.groupId ?? null;
   const oldGroupId = existing.groupId;
+  const colorCustom = formData.get("colorCustom") === "1";
 
   const base = {
     name: parsed.data.name,
@@ -101,11 +119,24 @@ export async function updateAccount(
 
   if (newGroupId == null) {
     db.update(accounts)
-      .set({ ...base, color: parsed.data.color })
+      .set({ ...base, color: parsed.data.color, colorCustom: false })
       .where(eq(accounts.id, id))
       .run();
+  } else if (colorCustom) {
+    db.update(accounts)
+      .set({
+        ...base,
+        color: parsed.data.color,
+        colorCustom: true,
+      })
+      .where(eq(accounts.id, id))
+      .run();
+    recomputeAccountColorsForGroup(newGroupId);
   } else {
-    db.update(accounts).set(base).where(eq(accounts.id, id)).run();
+    db.update(accounts)
+      .set({ ...base, colorCustom: false })
+      .where(eq(accounts.id, id))
+      .run();
     recomputeAccountColorsForGroup(newGroupId);
   }
 

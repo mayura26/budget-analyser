@@ -1,7 +1,7 @@
 "use client";
 
 import { Pencil, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,6 +46,12 @@ export function AccountDialog({
     account?.groupId ? String(account.groupId) : "none",
   );
   const [newGroupName, setNewGroupName] = useState("");
+  const [useCustomColor, setUseCustomColor] = useState(
+    () => !!(account?.groupId && account?.colorCustom),
+  );
+  const [customColor, setCustomColor] = useState(
+    () => account?.color ?? ACCOUNT_GROUP_SWATCH_COLORS[0],
+  );
   const isEdit = !!account;
 
   const previewDerivedColor = useMemo((): string | null => {
@@ -67,6 +73,26 @@ export function AccountDialog({
     return deriveAccountGroupMemberColor(g.color, ids.length);
   }, [selectedGroupId, groups, groupAccountIdsByGroup, isEdit, account]);
 
+  const inGroup = selectedGroupId !== "none";
+  const showGroupDerivedColor = previewDerivedColor != null;
+
+  const colorFieldValue = useMemo(() => {
+    if (!inGroup) return customColor;
+    if (useCustomColor) return customColor;
+    return previewDerivedColor ?? "#6366f1";
+  }, [inGroup, useCustomColor, customColor, previewDerivedColor]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (account) {
+      setUseCustomColor(!!(account.groupId && account.colorCustom));
+      setCustomColor(account.color);
+    } else {
+      setUseCustomColor(false);
+      setCustomColor(ACCOUNT_GROUP_SWATCH_COLORS[0]);
+    }
+  }, [open, account]);
+
   function handleOpenChange(v: boolean) {
     setOpen(v);
     if (!v) {
@@ -75,8 +101,6 @@ export function AccountDialog({
       setError(null);
     }
   }
-
-  const showGroupDerivedColor = previewDerivedColor != null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -101,7 +125,6 @@ export function AccountDialog({
             setPending(true);
             setError(null);
 
-            // If creating a new group inline, create it first
             let resolvedGroupId: string | null = null;
             if (selectedGroupId === "__new__") {
               if (!newGroupName.trim()) {
@@ -128,6 +151,10 @@ export function AccountDialog({
             } else {
               fd.delete("groupId");
             }
+
+            const isGrouped = resolvedGroupId != null;
+            fd.set("colorCustom", isGrouped && useCustomColor ? "1" : "0");
+            fd.set("color", colorFieldValue);
 
             const result =
               isEdit && account
@@ -206,42 +233,84 @@ export function AccountDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Color</Label>
-            {showGroupDerivedColor && previewDerivedColor ? (
+            <Label>Colour</Label>
+            {showGroupDerivedColor && inGroup ? (
               <>
                 <p className="text-xs text-muted-foreground">
-                  This account uses a tint derived from the group colour. Change
-                  the group colour to shift every account in the group.
+                  Colours are derived from the group by default. Check
+                  &quot;Pick my own colour&quot; to choose a swatch.
                 </p>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="h-8 w-8 shrink-0 rounded-full border border-border"
-                    style={{ backgroundColor: previewDerivedColor }}
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCustomColor}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      if (on) {
+                        setUseCustomColor(true);
+                        setCustomColor(
+                          previewDerivedColor ?? customColor ?? "#6366f1",
+                        );
+                      } else {
+                        setUseCustomColor(false);
+                      }
+                    }}
+                    className="rounded border-border"
+                    aria-label="Pick my own colour"
                   />
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {previewDerivedColor}
-                  </span>
-                </div>
+                  <span>Pick my own colour</span>
+                </label>
+                {!useCustomColor && previewDerivedColor && (
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-8 w-8 shrink-0 rounded-full border border-border"
+                      style={{ backgroundColor: previewDerivedColor }}
+                    />
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {previewDerivedColor}
+                    </span>
+                  </div>
+                )}
+                {useCustomColor && (
+                  <div className="flex gap-2 flex-wrap pt-1">
+                    {ACCOUNT_GROUP_SWATCH_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setCustomColor(color)}
+                        className="h-7 w-7 rounded-full ring-2 ring-offset-2 ring-transparent transition-[box-shadow] hover:ring-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        style={{
+                          backgroundColor: color,
+                          boxShadow:
+                            customColor === color
+                              ? "0 0 0 2px hsl(var(--foreground))"
+                              : undefined,
+                        }}
+                        aria-label={`Colour ${color}`}
+                        aria-pressed={customColor === color}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex gap-2 flex-wrap">
                 {ACCOUNT_GROUP_SWATCH_COLORS.map((color) => (
-                  <label key={color} className="cursor-pointer">
-                    <input
-                      type="radio"
-                      name="color"
-                      value={color}
-                      className="sr-only"
-                      defaultChecked={
-                        account?.color === color ||
-                        (!account && color === ACCOUNT_GROUP_SWATCH_COLORS[0])
-                      }
-                    />
-                    <div
-                      className="h-6 w-6 rounded-full ring-2 ring-offset-2 ring-transparent has-[:checked]:ring-foreground"
-                      style={{ backgroundColor: color }}
-                    />
-                  </label>
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setCustomColor(color)}
+                    className="h-6 w-6 rounded-full ring-2 ring-offset-2 ring-transparent transition-[box-shadow] hover:ring-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    style={{
+                      backgroundColor: color,
+                      boxShadow:
+                        customColor === color
+                          ? "0 0 0 2px hsl(var(--foreground))"
+                          : undefined,
+                    }}
+                    aria-label={`Colour ${color}`}
+                    aria-pressed={customColor === color}
+                  />
                 ))}
               </div>
             )}

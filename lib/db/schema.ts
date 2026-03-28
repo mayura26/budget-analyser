@@ -55,6 +55,9 @@ export const accounts = sqliteTable("accounts", {
   }),
   currency: text("currency").notNull().default("AUD"),
   color: text("color").notNull().default("#6366f1"),
+  colorCustom: integer("color_custom", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: integer("created_at")
     .notNull()
     .default(sql`(unixepoch())`),
