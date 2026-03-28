@@ -20,6 +20,7 @@ import {
   accounts,
   categories,
   categorisationRules,
+  dismissedMismatches,
   settings,
   transactions,
 } from "@/lib/db/schema";
@@ -270,18 +271,148 @@ export async function recategoriseUncategorised(): Promise<
   return { success: true, data: { count: ids.length } };
 }
 
+async function getMismatchSuggestions(): Promise<SuggestionRow[]> {
+  // Group confirmed transactions by normalised description + category
+  const grouped = db
+    .select({
+      normalised: transactions.normalised,
+      categoryId: transactions.categoryId,
+      cnt: sql<number>`COUNT(*)`.as("cnt"),
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.categoryConfirmed, true),
+        isNotNull(transactions.categoryId),
+      ),
+    )
+    .groupBy(transactions.normalised, transactions.categoryId)
+    .all();
+
+  // Build map: normalised -> [{categoryId, count}]
+  const groupMap = new Map<string, { categoryId: number; count: number }[]>();
+  for (const row of grouped) {
+    if (row.categoryId == null) continue;
+    const arr = groupMap.get(row.normalised) ?? [];
+    arr.push({ categoryId: row.categoryId, count: row.cnt });
+    groupMap.set(row.normalised, arr);
+  }
+
+  // Load dismissed pairs
+  const dismissed = db.select().from(dismissedMismatches).all();
+  const dismissedSet = new Set(
+    dismissed.map((d) => `${d.normalised}::${d.categoryId}`),
+  );
+
+  // Find groups with 2+ distinct categories; identify majority
+  const minorityFilters: {
+    normalised: string;
+    minorityCategoryId: number;
+    majorityCategoryId: number;
+    confidence: number;
+  }[] = [];
+
+  for (const [norm, cats] of groupMap) {
+    if (cats.length < 2) continue;
+
+    // Sort by count descending
+    cats.sort((a, b) => b.count - a.count);
+    const total = cats.reduce((s, c) => s + c.count, 0);
+
+    // Skip if tie for first place
+    if (cats[0].count === cats[1].count) continue;
+
+    const majorityCatId = cats[0].categoryId;
+    const confidence = cats[0].count / total;
+
+    for (let i = 1; i < cats.length; i++) {
+      const key = `${norm}::${cats[i].categoryId}`;
+      if (dismissedSet.has(key)) continue;
+      minorityFilters.push({
+        normalised: norm,
+        minorityCategoryId: cats[i].categoryId,
+        majorityCategoryId: majorityCatId,
+        confidence,
+      });
+    }
+  }
+
+  if (minorityFilters.length === 0) return [];
+
+  // Fetch actual minority transactions
+  const allCategories = db.select().from(categories).all();
+  const categoryMap = new Map(allCategories.map((c) => [c.id, c.name]));
+
+  const suggestions: SuggestionRow[] = [];
+
+  for (const mf of minorityFilters) {
+    const rows = db
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        description: transactions.description,
+        normalised: transactions.normalised,
+        amount: transactions.amount,
+        accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+      })
+      .from(transactions)
+      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+      .where(
+        and(
+          eq(transactions.normalised, mf.normalised),
+          eq(transactions.categoryId, mf.minorityCategoryId),
+          eq(transactions.categoryConfirmed, true),
+        ),
+      )
+      .all();
+
+    for (const row of rows) {
+      suggestions.push({
+        transactionId: row.id,
+        date: row.date,
+        description: row.description,
+        normalised: row.normalised,
+        amount: row.amount,
+        accountName: row.accountName,
+        currentCategoryId: mf.minorityCategoryId,
+        currentCategoryName: categoryMap.get(mf.minorityCategoryId) ?? "Unknown",
+        suggestedCategoryId: mf.majorityCategoryId,
+        suggestedCategoryName:
+          categoryMap.get(mf.majorityCategoryId) ?? "Unknown",
+        source: "none",
+        confidence: mf.confidence,
+      });
+    }
+  }
+
+  return suggestions;
+}
+
+export async function dismissMismatch(
+  normalised: string,
+  categoryId: number,
+): Promise<ActionResult> {
+  db.insert(dismissedMismatches)
+    .values({ normalised, categoryId })
+    .onConflictDoNothing()
+    .run();
+
+  revalidatePath("/transactions");
+  return { success: true, data: undefined };
+}
+
 export async function getAISuggestions(
   scope: AISuggestionScope = "uncategorised",
 ): Promise<ActionResult<SuggestionRow[]>> {
+  if (scope === "mismatches") {
+    const data = await getMismatchSuggestions();
+    return { success: true, data };
+  }
+
   const whereClause =
-    scope === "mismatches"
-      ? and(
-          eq(transactions.categoryConfirmed, true),
-          isNotNull(transactions.categoryId),
-        )
-      : scope === "unfinalised"
-        ? eq(transactions.categoryConfirmed, false)
-        : isNull(transactions.categoryId);
+    scope === "unfinalised"
+      ? eq(transactions.categoryConfirmed, false)
+      : isNull(transactions.categoryId);
 
   const candidates = db
     .select({
@@ -426,16 +557,6 @@ export async function getAISuggestions(
         });
       }
     }
-  }
-
-  // For mismatches scope, only return rows where AI/rule disagrees with current category
-  if (scope === "mismatches") {
-    const mismatched = suggestions.filter(
-      (s) =>
-        s.suggestedCategoryId != null &&
-        s.suggestedCategoryId !== s.currentCategoryId,
-    );
-    return { success: true, data: mismatched };
   }
 
   return { success: true, data: suggestions };

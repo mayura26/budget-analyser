@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Loader2,
   Sparkles,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
@@ -50,6 +51,7 @@ import type {
 } from "@/lib/actions/transactions";
 import {
   applyCategorisations,
+  dismissMismatch,
   getAISuggestions,
 } from "@/lib/actions/transactions";
 import type { SuggestedRule } from "@/lib/categorisation/rule-suggester";
@@ -371,7 +373,7 @@ export function CategoriseDialog({
             <DialogDescription>
               {state === "loading" &&
                 (activeScope === "mismatches"
-                  ? "Scanning confirmed transactions for mismatches…"
+                  ? "Analysing category consistency…"
                   : "Asking AI to suggest categories…")}
               {state === "review" &&
                 `${suggestions.length} transactions — review and adjust before applying.`}
@@ -389,7 +391,7 @@ export function CategoriseDialog({
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 {activeScope === "mismatches"
-                  ? "Reviewing confirmed transactions…"
+                  ? "Analysing category consistency…"
                   : `Processing ${loadingCount} transactions…`}
               </p>
             </div>
@@ -423,7 +425,7 @@ export function CategoriseDialog({
                       Verify
                     </th>
                     <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                      Source
+                      {activeScope === "mismatches" ? "" : "Source"}
                     </th>
                   </tr>
                 </thead>
@@ -437,30 +439,55 @@ export function CategoriseDialog({
                         {formatDate(row.date)}
                       </td>
                       <td className="min-w-0 px-3 py-2 align-middle">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="min-w-0">
-                                <p className="truncate cursor-default">
-                                  {row.description}
-                                </p>
-                                {row.currentCategoryId != null &&
-                                  row.currentCategoryName && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                                      Current:{" "}
-                                      <CategoryNameParts
-                                        name={row.currentCategoryName}
-                                        variant="list"
-                                      />
-                                    </p>
-                                  )}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
-                              {row.description}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <div className="flex items-start gap-1">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate cursor-default">
+                                    {row.description}
+                                  </p>
+                                  {row.currentCategoryId != null &&
+                                    row.currentCategoryName && (
+                                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                        Current:{" "}
+                                        <CategoryNameParts
+                                          name={row.currentCategoryName}
+                                          variant="list"
+                                        />
+                                      </p>
+                                    )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                {row.description}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          {activeScope === "mismatches" &&
+                            row.currentCategoryId != null && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive sm:hidden"
+                                title="Dismiss"
+                                onClick={() => {
+                                  dismissMismatch(
+                                    row.normalised,
+                                    row.currentCategoryId!,
+                                  );
+                                  setSuggestions((prev) =>
+                                    prev.filter(
+                                      (s) =>
+                                        s.transactionId !== row.transactionId,
+                                    ),
+                                  );
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                        </div>
                       </td>
                       <td className="min-w-0 px-3 py-2 align-middle hidden sm:table-cell">
                         <p className="truncate text-muted-foreground text-xs">
@@ -533,7 +560,35 @@ export function CategoriseDialog({
                         />
                       </td>
                       <td className="px-3 py-2 align-middle hidden sm:table-cell">
-                        {sourceLabel(row.source)}
+                        {activeScope === "mismatches" ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                            title="Dismiss — won't show again"
+                            data-testid="dismiss-mismatch"
+                            onClick={() => {
+                              if (
+                                row.currentCategoryId != null
+                              ) {
+                                dismissMismatch(
+                                  row.normalised,
+                                  row.currentCategoryId,
+                                );
+                                setSuggestions((prev) =>
+                                  prev.filter(
+                                    (s) =>
+                                      s.transactionId !== row.transactionId,
+                                  ),
+                                );
+                              }
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          sourceLabel(row.source)
+                        )}
                       </td>
                     </tr>
                   ))}
