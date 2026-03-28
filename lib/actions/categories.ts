@@ -9,6 +9,11 @@ import { serializeCategoryDisplayName } from "@/lib/categories/display-name";
 import { keywordRuleStub, matchRule } from "@/lib/categorisation/rule-matcher";
 import { db } from "@/lib/db";
 import { refreshSubcategoryColorsForParent } from "@/lib/db/category-hierarchy-migrate";
+import {
+  mainSeedSuppressionKey,
+  subSeedSuppressionKey,
+  suppressCategorySeedKey,
+} from "@/lib/db/category-seed-suppressions";
 import { categories, categorisationRules, transactions } from "@/lib/db/schema";
 import type { ActionResult } from "@/types";
 
@@ -210,8 +215,8 @@ export async function updateCategory(
 
 export async function deleteCategory(id: number): Promise<ActionResult> {
   const cat = db.select().from(categories).where(eq(categories.id, id)).get();
-  if (cat?.isSystem) {
-    return { success: false, error: "Cannot delete system category" };
+  if (!cat) {
+    return { success: false, error: "Category not found" };
   }
   const child = db
     .select()
@@ -221,6 +226,20 @@ export async function deleteCategory(id: number): Promise<ActionResult> {
     .get();
   if (child) {
     return { success: false, error: "Remove sub-categories first" };
+  }
+  if (cat.isSystem) {
+    if (cat.parentId === null) {
+      suppressCategorySeedKey(mainSeedSuppressionKey(cat.name));
+    } else {
+      const parent = db
+        .select()
+        .from(categories)
+        .where(eq(categories.id, cat.parentId))
+        .get();
+      if (parent?.parentId === null) {
+        suppressCategorySeedKey(subSeedSuppressionKey(parent.name, cat.name));
+      }
+    }
   }
   db.delete(categories).where(eq(categories.id, id)).run();
   revalidatePath("/categories");

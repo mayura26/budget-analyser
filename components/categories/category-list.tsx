@@ -41,6 +41,42 @@ type CategoryWithCount = Category & { ruleCount: number };
 
 const TYPE_OPTIONS = ["expense", "income", "transfer"] as const;
 
+function DeleteCategoryButton({
+  categoryId,
+  isSystem,
+  size,
+}: {
+  categoryId: number;
+  isSystem: boolean;
+  size: "main" | "sub" | "orphan";
+}) {
+  const btn =
+    size === "sub"
+      ? "h-7 w-7 text-destructive hover:text-destructive"
+      : "h-8 w-8 text-destructive hover:text-destructive";
+  const icon = size === "sub" ? "h-3 w-3" : "h-4 w-4";
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={btn}
+      onClick={async () => {
+        if (
+          isSystem &&
+          !window.confirm(
+            "Delete this built-in category? Transactions may lose this category. It will not be re-added automatically on the next update.",
+          )
+        ) {
+          return;
+        }
+        await deleteCategory(categoryId);
+      }}
+    >
+      <Trash2 className={icon} />
+    </Button>
+  );
+}
+
 export function CategoryList({
   categories,
   rules,
@@ -122,16 +158,11 @@ export function CategoryList({
                 <CategoryTypeBadge type={main.type} className="text-[10px]" />
                 <div className="ml-auto flex items-center gap-1">
                   <EditCategoryDialog category={main} mains={mains} isMain />
-                  {!main.isSystem && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => deleteCategory(main.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <DeleteCategoryButton
+                    categoryId={main.id}
+                    isSystem={main.isSystem}
+                    size="main"
+                  />
                 </div>
               </div>
 
@@ -190,16 +221,11 @@ export function CategoryList({
                                 mains={mains}
                                 isMain={false}
                               />
-                              {!cat.isSystem && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive hover:text-destructive"
-                                  onClick={() => deleteCategory(cat.id)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
+                              <DeleteCategoryButton
+                                categoryId={cat.id}
+                                isSystem={cat.isSystem}
+                                size="sub"
+                              />
                             </div>
                           </div>
                         </CardHeader>
@@ -292,16 +318,11 @@ export function CategoryList({
                       mains={mains}
                       isMain={false}
                     />
-                    {!c.isSystem && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => deleteCategory(c.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <DeleteCategoryButton
+                      categoryId={c.id}
+                      isSystem={c.isSystem}
+                      size="orphan"
+                    />
                   </div>
                 </li>
               ))}

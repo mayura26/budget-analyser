@@ -1,8 +1,8 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { deriveSubcategoryColor } from "@/lib/categories/colors";
+import { isMainSeedSuppressed } from "@/lib/db/category-seed-suppressions";
 import {
   allKnownMainNames,
-  DEFAULT_SUBS,
   LEGACY_FLAT_TO_MAIN,
   MAIN_GROUP_DEFAULTS,
   MAIN_GROUP_NAMES,
@@ -89,16 +89,7 @@ function moveSubcategoriesResolvingNameClashes(
 function mergeDuplicateMainIntoCanonical(
   duplicateMainId: number,
   canonicalMainId: number,
-  def: (typeof MAIN_GROUP_DEFAULTS)[number],
 ): void {
-  db.update(categories)
-    .set({
-      color: def.color,
-      icon: def.icon,
-      type: def.type,
-    })
-    .where(eq(categories.id, canonicalMainId))
-    .run();
   moveSubcategoriesResolvingNameClashes(duplicateMainId, canonicalMainId);
   reassignCategoryReferences(duplicateMainId, canonicalMainId);
   db.delete(categories).where(eq(categories.id, duplicateMainId)).run();
@@ -120,15 +111,10 @@ export function normalizeMainGroupNamesAndInsertMissing(): void {
         .where(and(eq(categories.name, def.name), isNull(categories.parentId)))
         .get();
       if (canonical && canonical.id !== row.id) {
-        mergeDuplicateMainIntoCanonical(row.id, canonical.id, def);
+        mergeDuplicateMainIntoCanonical(row.id, canonical.id);
       } else {
         db.update(categories)
-          .set({
-            name: def.name,
-            color: def.color,
-            icon: def.icon,
-            type: def.type,
-          })
+          .set({ name: def.name })
           .where(eq(categories.id, row.id))
           .run();
       }
@@ -136,6 +122,7 @@ export function normalizeMainGroupNamesAndInsertMissing(): void {
   }
 
   for (const def of MAIN_GROUP_DEFAULTS) {
+    if (isMainSeedSuppressed(def.name)) continue;
     const exists = db
       .select({ id: categories.id })
       .from(categories)
@@ -153,17 +140,6 @@ export function normalizeMainGroupNamesAndInsertMissing(): void {
         })
         .run();
     }
-  }
-
-  for (const def of MAIN_GROUP_DEFAULTS) {
-    db.update(categories)
-      .set({
-        color: def.color,
-        icon: def.icon,
-        type: def.type,
-      })
-      .where(and(eq(categories.name, def.name), isNull(categories.parentId)))
-      .run();
   }
 }
 
@@ -213,26 +189,6 @@ export function applySubcategoryTaxonomyAndColours(): void {
       )
       .run();
   }
-
-  for (const sub of DEFAULT_SUBS) {
-    const pid = getMainIdByName(sub.main);
-    if (!pid) continue;
-    const row = db
-      .select()
-      .from(categories)
-      .where(and(eq(categories.name, sub.name), eq(categories.parentId, pid)))
-      .get();
-    if (row) {
-      db.update(categories)
-        .set({
-          color: sub.color,
-          icon: sub.icon,
-          type: sub.type,
-        })
-        .where(eq(categories.id, row.id))
-        .run();
-    }
-  }
 }
 
 export function refreshSubcategoryColorsForParent(mainId: number): void {
@@ -276,6 +232,7 @@ export function migrateLegacyFlatCategoriesIfNeeded(): void {
   if (!needsLegacy) return;
 
   for (const def of MAIN_GROUP_DEFAULTS) {
+    if (isMainSeedSuppressed(def.name)) continue;
     const exists = db
       .select({ id: categories.id })
       .from(categories)

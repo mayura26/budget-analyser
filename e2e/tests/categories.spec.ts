@@ -90,17 +90,6 @@ test.describe("Categories", () => {
     await expect(page.getByText("E2E Category")).not.toBeVisible();
   });
 
-  test("system sub-category has no delete button", async ({ page }) => {
-    await page.goto("/categories");
-    const groceriesCard = page
-      .locator(".rounded-lg")
-      .filter({ hasText: "Groceries" })
-      .first();
-    await expect(
-      groceriesCard.locator("button:has(.lucide-trash-2)"),
-    ).not.toBeVisible();
-  });
-
   test("repair orphan sub-category via edit", async ({ page }) => {
     await page.goto("/categories");
     await expect(
@@ -151,5 +140,21 @@ test.describe("Categories", () => {
     await expect(
       page.getByText(/Sub-categories with missing parent/),
     ).toHaveCount(0);
+  });
+
+  test("built-in sub-category delete confirms and removes", async ({
+    page,
+  }) => {
+    page.once("dialog", (dialog) => {
+      expect(dialog.message()).toContain("built-in");
+      dialog.accept();
+    });
+    await page.goto("/categories");
+    const groceriesCard = page
+      .locator(".rounded-lg")
+      .filter({ hasText: "Groceries" })
+      .first();
+    await groceriesCard.locator("button:has(.lucide-trash-2)").click();
+    await expect(page.getByText("Groceries").first()).not.toBeVisible();
   });
 });

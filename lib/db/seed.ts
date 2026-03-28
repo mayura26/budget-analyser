@@ -1,5 +1,9 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { applySubcategoryTaxonomyAndColours } from "./category-hierarchy-migrate";
+import {
+  isMainSeedSuppressed,
+  isSubSeedSuppressed,
+} from "./category-seed-suppressions";
 import type { MainGroupName } from "./category-taxonomy";
 import { DEFAULT_SUBS, MAIN_GROUP_DEFAULTS } from "./category-taxonomy";
 import { db } from "./index";
@@ -8,6 +12,7 @@ import { accounts, bankProfiles, categories } from "./schema";
 function ensureSystemCategories(): void {
   let inserted = false;
   for (const main of MAIN_GROUP_DEFAULTS) {
+    if (isMainSeedSuppressed(main.name)) continue;
     const exists = db
       .select({ id: categories.id })
       .from(categories)
@@ -29,6 +34,7 @@ function ensureSystemCategories(): void {
       .get()?.id;
 
   for (const sub of DEFAULT_SUBS) {
+    if (isSubSeedSuppressed(sub.main, sub.name)) continue;
     const pid = mainId(sub.main);
     if (!pid) continue;
     const exists = db
