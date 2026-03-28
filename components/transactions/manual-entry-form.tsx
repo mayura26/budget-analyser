@@ -7,21 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CategoryOptgroupNative } from "@/components/categories/category-select-grouped";
 import type { Account, Category, ActionResult } from "@/types";
 
 export function ManualTransactionForm({
   accounts,
   categories,
+  categoryMains,
 }: {
   accounts: Account[];
   categories: Category[];
+  categoryMains?: Category[];
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
@@ -90,9 +86,15 @@ export function ManualTransactionForm({
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
         >
           <option value="">Auto-categorise</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
+          {categoryMains && categoryMains.length > 0 ? (
+            <CategoryOptgroupNative categories={categories} mains={categoryMains} />
+          ) : (
+            categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))
+          )}
         </select>
       </div>
 

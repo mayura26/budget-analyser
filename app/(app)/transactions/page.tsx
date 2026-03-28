@@ -4,11 +4,14 @@ import { and, eq, gte, isNotNull, isNull, like, lte, sql } from "drizzle-orm";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { CategoriseDialog } from "@/components/transactions/categorise-dialog";
+import { ChatCategoriseDialog } from "@/components/transactions/chat-categorise-dialog";
 import { ProcessUncategorisedButton } from "@/components/transactions/process-uncategorised-button";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
+import { filterAssignableCategories } from "@/lib/categories/assignable";
+import type { Category } from "@/types";
 
 export default async function TransactionsPage({
   searchParams,
@@ -25,7 +28,11 @@ export default async function TransactionsPage({
   const params = await searchParams;
 
   const allAccounts = db.select().from(accounts).all();
-  const allCategories = db.select().from(categories).all();
+  const allCatsRaw = db.select().from(categories).all() as Category[];
+  const categoryMains = allCatsRaw
+    .filter((c) => c.parentId === null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const allCategories = filterAssignableCategories(allCatsRaw);
 
   // Build filters
   const filters = [];
@@ -136,6 +143,11 @@ export default async function TransactionsPage({
               <CategoriseDialog
                 uncategorisedCount={uncategorisedCount}
                 categories={allCategories}
+                categoryMains={categoryMains}
+              />
+              <ChatCategoriseDialog
+                uncategorisedCount={uncategorisedCount}
+                categories={allCategories}
               />
             </>
           )}
@@ -152,6 +164,7 @@ export default async function TransactionsPage({
         rows={rows}
         accounts={allAccounts}
         categories={allCategories}
+        categoryMains={categoryMains}
         currentFilters={params}
       />
     </div>

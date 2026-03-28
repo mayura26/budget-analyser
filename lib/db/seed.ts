@@ -1,23 +1,85 @@
 import { db } from "./index";
 import { categories, bankProfiles, accounts } from "./schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
+import {
+  MAIN_GROUP_DEFAULTS,
+  MAIN_GROUP_NAMES,
+  refreshSubcategoryColorsForAllMains,
+} from "./category-hierarchy-migrate";
 
-const DEFAULT_CATEGORIES = [
-  { name: "Groceries", color: "#22c55e", icon: "ShoppingCart", type: "expense" as const },
-  { name: "Dining", color: "#f97316", icon: "Utensils", type: "expense" as const },
-  { name: "Transport", color: "#3b82f6", icon: "Car", type: "expense" as const },
-  { name: "Utilities", color: "#8b5cf6", icon: "Zap", type: "expense" as const },
-  { name: "Health", color: "#ec4899", icon: "Heart", type: "expense" as const },
-  { name: "Entertainment", color: "#f59e0b", icon: "Film", type: "expense" as const },
-  { name: "Shopping", color: "#14b8a6", icon: "ShoppingBag", type: "expense" as const },
-  { name: "Travel", color: "#06b6d4", icon: "Plane", type: "expense" as const },
-  { name: "Housing", color: "#64748b", icon: "Home", type: "expense" as const },
-  { name: "Insurance", color: "#94a3b8", icon: "Shield", type: "expense" as const },
-  { name: "Income", color: "#10b981", icon: "TrendingUp", type: "income" as const },
-  { name: "Transfer", color: "#6366f1", icon: "ArrowLeftRight", type: "transfer" as const },
-  { name: "Credit Card Payment", color: "#a855f7", icon: "CreditCard", type: "transfer" as const },
-  { name: "Misc", color: "#9ca3af", icon: "HelpCircle", type: "expense" as const },
+type MainName = (typeof MAIN_GROUP_NAMES)[number];
+
+const DEFAULT_SUBS: {
+  name: string;
+  main: MainName;
+  icon: string;
+  type: "income" | "expense" | "transfer";
+}[] = [
+  { name: "Income", main: "Money in", icon: "TrendingUp", type: "income" },
+  { name: "Gifts", main: "Money in", icon: "Gift", type: "income" },
+  { name: "Groceries", main: "Living costs", icon: "ShoppingCart", type: "expense" },
+  { name: "Dining", main: "Living costs", icon: "Utensils", type: "expense" },
+  { name: "Transport", main: "Living costs", icon: "Car", type: "expense" },
+  { name: "Utilities", main: "Living costs", icon: "Zap", type: "expense" },
+  { name: "Health", main: "Living costs", icon: "Heart", type: "expense" },
+  { name: "Housing", main: "Living costs", icon: "Home", type: "expense" },
+  { name: "Insurance", main: "Living costs", icon: "Shield", type: "expense" },
+  { name: "Investments", main: "Savings", icon: "LineChart", type: "expense" },
+  { name: "Entertainment", main: "Enjoyment", icon: "Film", type: "expense" },
+  { name: "Shopping", main: "Enjoyment", icon: "ShoppingBag", type: "expense" },
+  { name: "Travel", main: "One-off & irregular", icon: "Plane", type: "expense" },
+  { name: "Holidays", main: "One-off & irregular", icon: "Palmtree", type: "expense" },
+  { name: "Misc", main: "One-off & irregular", icon: "HelpCircle", type: "expense" },
+  { name: "Transfer", main: "Transfers", icon: "ArrowLeftRight", type: "transfer" },
+  { name: "Credit Card Payment", main: "Transfers", icon: "CreditCard", type: "transfer" },
 ];
+
+function ensureSystemCategories(): void {
+  let inserted = false;
+  for (const main of MAIN_GROUP_DEFAULTS) {
+    const exists = db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.name, main.name), isNull(categories.parentId)))
+      .get();
+    if (!exists) {
+      db.insert(categories).values({ ...main, parentId: null, isSystem: true }).run();
+      inserted = true;
+    }
+  }
+
+  const mainId = (name: MainName): number | undefined =>
+    db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.name, name), isNull(categories.parentId)))
+      .get()?.id;
+
+  for (const sub of DEFAULT_SUBS) {
+    const pid = mainId(sub.main);
+    if (!pid) continue;
+    const exists = db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.name, sub.name), eq(categories.parentId, pid)))
+      .get();
+    if (!exists) {
+      db.insert(categories).values({
+        name: sub.name,
+        icon: sub.icon,
+        type: sub.type,
+        parentId: pid,
+        color: "#6366f1",
+        isSystem: true,
+      }).run();
+      inserted = true;
+    }
+  }
+
+  if (inserted) {
+    refreshSubcategoryColorsForAllMains();
+  }
+}
 
 const DEFAULT_BANK_PROFILES = [
   {
@@ -72,22 +134,7 @@ const DEFAULT_BANK_PROFILES = [
 ];
 
 export async function seedDatabase() {
-  // Seed categories if none exist
-  const existingCategories = db.select().from(categories).all();
-  if (existingCategories.length === 0) {
-    for (const cat of DEFAULT_CATEGORIES) {
-      db.insert(categories).values({ ...cat, isSystem: true }).run();
-    }
-    console.log("Seeded default categories");
-  } else {
-    // Insert any new system categories added since initial seed
-    const existingNames = new Set(existingCategories.map((c) => c.name));
-    for (const cat of DEFAULT_CATEGORIES) {
-      if (!existingNames.has(cat.name)) {
-        db.insert(categories).values({ ...cat, isSystem: true }).run();
-      }
-    }
-  }
+  ensureSystemCategories();
 
   // Seed bank profiles and refresh built-in profile defaults by name.
   // First handle legacy rename ("Coles Amex" -> "Coles") before insert/update pass.

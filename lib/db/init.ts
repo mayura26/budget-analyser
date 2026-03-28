@@ -1,5 +1,6 @@
 import { runMigrations } from "./migrate";
 import { seedDatabase } from "./seed";
+import { migrateLegacyFlatCategoriesIfNeeded } from "./category-hierarchy-migrate";
 
 let initialized = false;
 
@@ -8,6 +9,7 @@ export function initializeDatabase() {
   initialized = true;
   try {
     runMigrations();
+    migrateLegacyFlatCategoriesIfNeeded();
     seedDatabase();
   } catch (err) {
     console.error("Database initialization failed:", err);

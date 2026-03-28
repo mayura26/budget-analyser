@@ -32,7 +32,7 @@ export async function categoriseWithAI(
   const client = new OpenAI({ apiKey });
 
   const categoryList = categories
-    .filter((c) => c.type !== "transfer")
+    .filter((c) => c.parentId != null && c.type !== "transfer")
     .map((c) => `${c.id}: ${c.name} (${c.type})`)
     .join("\n");
 

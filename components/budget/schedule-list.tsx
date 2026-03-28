@@ -16,6 +16,7 @@ interface Props {
   schedules: ScheduledTransaction[];
   accounts: Account[];
   categories: Category[];
+  categoryMains?: Category[];
   aiEnabled?: boolean;
 }
 
@@ -57,7 +58,13 @@ function nextOccurrenceDate(schedule: ScheduledTransaction): string {
   return current;
 }
 
-export function ScheduleList({ schedules, accounts, categories, aiEnabled = false }: Props) {
+export function ScheduleList({
+  schedules,
+  accounts,
+  categories,
+  categoryMains,
+  aiEnabled = false,
+}: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ScheduledTransaction | null>(null);
   const [, startTransition] = useTransition();
@@ -182,6 +189,7 @@ export function ScheduleList({ schedules, accounts, categories, aiEnabled = fals
         schedule={editTarget}
         accounts={accounts}
         categories={categories}
+        categoryMains={categoryMains}
       />
     </div>
   );

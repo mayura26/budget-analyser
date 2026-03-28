@@ -37,6 +37,7 @@ import {
   updateTransactionCategory,
 } from "@/lib/actions/transactions";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import type { Account, Category } from "@/types";
 
 type Row = {
@@ -63,11 +64,14 @@ export function TransactionTable({
   rows,
   accounts,
   categories,
+  categoryMains,
   currentFilters,
 }: {
   rows: Row[];
   accounts: Account[];
   categories: Category[];
+  /** Main groups for optgroup labels (optional, falls back to flat list). */
+  categoryMains?: Category[];
   currentFilters: Record<string, string | undefined>;
 }) {
   const router = useRouter();
@@ -154,6 +158,7 @@ export function TransactionTable({
             categoryColor={row.categoryColor}
             categoryConfirmed={row.categoryConfirmed}
             categories={categories}
+            categoryMains={categoryMains}
           />
         );
       },
@@ -275,11 +280,15 @@ export function TransactionTable({
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
             <SelectItem value="none">Not processed</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={String(c.id)}>
-                {c.name}
-              </SelectItem>
-            ))}
+            {categoryMains && categoryMains.length > 0 ? (
+              <CategorySelectGrouped categories={categories} mains={categoryMains} />
+            ) : (
+              categories.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.name}
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
 
@@ -408,6 +417,7 @@ function CategoryCell({
   categoryColor,
   categoryConfirmed,
   categories,
+  categoryMains,
 }: {
   transactionId: number;
   categoryId: number | null;
@@ -415,6 +425,7 @@ function CategoryCell({
   categoryColor: string | null;
   categoryConfirmed: boolean;
   categories: Category[];
+  categoryMains?: Category[];
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -438,11 +449,15 @@ function CategoryCell({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="none">Not processed</SelectItem>
-          {categories.map((c) => (
-            <SelectItem key={c.id} value={String(c.id)}>
-              {c.name}
-            </SelectItem>
-          ))}
+          {categoryMains && categoryMains.length > 0 ? (
+            <CategorySelectGrouped categories={categories} mains={categoryMains} />
+          ) : (
+            categories.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name}
+              </SelectItem>
+            ))
+          )}
         </SelectContent>
       </Select>
     );

@@ -26,6 +26,7 @@ import type { SuggestionRow } from "@/lib/actions/transactions";
 import { computeSuggestedRules } from "@/lib/categorisation/rule-suggester";
 import type { SuggestedRule } from "@/lib/categorisation/rule-suggester";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import type { Category } from "@/types";
 
 type DialogState = "idle" | "loading" | "review" | "applying" | "suggestedRules" | "done" | "error";
@@ -33,9 +34,11 @@ type DialogState = "idle" | "loading" | "review" | "applying" | "suggestedRules"
 export function CategoriseDialog({
   uncategorisedCount,
   categories,
+  categoryMains,
 }: {
   uncategorisedCount: number;
   categories: Category[];
+  categoryMains?: Category[];
 }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<DialogState>("idle");
@@ -165,8 +168,8 @@ export function CategoriseDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { if (!isPending) setOpen(v); }}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>AI Categorisation</DialogTitle>
             <DialogDescription>
               {state === "loading" && "Asking AI to suggest categories…"}
@@ -188,25 +191,25 @@ export function CategoriseDialog({
 
           {/* Review table */}
           {state === "review" && (
-            <div className="overflow-auto flex-1 rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-muted/80">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-md border">
+              <table className="w-full table-fixed text-sm">
+                <thead className="sticky top-0 z-1 border-b bg-muted/80 backdrop-blur-sm">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Date</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Description</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Account</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Amount</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Category</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Source</th>
+                    <th className="w-[11%] px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Date</th>
+                    <th className="w-[32%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Description</th>
+                    <th className="w-[14%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Account</th>
+                    <th className="w-[12%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Amount</th>
+                    <th className="w-[23%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Category</th>
+                    <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground">Source</th>
                   </tr>
                 </thead>
                 <tbody>
                   {suggestions.map((row) => (
-                    <tr key={row.transactionId} className="border-t">
-                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                    <tr key={row.transactionId} className="border-t border-border">
+                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap align-middle">
                         {formatDate(row.date)}
                       </td>
-                      <td className="px-3 py-2 max-w-[300px]">
+                      <td className="min-w-0 px-3 py-2 align-middle">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -218,33 +221,40 @@ export function CategoriseDialog({
                           </Tooltip>
                         </TooltipProvider>
                       </td>
-                      <td className="px-3 py-2 max-w-[120px]">
+                      <td className="min-w-0 px-3 py-2 align-middle">
                         <p className="truncate text-muted-foreground text-xs">{row.accountName}</p>
                       </td>
-                      <td className={`px-3 py-2 text-right font-medium whitespace-nowrap ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}>
+                      <td className={`px-3 py-2 text-right font-medium whitespace-nowrap align-middle ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}>
                         {row.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(row.amount))}
                       </td>
-                      <td className="px-3 py-2 min-w-[160px]">
+                      <td className="min-w-0 px-3 py-2 align-middle">
                         <Select
                           value={selections[row.transactionId] != null ? String(selections[row.transactionId]) : "none"}
                           onValueChange={(v) => handleCategoryChange(row.transactionId, v)}
                         >
-                          <SelectTrigger className="h-7 text-xs">
+                          <SelectTrigger className="h-7 w-full min-w-0 text-xs">
                             <SelectValue placeholder="Pick category" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">
                               <span className="text-muted-foreground">Not processed</span>
                             </SelectItem>
-                            {categories.map((c) => (
-                              <SelectItem key={c.id} value={String(c.id)}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
+                            {categoryMains && categoryMains.length > 0 ? (
+                              <CategorySelectGrouped
+                                categories={categories}
+                                mains={categoryMains}
+                              />
+                            ) : (
+                              categories.map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                  {c.name}
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 align-middle">
                         {sourceLabel(row.source)}
                       </td>
                     </tr>
@@ -264,7 +274,7 @@ export function CategoriseDialog({
 
           {/* Suggested rules */}
           {state === "suggestedRules" && (
-            <div className="space-y-3 overflow-auto flex-1">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden">
               <p className="text-sm text-muted-foreground">
                 These rules will auto-categorise matching transactions on future imports:
               </p>
@@ -315,7 +325,7 @@ export function CategoriseDialog({
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             {state === "review" && (
               <>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

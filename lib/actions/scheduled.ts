@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { scheduledTransactions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { ActionResult } from "@/types";
+import { assignableCategoryError } from "@/lib/categories/assignable";
 
 const ScheduledSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -56,6 +57,11 @@ export async function createScheduledTransaction(
 
   const { name, amount, frequency, startDate, endDate, accountId, categoryId, notes } =
     parsed.data;
+
+  const catErr = assignableCategoryError(categoryId);
+  if (catErr) {
+    return { success: false, error: catErr };
+  }
 
   const result = db
     .insert(scheduledTransactions)
@@ -111,6 +117,11 @@ export async function updateScheduledTransaction(
 
   const { name, amount, frequency, startDate, endDate, accountId, categoryId, notes } =
     parsed.data;
+
+  const catErr = assignableCategoryError(categoryId);
+  if (catErr) {
+    return { success: false, error: catErr };
+  }
 
   db.update(scheduledTransactions)
     .set({

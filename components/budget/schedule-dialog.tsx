@@ -22,6 +22,7 @@ import {
   createScheduledTransaction,
   updateScheduledTransaction,
 } from "@/lib/actions/scheduled";
+import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import type { ScheduledTransaction, Account, Category, ActionResult } from "@/types";
 
 interface Props {
@@ -30,6 +31,7 @@ interface Props {
   schedule?: ScheduledTransaction | null;
   accounts: Account[];
   categories: Category[];
+  categoryMains?: Category[];
 }
 
 const FREQUENCIES = [
@@ -42,7 +44,14 @@ const FREQUENCIES = [
 
 const today = new Date().toISOString().slice(0, 10);
 
-export function ScheduleDialog({ open, onOpenChange, schedule, accounts, categories }: Props) {
+export function ScheduleDialog({
+  open,
+  onOpenChange,
+  schedule,
+  accounts,
+  categories,
+  categoryMains,
+}: Props) {
   const isEdit = !!schedule;
   const [type, setType] = useState<"income" | "expense">("expense");
   const [frequency, setFrequency] = useState<string>("monthly");
@@ -208,11 +217,15 @@ export function ScheduleDialog({ open, onOpenChange, schedule, accounts, categor
                 <SelectValue placeholder="No category" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
+                {categoryMains && categoryMains.length > 0 ? (
+                  <CategorySelectGrouped categories={categories} mains={categoryMains} />
+                ) : (
+                  categories.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>

@@ -6,6 +6,7 @@ import { transactions, settings, categories } from "@/lib/db/schema";
 import { inArray, eq } from "drizzle-orm";
 import { categoriseWithAI } from "@/lib/categorisation/ai-client";
 import type { Category } from "@/types";
+import { filterAssignableCategories, isAssignableCategoryId } from "@/lib/categories/assignable";
 
 const RequestSchema = z.object({
   transactionIds: z.array(z.number()).min(1).max(100),
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     .all();
 
   const allCategories = db.select().from(categories).all() as Category[];
+  const assignableForAi = filterAssignableCategories(allCategories);
 
   const results = await categoriseWithAI(
     txns.map((t) => ({
@@ -61,14 +63,14 @@ export async function POST(request: NextRequest) {
       amount: t.amount,
       date: t.date,
     })),
-    allCategories,
+    assignableForAi,
     apiKeySetting.value,
     model
   );
 
   // Update transactions
   for (const result of results) {
-    if (result.categoryId) {
+    if (result.categoryId && isAssignableCategoryId(result.categoryId)) {
       db.update(transactions)
         .set({
           categoryId: result.categoryId,

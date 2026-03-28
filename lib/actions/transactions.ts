@@ -11,6 +11,11 @@ import { categoriseTransactions } from "@/lib/categorisation/engine";
 import { findMatchingRule } from "@/lib/categorisation/rule-matcher";
 import { categoriseWithAI } from "@/lib/categorisation/ai-client";
 import type { ActionResult, CategorisationRule, Category } from "@/types";
+import {
+  assignableCategoryError,
+  filterAssignableCategories,
+  isAssignableCategoryId,
+} from "@/lib/categories/assignable";
 
 export type SuggestionRow = {
   transactionId: number;
@@ -55,6 +60,10 @@ export async function createManualTransaction(
   }
 
   const { accountId, date, description, amount, categoryId, notes, tags } = parsed.data;
+  const catErr = assignableCategoryError(categoryId);
+  if (catErr) {
+    return { success: false, error: catErr };
+  }
   const normalised = normaliseDescription(description);
   const fingerprint = generateFingerprint(accountId, date, amount, normalised);
   const tagsArray = tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
@@ -97,6 +106,11 @@ export async function updateTransactionCategory(
 ): Promise<ActionResult> {
   const txn = db.select().from(transactions).where(eq(transactions.id, transactionId)).get();
   if (!txn) return { success: false, error: "Transaction not found" };
+
+  const catErr = assignableCategoryError(categoryId);
+  if (catErr) {
+    return { success: false, error: catErr };
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const categoryUpdate = {
@@ -236,6 +250,7 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
 
   const allCategories = db.select().from(categories).all() as Category[];
   const categoryMap = new Map(allCategories.map((c) => [c.id, c.name]));
+  const assignableForAi = filterAssignableCategories(allCategories);
 
   const suggestions: SuggestionRow[] = [];
   const needsAI: typeof uncategorised = [];
@@ -272,7 +287,7 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
       try {
         const aiResults = await categoriseWithAI(
           needsAI.map((t) => ({ id: t.id, normalised: t.normalised, amount: t.amount, date: t.date, accountName: t.accountName })),
-          allCategories,
+          assignableForAi,
           apiKey,
           model
         );
@@ -281,6 +296,8 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
 
         for (const txn of needsAI) {
           const ai = aiMap.get(txn.id);
+          const aiCat =
+            ai?.categoryId != null && isAssignableCategoryId(ai.categoryId) ? ai.categoryId : null;
           suggestions.push({
             transactionId: txn.id,
             date: txn.date,
@@ -288,9 +305,9 @@ export async function getAISuggestions(): Promise<ActionResult<SuggestionRow[]>>
             normalised: txn.normalised,
             amount: txn.amount,
             accountName: txn.accountName,
-            suggestedCategoryId: ai?.categoryId ?? null,
+            suggestedCategoryId: aiCat,
             suggestedCategoryName: ai?.categoryName ?? "Not processed",
-            source: ai?.categoryId ? "ai" : "none",
+            source: aiCat ? "ai" : "none",
             confidence: ai?.confidence ?? 0,
           });
         }
@@ -340,6 +357,13 @@ export async function applyCategorisations(
   let applied = 0;
 
   for (const u of updates) {
+    const err = assignableCategoryError(u.categoryId);
+    if (err) {
+      return { success: false, error: err };
+    }
+  }
+
+  for (const u of updates) {
     const row = db
       .select({ linkedTransactionId: transactions.linkedTransactionId })
       .from(transactions)
@@ -370,6 +394,35 @@ export async function applyCategorisations(
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   return { success: true, data: { applied } };
+}
+
+export type UncategorisedTransaction = {
+  id: number;
+  date: string;
+  description: string;
+  normalised: string;
+  amount: number;
+  accountName: string;
+};
+
+export async function getUncategorisedTransactions(): Promise<ActionResult<UncategorisedTransaction[]>> {
+  const rows = db
+    .select({
+      id: transactions.id,
+      date: transactions.date,
+      description: transactions.description,
+      normalised: transactions.normalised,
+      amount: transactions.amount,
+      accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+    })
+    .from(transactions)
+    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+    .where(isNull(transactions.categoryId))
+    .orderBy(sql`${transactions.date} DESC`)
+    .limit(200)
+    .all();
+
+  return { success: true, data: rows };
 }
 
 export type TransferCandidate = {

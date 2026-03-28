@@ -65,6 +65,7 @@ export const categories = sqliteTable("categories", {
   name: text("name").notNull(),
   color: text("color").notNull().default("#6366f1"),
   icon: text("icon"),
+  // FK to categories(id) enforced in migration (self-reference breaks Drizzle TS inference).
   parentId: integer("parent_id"),
   type: text("type", { enum: ["income", "expense", "transfer"] })
     .notNull()

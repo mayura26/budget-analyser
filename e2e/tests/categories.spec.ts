@@ -1,20 +1,21 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Categories', () => {
-  test('seeded categories render', async ({ page }) => {
+  test('seeded main groups and sub-categories render', async ({ page }) => {
     await page.goto('/categories');
+    await expect(page.getByRole('heading', { name: 'Living costs' })).toBeVisible();
     await expect(page.getByText('Groceries').first()).toBeVisible();
-    // "Income" appears as both a card title and a badge type — use heading-level text
+    await expect(page.getByRole('heading', { name: 'Money in' })).toBeVisible();
     await expect(page.getByText('Income', { exact: true }).first()).toBeVisible();
   });
 
-  test('rule count shown on category card', async ({ page }) => {
+  test('rule count shown on sub-category card', async ({ page }) => {
     await page.goto('/categories');
     const groceriesCard = page.locator('.rounded-lg').filter({ hasText: 'Groceries' }).first();
     await expect(groceriesCard.getByText(/\d+ rule/i)).toBeVisible();
   });
 
-  test('expand and collapse category card', async ({ page }) => {
+  test('expand and collapse sub-category card', async ({ page }) => {
     await page.goto('/categories');
     await page.getByText('Groceries').first().click();
     await expect(page.getByText('Matching rules')).toBeVisible();
@@ -22,25 +23,24 @@ test.describe('Categories', () => {
     await expect(page.getByText('Matching rules')).not.toBeVisible();
   });
 
-  test('add category', async ({ page }) => {
+  test('add sub-category', async ({ page }) => {
     await page.goto('/categories');
-    await page.getByRole('button', { name: 'Add category' }).click();
+    await page.getByRole('button', { name: 'Add sub-category' }).click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="name"]').fill('E2E Category');
 
-    // Select type Income
     await dialog.getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Income' }).click();
+    await page.getByRole('option', { name: 'Living costs' }).click();
+    await dialog.locator('input[name="name"]').fill('E2E Category');
 
     await dialog.getByRole('button', { name: 'Create' }).click();
 
-    await expect(page.getByText('E2E Category')).toBeVisible();
-    await expect(page.getByText('income').first()).toBeVisible();
+    await expect(page.getByText('E2E Category').first()).toBeVisible();
+    await expect(page.getByText('expense').first()).toBeVisible();
   });
 
-  test('add rule to category', async ({ page }) => {
+  test('add rule to sub-category', async ({ page }) => {
     await page.goto('/categories');
     await page.getByText('E2E Category').first().click();
     await page.getByRole('button', { name: 'Add rule' }).click();
@@ -62,15 +62,14 @@ test.describe('Categories', () => {
     await expect(page.getByText('TESTMERCHANT')).not.toBeVisible();
   });
 
-  test('delete non-system category', async ({ page }) => {
+  test('delete non-system sub-category', async ({ page }) => {
     await page.goto('/categories');
-    // Find the E2E Category card header and click its trash button
     const e2eCard = page.locator('.rounded-lg').filter({ hasText: 'E2E Category' }).first();
     await e2eCard.locator('button:has(.lucide-trash-2)').click();
     await expect(page.getByText('E2E Category')).not.toBeVisible();
   });
 
-  test('system category has no delete button', async ({ page }) => {
+  test('system sub-category has no delete button', async ({ page }) => {
     await page.goto('/categories');
     const groceriesCard = page.locator('.rounded-lg').filter({ hasText: 'Groceries' }).first();
     await expect(groceriesCard.locator('button:has(.lucide-trash-2)')).not.toBeVisible();

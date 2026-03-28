@@ -8,4 +8,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 Whenever you add or modify a feature, you MUST also update the Playwright E2E tests in `e2e/tests/`.
 - New pages → new `e2e/tests/<page>.spec.ts`
 - Modified flows → update existing spec
-- Run `npm run test:e2e` to verify all 41+ tests still pass
+
+Don't run tests again unless asked
