@@ -10,7 +10,17 @@ test.describe("Dashboard", () => {
 
   test("month subtitle visible", async ({ page }) => {
     await page.goto("/dashboard");
+    await expect(
+      page.getByText(/summary and category breakdown for/i),
+    ).toBeVisible();
     await expect(page.getByText(/\w+ \d{4}/)).toBeVisible();
+  });
+
+  test("month picker controls visible", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expect(page.getByRole("combobox")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel("Previous month")).toBeVisible();
+    await expect(page.getByLabel("Next month")).toBeVisible();
   });
 
   test("four summary cards present", async ({ page }) => {

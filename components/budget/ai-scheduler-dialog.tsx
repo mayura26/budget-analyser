@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Loader2, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,10 +40,15 @@ interface Props {
   categories: Category[];
 }
 
+type DialogError = {
+  message: string;
+  showSettingsLink?: boolean;
+};
+
 export function AISchedulerDialog({ categories: _categories }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DialogError | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
@@ -58,20 +64,26 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
       const res = await fetch("/api/ai-scheduler", { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (
-          data.error === "AI not enabled" ||
-          data.error === "No API key configured"
-        ) {
-          setError("Enable AI in Settings to use this feature.");
+        if (data.error === "AI not enabled") {
+          setError({
+            message:
+              "Turn on Enable AI features in Settings (App → Settings), then save.",
+            showSettingsLink: true,
+          });
+        } else if (data.error === "No API key configured") {
+          setError({
+            message:
+              "No OpenAI API key found. Set the OPENAI_API_KEY environment variable for the server and restart if needed.",
+          });
         } else {
-          setError("Something went wrong. Please try again.");
+          setError({ message: "Something went wrong. Please try again." });
         }
         return;
       }
       const data = await res.json();
       setSuggestions(data.suggestions ?? []);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError({ message: "Something went wrong. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -115,8 +127,13 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
           )}
 
           {!loading && error && (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              {error}
+            <div className="py-8 text-center text-sm text-muted-foreground space-y-3">
+              <p>{error.message}</p>
+              {error.showSettingsLink && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/settings">Open Settings</Link>
+                </Button>
+              )}
             </div>
           )}
 

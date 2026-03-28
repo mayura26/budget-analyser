@@ -55,10 +55,11 @@ export function SettingsForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI Categorisation</CardTitle>
+        <CardTitle>AI features</CardTitle>
         <CardDescription>
-          Configure your OpenAI API key via the <code>OPENAI_API_KEY</code>{" "}
-          environment variable to enable automatic transaction categorisation.
+          Set <code>OPENAI_API_KEY</code> in the server environment. When enabled
+          below, this powers automatic transaction categorisation, chat
+          categorisation, and Smart Schedule Suggestions on the Budget page.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -83,7 +84,7 @@ export function SettingsForm({
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <Label htmlFor="ai_enabled">Enable AI categorisation</Label>
+            <Label htmlFor="ai_enabled">Enable AI features</Label>
             <Select name="ai_enabled" defaultValue={defaultValues.ai_enabled}>
               <SelectTrigger id="ai_enabled" className="w-full sm:w-44">
                 <SelectValue />

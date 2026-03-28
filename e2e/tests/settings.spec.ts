@@ -3,10 +3,18 @@ import { expect, test } from "@playwright/test";
 test.describe("Settings", () => {
   test("AI card renders", async ({ page }) => {
     await page.goto("/settings");
-    // CardTitle renders as a div — use exact match to avoid matching "Enable AI categorisation" label
+    // CardTitle renders as a div — use exact match to avoid matching "Enable AI features" label
+    await expect(page.getByText("AI features", { exact: true })).toBeVisible();
+  });
+
+  test("AI card mentions Smart Schedule and OPENAI_API_KEY", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
     await expect(
-      page.getByText("AI Categorisation", { exact: true }),
+      page.getByText(/Smart Schedule Suggestions/i),
     ).toBeVisible();
+    await expect(page.getByText(/OPENAI_API_KEY/i)).toBeVisible();
   });
 
   test("model select shows default", async ({ page }) => {
@@ -30,7 +38,7 @@ test.describe("Settings", () => {
 
   test("AI enabled select lists Disabled and Enabled", async ({ page }) => {
     await page.goto("/settings");
-    await page.getByLabel("Enable AI categorisation").click();
+    await page.getByLabel("Enable AI features").click();
     await expect(page.getByRole("option", { name: "Disabled" })).toBeVisible();
     await expect(page.getByRole("option", { name: "Enabled" })).toBeVisible();
   });

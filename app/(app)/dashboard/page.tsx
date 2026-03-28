@@ -9,14 +9,18 @@ import {
   Wallet,
 } from "lucide-react";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
+import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import {
+  enumerateMonthsInclusive,
   formatCurrency,
   formatMonth,
   getCurrentMonth,
   getMonthRange,
+  getMonthsEndingAt,
+  parseMonthParam,
 } from "@/lib/utils";
 import type { CategoryTotal, MonthlyTotal } from "@/types";
 
@@ -74,36 +78,42 @@ function getCategoryTotals(start: string, end: string): CategoryTotal[] {
   return rows as CategoryTotal[];
 }
 
-function getLast6Months(): string[] {
-  const months: string[] = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-    );
-  }
-  return months;
+function getEarliestTransactionMonth(): string | null {
+  const row = db
+    .select({ d: sql<string>`MIN(${transactions.date})` })
+    .from(transactions)
+    .get();
+  if (!row?.d) return null;
+  return row.d.slice(0, 7);
 }
 
-export default function DashboardPage({
-  searchParams: _searchParams,
+export default async function DashboardPage({
+  searchParams,
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
-  const months = getLast6Months();
-  const currentMonth = getCurrentMonth();
-  const { start, end } = getMonthRange(currentMonth);
+  const params = await searchParams;
+  const maxMonth = getCurrentMonth();
+  const earliest = getEarliestTransactionMonth();
+  const minMonth = earliest
+    ? (earliest < maxMonth ? earliest : maxMonth)
+    : maxMonth;
+
+  const selectedMonth = parseMonthParam(params.month, minMonth, maxMonth);
+  const months = getMonthsEndingAt(selectedMonth, 6);
+  const { start, end } = getMonthRange(selectedMonth);
 
   const monthlyTotals = getMonthlyTotals(months);
   const currentMonthData = monthlyTotals.find(
-    (m) => m.month === currentMonth,
+    (m) => m.month === selectedMonth,
   ) ?? {
-    month: currentMonth,
+    month: selectedMonth,
     income: 0,
     expenses: 0,
     net: 0,
   };
+
+  const monthOptions = enumerateMonthsInclusive(minMonth, maxMonth);
 
   const categoryTotals = getCategoryTotals(start, end);
 
@@ -120,11 +130,19 @@ export default function DashboardPage({
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          {formatMonth(currentMonth)}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Summary and category breakdown for {formatMonth(selectedMonth)}
+          </p>
+        </div>
+        <DashboardMonthPicker
+          selectedMonth={selectedMonth}
+          minMonth={minMonth}
+          maxMonth={maxMonth}
+          monthOptions={monthOptions}
+        />
       </div>
 
       {/* Summary Cards */}

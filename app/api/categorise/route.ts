@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
     .where(eq(settings.key, "openai_api_key"))
     .get();
 
-  if (!apiKeySetting?.value) {
+  const apiKey = process.env.OPENAI_API_KEY ?? apiKeySetting?.value;
+  if (!apiKey) {
     return NextResponse.json(
       { error: "No API key configured" },
       { status: 400 },
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       date: t.date,
     })),
     assignableForAi,
-    apiKeySetting.value,
+    apiKey,
     model,
   );
 

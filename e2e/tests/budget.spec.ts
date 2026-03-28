@@ -191,4 +191,36 @@ test.describe("Budget", () => {
       page.getByRole("button", { name: "AI Suggestions" }),
     ).not.toBeVisible();
   });
+
+  test("Smart Schedule dialog shows Open Settings when API reports AI disabled", async ({
+    page,
+  }) => {
+    await page.route("**/api/ai-scheduler", async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "AI not enabled" }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.getByLabel("Enable AI features").click();
+    await page.getByRole("option", { name: "Enabled" }).click();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Settings saved")).toBeVisible();
+
+    await page.goto("/budget");
+    await page.getByRole("tab", { name: "Schedules" }).click();
+    await page.getByRole("button", { name: "AI Suggestions" }).click();
+    await expect(
+      page.getByText(/Turn on Enable AI features in Settings/i),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open Settings" })).toBeVisible();
+
+    await page.goto("/settings");
+    await page.getByLabel("Enable AI features").click();
+    await page.getByRole("option", { name: "Disabled" }).click();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Settings saved")).toBeVisible();
+  });
 });

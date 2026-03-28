@@ -32,7 +32,8 @@ export async function POST() {
     .where(eq(settings.key, "openai_api_key"))
     .get();
 
-  if (!apiKeySetting?.value) {
+  const apiKey = process.env.OPENAI_API_KEY ?? apiKeySetting?.value;
+  if (!apiKey) {
     return NextResponse.json(
       { error: "No API key configured" },
       { status: 400 },
@@ -152,7 +153,7 @@ Respond with a JSON object: {"suggestions": [...]}
 Each suggestion: {"name": string, "amount": number, "frequency": string, "startDate": string, "categoryId": number|null, "reasoning": string, "confidence": number}
 Only return the JSON object, no other text.`;
 
-  const client = new OpenAI({ apiKey: apiKeySetting.value });
+  const client = new OpenAI({ apiKey });
   const reasoning = isOpenAIReasoningChatModel(model);
 
   const response = await client.chat.completions.create({
