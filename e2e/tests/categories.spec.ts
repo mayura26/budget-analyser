@@ -42,11 +42,13 @@ test.describe("Categories", () => {
 
     await dialog.getByRole("combobox").click();
     await page.getByRole("option", { name: "Living Costs" }).click();
-    await dialog.locator('input[name="name"]').fill("E2E Category");
+    await dialog.locator('input[name="title"]').fill("E2E Category");
+    await dialog.locator('textarea[name="subtext"]').fill("e2e ai hint");
 
     await dialog.getByRole("button", { name: "Create" }).click();
 
     await expect(page.getByText("E2E Category").first()).toBeVisible();
+    await expect(page.getByText("e2e ai hint").first()).toBeVisible();
     await expect(page.getByText("Expense").first()).toBeVisible();
   });
 

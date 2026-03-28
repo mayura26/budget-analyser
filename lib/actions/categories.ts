@@ -3,14 +3,12 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { applyKeywordRulesToUnverifiedTransactions } from "@/lib/actions/transactions";
 import { assignableCategoryError } from "@/lib/categories/assignable";
+import { serializeCategoryDisplayName } from "@/lib/categories/display-name";
+import { keywordRuleStub, matchRule } from "@/lib/categorisation/rule-matcher";
 import { db } from "@/lib/db";
 import { refreshSubcategoryColorsForParent } from "@/lib/db/category-hierarchy-migrate";
-import { applyKeywordRulesToUnverifiedTransactions } from "@/lib/actions/transactions";
-import {
-  keywordRuleStub,
-  matchRule,
-} from "@/lib/categorisation/rule-matcher";
 import { categories, categorisationRules, transactions } from "@/lib/db/schema";
 import type { ActionResult } from "@/types";
 
@@ -37,12 +35,22 @@ function parseParentId(formData: FormData): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+function categoryNameFromFormData(formData: FormData): string {
+  const title = String(formData.get("title") ?? "");
+  const rawSub = formData.get("subtext");
+  const subtext =
+    rawSub === null || rawSub === undefined
+      ? null
+      : String(rawSub).trim() || null;
+  return serializeCategoryDisplayName(title, subtext);
+}
+
 export async function createCategory(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
   const parsed = CategorySchema.safeParse({
-    name: formData.get("name"),
+    name: categoryNameFromFormData(formData),
     color: formData.get("color") || "#6366f1",
     icon: formData.get("icon") || undefined,
     type: formData.get("type") || "expense",
@@ -115,7 +123,7 @@ export async function updateCategory(
   formData: FormData,
 ): Promise<ActionResult> {
   const parsed = CategorySchema.safeParse({
-    name: formData.get("name"),
+    name: categoryNameFromFormData(formData),
     color: formData.get("color") || "#6366f1",
     icon: formData.get("icon") || undefined,
     type: formData.get("type") || "expense",
@@ -333,4 +341,3 @@ export async function createRulesBulkAndApplyToUnverified(
     },
   };
 }
-

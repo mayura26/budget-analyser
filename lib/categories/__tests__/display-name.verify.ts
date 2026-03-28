@@ -3,6 +3,7 @@ import {
   formatCategoryForAI,
   formatCategoryOptionPlainText,
   parseCategoryDisplayName,
+  serializeCategoryDisplayName,
 } from "../display-name";
 
 assert.deepEqual(
@@ -38,5 +39,26 @@ assert.equal(
   "Activities — dining",
 );
 assert.equal(formatCategoryOptionPlainText("Groceries"), "Groceries");
+
+assert.equal(serializeCategoryDisplayName("Groceries", null), "Groceries");
+assert.equal(serializeCategoryDisplayName("Groceries", "  "), "Groceries");
+assert.equal(
+  serializeCategoryDisplayName("Activities", "dining, events"),
+  "Activities (dining, events)",
+);
+
+const roundTripSamples = [
+  "Groceries",
+  "Activities (dining, events, hobbies)",
+  "  Income (salary / primary)  ",
+  "Nested (supermarkets (coles, woolies))",
+];
+for (const name of roundTripSamples) {
+  const p = parseCategoryDisplayName(name);
+  const again = parseCategoryDisplayName(
+    serializeCategoryDisplayName(p.title, p.subtext),
+  );
+  assert.deepEqual(again, p);
+}
 
 console.log("display-name.verify.ts: ok");

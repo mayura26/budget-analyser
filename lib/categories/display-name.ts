@@ -25,6 +25,18 @@ export function parseCategoryDisplayName(name: string): {
   return { title: before, subtext: inner || null };
 }
 
+/** Inverse of {@link parseCategoryDisplayName}: build stored `name` from title and optional subtext. */
+export function serializeCategoryDisplayName(
+  title: string,
+  subtext?: string | null,
+): string {
+  const t = title.trim();
+  if (!t) return "";
+  const s = subtext?.trim();
+  if (!s) return t;
+  return `${t} (${s})`;
+}
+
 /** Plain-text label for native `<option>` (no JSX). */
 export function formatCategoryOptionPlainText(name: string): string {
   const { title, subtext } = parseCategoryDisplayName(name);

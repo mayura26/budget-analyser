@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createCategory,
   createRule,
@@ -32,6 +33,7 @@ import {
   updateCategory,
 } from "@/lib/actions/categories";
 import { deriveSubcategoryColor } from "@/lib/categories/colors";
+import { parseCategoryDisplayName } from "@/lib/categories/display-name";
 import type { CategorisationRule, Category } from "@/types";
 
 type CategoryWithCount = Category & { ruleCount: number };
@@ -320,8 +322,23 @@ function AddMainGroupDialog() {
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label>Name</Label>
-            <Input name="name" required />
+            <Label htmlFor="add-main-title">Title</Label>
+            <Input
+              id="add-main-title"
+              name="title"
+              required
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="add-main-subtext">Subtext (optional)</Label>
+            <Textarea
+              id="add-main-subtext"
+              name="subtext"
+              rows={2}
+              className="min-h-[60px] resize-y"
+              placeholder="Shown under the group name"
+            />
           </div>
           <input type="hidden" name="type" value={type} />
           <div className="space-y-2">
@@ -412,15 +429,37 @@ function AddSubCategoryDialog({
               <SelectContent>
                 {mains.map((m) => (
                   <SelectItem key={m.id} value={String(m.id)}>
-                    {m.name}
+                    {parseCategoryDisplayName(m.name).title}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Name</Label>
-            <Input name="name" required disabled={!parentId} />
+            <Label htmlFor="add-sub-title">Title</Label>
+            <Input
+              id="add-sub-title"
+              name="title"
+              required
+              disabled={!parentId}
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="add-sub-subtext">
+              Subtext / AI hints (optional)
+            </Label>
+            <Textarea
+              id="add-sub-subtext"
+              name="subtext"
+              rows={2}
+              className="min-h-[60px] resize-y"
+              disabled={!parentId}
+              placeholder="e.g. supermarkets, fresh food"
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown under the title; helps auto-categorisation and AI matching.
+            </p>
           </div>
           <input type="hidden" name="type" value={type} />
           <p className="text-xs text-muted-foreground">
@@ -457,6 +496,8 @@ function EditCategoryDialog({
   const [pending, setPending] = useState(false);
   const [type, setType] = useState<string>(category.type);
   const [parentId, setParentId] = useState(String(category.parentId ?? ""));
+  const { title: defaultTitle, subtext: defaultSubtext } =
+    parseCategoryDisplayName(category.name);
 
   const selectedMain = !isMain
     ? mains.find((m) => String(m.id) === parentId)
@@ -476,6 +517,7 @@ function EditCategoryDialog({
           </DialogTitle>
         </DialogHeader>
         <form
+          key={category.name}
           action={async (fd) => {
             setPending(true);
             fd.set(
@@ -490,8 +532,37 @@ function EditCategoryDialog({
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label>Name</Label>
-            <Input name="name" required defaultValue={category.name} />
+            <Label htmlFor={`edit-cat-title-${category.id}`}>Title</Label>
+            <Input
+              id={`edit-cat-title-${category.id}`}
+              name="title"
+              required
+              defaultValue={defaultTitle}
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`edit-cat-subtext-${category.id}`}>
+              {isMain ? "Subtext (optional)" : "Subtext / AI hints (optional)"}
+            </Label>
+            <Textarea
+              id={`edit-cat-subtext-${category.id}`}
+              name="subtext"
+              rows={2}
+              className="min-h-[60px] resize-y"
+              defaultValue={defaultSubtext ?? ""}
+              placeholder={
+                isMain
+                  ? "Shown under the group name"
+                  : "e.g. supermarkets, fresh food"
+              }
+            />
+            {!isMain ? (
+              <p className="text-xs text-muted-foreground">
+                Shown under the title; helps auto-categorisation and AI
+                matching.
+              </p>
+            ) : null}
           </div>
           {isMain ? (
             <div className="space-y-2">
@@ -519,7 +590,7 @@ function EditCategoryDialog({
                 <SelectContent>
                   {mains.map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>
-                      {m.name}
+                      {parseCategoryDisplayName(m.name).title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -553,7 +624,9 @@ function AddRuleDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add rule for {categoryName}</DialogTitle>
+          <DialogTitle>
+            Add rule for {parseCategoryDisplayName(categoryName).title}
+          </DialogTitle>
         </DialogHeader>
         <form
           action={async (fd) => {
