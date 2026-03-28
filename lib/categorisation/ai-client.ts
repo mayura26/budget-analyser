@@ -16,6 +16,13 @@ type TransactionInput = {
   accountName?: string;
 };
 
+/** OpenAI o-series and codex-mini use reasoning params; they reject `temperature` / `top_p`. */
+function isOpenAIReasoningChatModel(model: string): boolean {
+  const m = model.toLowerCase();
+  if (/^o\d/.test(m)) return true;
+  return m === "codex-mini-latest";
+}
+
 export async function categoriseWithAI(
   transactions: TransactionInput[],
   categories: Category[],
@@ -44,19 +51,25 @@ ${categoryList}
 Transactions to categorise:
 ${transactionList}
 
-Respond with a JSON array. Each item must have:
+Respond with a JSON object with a single key "results" whose value is an array. Each array item must have:
 - id: transaction ID (number)
 - categoryId: matching category ID (number) or null if uncertain
 - categoryName: category name (string)
 - confidence: 0.0 to 1.0 (number)
 
-Only return the JSON array, no other text.`;
+Example shape: {"results":[{"id":1,"categoryId":2,"categoryName":"Groceries","confidence":0.9}]}
+
+Only return the JSON object, no other text.`;
+
+  const reasoning = isOpenAIReasoningChatModel(model);
 
   const response = await client.chat.completions.create({
     model,
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.1,
     response_format: { type: "json_object" },
+    ...(reasoning
+      ? { reasoning_effort: "medium" as const }
+      : { temperature: 0.1 }),
   });
 
   const content = response.choices[0]?.message?.content ?? "{}";

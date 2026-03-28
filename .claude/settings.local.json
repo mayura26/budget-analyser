@@ -22,7 +22,8 @@
       "Bash(node -e \"console.log\\(require\\(''./node_modules/lucide-react/package.json''\\).version\\)\")",
       "Bash(node -e \":*)",
       "Bash(sed -n '10,25p' e2e/tests/categorise.spec.ts)",
-      "Bash(sed -n '18,30p' e2e/tests/import.spec.ts)"
+      "Bash(sed -n '18,30p' e2e/tests/import.spec.ts)",
+      "Bash(ls -la app/\\\\\\(app\\\\\\)/settings/ components/settings/ lib/actions/)"
     ]
   }
 }

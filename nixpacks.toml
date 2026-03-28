@@ -1,0 +1,4 @@
+# Coolify / Nixpacks: install sqlite3 CLI + bash for `npm run backup:db`
+# (scripts/backup-db.sh uses `sqlite3 .backup` when WAL is active — see README)
+[phases.setup]
+nixPkgs = ["...", "sqlite", "bash"]

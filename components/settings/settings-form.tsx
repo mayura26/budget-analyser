@@ -18,6 +18,22 @@ import { CheckCircle } from "lucide-react";
 const MODELS = [
   { value: "gpt-4o-mini", label: "GPT-4o Mini (recommended)" },
   { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4.1", label: "GPT-4.1" },
+  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+  { value: "gpt-5-mini", label: "GPT-5 Mini" },
+  { value: "gpt-5-nano", label: "GPT-5 Nano" },
+  { value: "gpt-5", label: "GPT-5" },
+  { value: "gpt-5.1", label: "GPT-5.1" },
+  { value: "gpt-5.4", label: "GPT-5.4" },
+  { value: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+  { value: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+  { value: "o4-mini", label: "o4-mini (reasoning)" },
+  { value: "o3-mini", label: "o3-mini (reasoning)" },
+  { value: "o3", label: "o3 (reasoning)" },
+  { value: "o1-mini", label: "o1-mini (reasoning)" },
+  { value: "o1", label: "o1 (reasoning)" },
+  { value: "codex-mini-latest", label: "codex-mini-latest (reasoning)" },
   { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
 ];
 

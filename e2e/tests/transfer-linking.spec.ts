@@ -24,7 +24,7 @@ test.describe('Transfer Linking', () => {
     // Add manual transaction on Account A (debit -100)
     await page.goto('/transactions/new');
     await page.getByRole('combobox').first().click();
-    await page.getByRole('option', { name: 'Transfer Test A' }).click();
+    await page.getByRole('option', { name: 'Transfer Test A' }).first().click();
     await page.locator('input[name="date"]').fill('2024-06-15');
     await page.locator('input[name="description"]').fill('Transfer to B');
     await page.locator('input[name="amount"]').fill('-100');
@@ -34,7 +34,7 @@ test.describe('Transfer Linking', () => {
     // Add manual transaction on Account B (credit +100)
     await page.goto('/transactions/new');
     await page.getByRole('combobox').first().click();
-    await page.getByRole('option', { name: 'Transfer Test B' }).click();
+    await page.getByRole('option', { name: 'Transfer Test B' }).first().click();
     await page.locator('input[name="date"]').fill('2024-06-15');
     await page.locator('input[name="description"]').fill('Transfer from A');
     await page.locator('input[name="amount"]').fill('100');

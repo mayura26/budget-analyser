@@ -13,6 +13,12 @@ test.describe('Settings', () => {
     await expect(page.getByRole('combobox').filter({ hasText: /gpt-4o mini/i })).toBeVisible();
   });
 
+  test('model select includes a reasoning model option', async ({ page }) => {
+    await page.goto('/settings');
+    await page.getByRole('combobox').filter({ hasText: /gpt-4o mini/i }).click();
+    await expect(page.getByRole('option', { name: /o3-mini \(reasoning\)/i })).toBeVisible();
+  });
+
   test('save shows success message', async ({ page }) => {
     await page.goto('/settings');
     await page.getByRole('button', { name: 'Save settings' }).click();

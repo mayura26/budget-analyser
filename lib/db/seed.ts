@@ -48,7 +48,7 @@ const DEFAULT_BANK_PROFILES = [
     amountColumn: "Amount",
     debitColumn: null,
     creditColumn: null,
-    dateFormat: "YYYY-MM-DD",
+    dateFormat: "DD/MM/YYYY",
     skipRows: 0,
     delimiter: ",",
     negativeIsDebit: true,
