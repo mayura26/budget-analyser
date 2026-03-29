@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -14,9 +15,25 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 import type { CategoryTotal, MonthlyTotal } from "@/types";
+
+type PieDatum = {
+  name: string;
+  value: number;
+  color: string;
+  /** Present when pie uses net mode; tooltip and legend show signed amounts. */
+  signedAmount?: number;
+};
+
+function formatSignedCurrency(amount: number, currency: SupportedCurrency) {
+  const abs = formatCurrency(Math.abs(amount), currency);
+  if (amount < 0) return `−${abs}`;
+  if (amount > 0) return `+${abs}`;
+  return abs;
+}
 
 function formatMonthShort(monthStr: string) {
   const [year, month] = monthStr.split("-");
@@ -26,7 +43,12 @@ function formatMonthShort(monthStr: string) {
 
 interface TooltipProps {
   active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
+  payload?: Array<{
+    name: string;
+    value: number;
+    color: string;
+    payload?: PieDatum;
+  }>;
   label?: string;
   homeCurrency: SupportedCurrency;
 }
@@ -36,42 +58,56 @@ function ChartTooltip({ active, payload, label, homeCurrency }: TooltipProps) {
   return (
     <div className="chart-tooltip">
       {label && <p className="chart-tooltip-label">{label}</p>}
-      {payload.map((entry) => (
-        <div key={entry.name} className="flex items-center gap-2">
-          <span
-            className="inline-block h-2 w-2 rounded-full shrink-0"
-            style={{ background: entry.color }}
-          />
-          <span className="opacity-70">{entry.name}:</span>
-          <span className="font-semibold">
-            {formatCurrency(entry.value, homeCurrency)}
-          </span>
-        </div>
-      ))}
+      {payload.map((entry) => {
+        const datum = entry.payload;
+        const signed = datum?.signedAmount;
+        const text =
+          signed !== undefined
+            ? formatSignedCurrency(signed, homeCurrency)
+            : formatCurrency(entry.value, homeCurrency);
+        return (
+          <div key={entry.name} className="flex items-center gap-2">
+            <span
+              className="inline-block h-2 w-2 rounded-full shrink-0"
+              style={{ background: entry.color }}
+            />
+            <span className="opacity-70">{entry.name}:</span>
+            <span className="font-semibold">{text}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 export function DashboardCharts({
   monthlyTotals,
-  categoryTotals,
+  categoryExpenseTotals,
+  categoryNetTotals,
   homeCurrency,
 }: {
   monthlyTotals: MonthlyTotal[];
-  categoryTotals: CategoryTotal[];
+  categoryExpenseTotals: CategoryTotal[];
+  categoryNetTotals: CategoryTotal[];
   homeCurrency: SupportedCurrency;
 }) {
+  const [pieUseNet, setPieUseNet] = useState(false);
+
   const barData = monthlyTotals.map((m) => ({
     month: formatMonthShort(m.month),
     Income: m.income,
     Expenses: m.expenses,
   }));
 
-  const pieData = categoryTotals.slice(0, 8).map((c) => ({
-    name: c.categoryName,
-    value: c.total,
-    color: c.color,
-  }));
+  const pieData: PieDatum[] = useMemo(() => {
+    const source = pieUseNet ? categoryNetTotals : categoryExpenseTotals;
+    return source.slice(0, 8).map((c) => ({
+      name: c.categoryName,
+      value: pieUseNet ? Math.abs(c.total) : c.total,
+      color: c.color,
+      signedAmount: pieUseNet ? c.total : undefined,
+    }));
+  }, [pieUseNet, categoryExpenseTotals, categoryNetTotals]);
 
   const hasBarData = barData.some((d) => d.Income > 0 || d.Expenses > 0);
 
@@ -134,15 +170,43 @@ export function DashboardCharts({
 
       {/* Donut Chart */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">
-            Spending by Category
-          </CardTitle>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <CardTitle className="text-base font-semibold">
+              {pieUseNet ? "Net by Category" : "Spending by Category"}
+            </CardTitle>
+            <div className="flex items-center gap-3 shrink-0">
+              <Label
+                htmlFor="dashboard-pie-net-slider"
+                className="text-xs text-muted-foreground font-normal whitespace-nowrap"
+              >
+                Net in pie
+              </Label>
+              <input
+                id="dashboard-pie-net-slider"
+                type="range"
+                min={0}
+                max={1}
+                step={1}
+                value={pieUseNet ? 1 : 0}
+                onChange={(e) => setPieUseNet(Number(e.target.value) === 1)}
+                className="w-24 h-2 accent-primary cursor-pointer"
+                aria-valuetext={pieUseNet ? "Net amounts" : "Expenses only"}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground font-normal leading-snug">
+            {pieUseNet
+              ? "Slice size is the magnitude of net flow (income minus spending) per category."
+              : "Outflows only — same as expense totals elsewhere."}
+          </p>
         </CardHeader>
         <CardContent>
           {pieData.length === 0 ? (
             <div className="flex h-48 items-center justify-center text-muted-foreground text-sm">
-              No expense data for this month
+              {pieUseNet
+                ? "No net activity by category for this month"
+                : "No expense data for this month"}
             </div>
           ) : (
             <div className="flex items-center gap-4">
@@ -186,7 +250,9 @@ export function DashboardCharts({
                       {entry.name}
                     </span>
                     <span className="font-medium tabular-nums shrink-0">
-                      {formatCurrency(entry.value, homeCurrency)}
+                      {entry.signedAmount !== undefined
+                        ? formatSignedCurrency(entry.signedAmount, homeCurrency)
+                        : formatCurrency(entry.value, homeCurrency)}
                     </span>
                   </li>
                 ))}

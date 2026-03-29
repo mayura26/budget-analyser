@@ -6,6 +6,7 @@ import Link from "next/link";
 import { TransactionActions } from "@/components/transactions/transaction-actions";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
+import { isValidISODate } from "@/lib/analytics/date-range";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
@@ -17,6 +18,8 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<{
     month?: string;
+    from?: string;
+    to?: string;
     accountId?: string;
     categoryId?: string;
     search?: string;
@@ -34,9 +37,19 @@ export default async function TransactionsPage({
     .sort((a, b) => a.name.localeCompare(b.name));
   const allCategories = filterAssignableCategories(allCatsRaw);
 
+  const dateRangeActive =
+    params.from &&
+    params.to &&
+    isValidISODate(params.from) &&
+    isValidISODate(params.to) &&
+    params.from <= params.to;
+
   // Build filters
   const filters = [];
-  if (params.month) {
+  if (dateRangeActive && params.from && params.to) {
+    filters.push(gte(transactions.date, params.from));
+    filters.push(lte(transactions.date, params.to));
+  } else if (params.month) {
     const [year, month] = params.month.split("-").map(Number);
     const start = `${year}-${String(month).padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
@@ -136,6 +149,12 @@ export default async function TransactionsPage({
           <h1 className="text-2xl font-semibold">Transactions</h1>
           <p className="text-sm text-muted-foreground">
             {rows.length} transactions
+            {dateRangeActive && (
+              <>
+                {" "}
+                · {params.from} to {params.to}
+              </>
+            )}
           </p>
           {needsReviewCount > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-500 mt-0.5">

@@ -49,6 +49,28 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
   });
 
+  test("pie chart net slider toggles copy", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expect(page.getByText(/monthly overview/i)).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(
+      page.getByText("Spending by Category", { exact: true }),
+    ).toBeVisible();
+    const slider = page.getByRole("slider", { name: /net in pie/i });
+    await expect(slider).toBeVisible();
+    const box = await slider.boundingBox();
+    expect(box).toBeTruthy();
+    await page.mouse.click(box!.x + box!.width - 2, box!.y + box!.height / 2);
+    await expect(page.getByText("Net by Category", { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+    await page.mouse.click(box!.x + 2, box!.y + box!.height / 2);
+    await expect(
+      page.getByText("Spending by Category", { exact: true }),
+    ).toBeVisible({ timeout: 10000 });
+  });
+
   test("sidebar brand links to dashboard from another page", async ({
     page,
   }) => {

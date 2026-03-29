@@ -22,7 +22,7 @@ import {
 } from "@/lib/budget/queries";
 import { getHomeCurrency } from "@/lib/currency/home";
 import {
-  getCategoryTotalsInHomeCurrency,
+  getCategoryBreakdownInHomeCurrency,
   getMonthlyTotalsInHomeCurrency,
 } from "@/lib/dashboard/home-currency-totals";
 import { db } from "@/lib/db";
@@ -193,7 +193,7 @@ export default async function DashboardPage({
 
   const monthOptions = enumerateMonthsInclusive(minMonth, maxMonth);
 
-  const categoryTotals = await getCategoryTotalsInHomeCurrency(
+  const { expenseTotals, netTotals } = await getCategoryBreakdownInHomeCurrency(
     start,
     end,
     homeCurrency,
@@ -308,7 +308,8 @@ export default async function DashboardPage({
       {/* Charts */}
       <DashboardCharts
         monthlyTotals={monthlyTotals}
-        categoryTotals={categoryTotals}
+        categoryExpenseTotals={expenseTotals}
+        categoryNetTotals={netTotals}
         homeCurrency={homeCurrency}
       />
     </div>

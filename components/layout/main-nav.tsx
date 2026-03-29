@@ -2,6 +2,7 @@
 
 import {
   ArrowDownUp,
+  BarChart3,
   CalendarDays,
   CreditCard,
   LayoutDashboard,
@@ -31,6 +32,7 @@ const NAV_GROUPS: {
     headingClass: "text-emerald-400",
     items: [
       { href: "/budget", label: "Budget", icon: CalendarDays },
+      { href: "/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/transactions", label: "Transactions", icon: ArrowDownUp },
     ],
   },

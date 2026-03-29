@@ -218,3 +218,36 @@ export type CategoryTotal = {
   total: number;
   count: number;
 };
+
+export type AccountCashflowRow = {
+  accountId: number;
+  accountName: string;
+  color: string;
+  moneyIn: number;
+  moneyOut: number;
+  net: number;
+};
+
+/** Spending hierarchy for analytics (expense debits, transfers excluded). */
+export type CategoryHierarchyNode = {
+  id: number | null;
+  name: string;
+  color: string;
+  total: number;
+  transactionCount: number;
+  children: CategoryHierarchyNode[];
+};
+
+export type AnalyticsTreemapDatum = {
+  name: string;
+  value: number;
+  fill: string;
+  categoryId: number | null;
+  children?: AnalyticsTreemapDatum[];
+};
+
+export type AnalyticsSummary = {
+  income: number;
+  expenses: number;
+  net: number;
+};

@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
 import type { SupportedCurrency } from "@/lib/currency/supported";
@@ -62,11 +62,15 @@ export async function getMonthlyTotalsInHomeCurrency(
   return results;
 }
 
-export async function getCategoryTotalsInHomeCurrency(
+/** Expense-only slices (outflows) and signed net per category (same non-transfer filter). */
+export async function getCategoryBreakdownInHomeCurrency(
   start: string,
   end: string,
   homeCurrency: SupportedCurrency,
-): Promise<CategoryTotal[]> {
+): Promise<{
+  expenseTotals: CategoryTotal[];
+  netTotals: CategoryTotal[];
+}> {
   const rows = db
     .select({
       categoryId: transactions.categoryId,
@@ -83,7 +87,6 @@ export async function getCategoryTotalsInHomeCurrency(
       and(
         gte(transactions.date, start),
         lte(transactions.date, end),
-        lt(transactions.amount, sql`0`),
         or(isNull(categories.type), ne(categories.type, "transfer")),
       ),
     )
@@ -100,40 +103,58 @@ export async function getCategoryTotalsInHomeCurrency(
 
   const byCat = new Map<
     number | null,
-    { name: string; color: string; total: number; count: number }
+    {
+      name: string;
+      color: string;
+      expenseTotal: number;
+      expenseCount: number;
+      netTotal: number;
+      netCount: number;
+    }
   >();
 
   for (const row of rows) {
     const cur = parseAccountCurrency(row.currency, homeCurrency);
-    const conv = convertToHome(
-      db,
-      Math.abs(row.amount),
-      cur,
-      homeCurrency,
-      row.date,
-    );
+    const conv = convertToHome(db, row.amount, cur, homeCurrency, row.date);
     const key = row.categoryId;
     const existing = byCat.get(key) ?? {
       name: row.categoryName,
       color: row.color,
-      total: 0,
-      count: 0,
+      expenseTotal: 0,
+      expenseCount: 0,
+      netTotal: 0,
+      netCount: 0,
     };
-    existing.total += conv;
-    existing.count += 1;
+    existing.netTotal += conv;
+    existing.netCount += 1;
+    if (conv < 0) {
+      existing.expenseTotal += Math.abs(conv);
+      existing.expenseCount += 1;
+    }
     byCat.set(key, existing);
   }
 
-  const out: CategoryTotal[] = Array.from(byCat.entries()).map(
-    ([categoryId, v]) => ({
+  const expenseTotals: CategoryTotal[] = Array.from(byCat.entries())
+    .filter(([, v]) => v.expenseTotal > 0)
+    .map(([categoryId, v]) => ({
       categoryId,
       categoryName: v.name,
       color: v.color,
-      total: Math.round(v.total * 100) / 100,
-      count: v.count,
-    }),
-  );
+      total: Math.round(v.expenseTotal * 100) / 100,
+      count: v.expenseCount,
+    }));
+  expenseTotals.sort((a, b) => b.total - a.total);
 
-  out.sort((a, b) => b.total - a.total);
-  return out;
+  const netTotals: CategoryTotal[] = Array.from(byCat.entries())
+    .filter(([, v]) => v.netTotal !== 0)
+    .map(([categoryId, v]) => ({
+      categoryId,
+      categoryName: v.name,
+      color: v.color,
+      total: Math.round(v.netTotal * 100) / 100,
+      count: v.netCount,
+    }));
+  netTotals.sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+
+  return { expenseTotals, netTotals };
 }
