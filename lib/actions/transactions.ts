@@ -12,8 +12,8 @@ import { categoriseWithAI } from "@/lib/categorisation/ai-client";
 import { categoriseTransactions } from "@/lib/categorisation/engine";
 import {
   findMatchingRule,
-  keywordRuleStub,
   matchRule,
+  ruleDraftStub,
 } from "@/lib/categorisation/rule-matcher";
 import { db } from "@/lib/db";
 import {
@@ -26,7 +26,12 @@ import {
 } from "@/lib/db/schema";
 import { generateFingerprint } from "@/lib/import/fingerprint";
 import { normaliseDescription } from "@/lib/import/normaliser";
-import type { ActionResult, CategorisationRule, Category } from "@/types";
+import type {
+  ActionResult,
+  CategorisationRule,
+  Category,
+  RuleDraftInput,
+} from "@/types";
 
 export type AISuggestionScope = "uncategorised" | "unfinalised" | "mismatches";
 
@@ -628,8 +633,8 @@ export async function applyCategorisations(
   return { success: true, data: { applied } };
 }
 
-export async function applyKeywordRulesToUnverifiedTransactions(
-  rules: { pattern: string; categoryId: number }[],
+export async function applyDraftRulesToUnverifiedTransactions(
+  rules: RuleDraftInput[],
 ): Promise<ActionResult<{ updated: number }>> {
   if (rules.length === 0) return { success: true, data: { updated: 0 } };
 
@@ -656,7 +661,10 @@ export async function applyKeywordRulesToUnverifiedTransactions(
     if (updatedIds.has(row.id)) continue;
 
     const rule = rules.find((r) =>
-      matchRule(row.normalised, keywordRuleStub(r.pattern, r.categoryId)),
+      matchRule(
+        row.normalised,
+        ruleDraftStub(r.pattern, r.categoryId, r.patternType),
+      ),
     );
     if (!rule) continue;
 
@@ -687,6 +695,15 @@ export async function applyKeywordRulesToUnverifiedTransactions(
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   return { success: true, data: { updated } };
+}
+
+/** Keyword-only rules (legacy bulk helper). */
+export async function applyKeywordRulesToUnverifiedTransactions(
+  rules: { pattern: string; categoryId: number }[],
+): Promise<ActionResult<{ updated: number }>> {
+  return applyDraftRulesToUnverifiedTransactions(
+    rules.map((r) => ({ ...r, patternType: "keyword" as const })),
+  );
 }
 
 export type UncategorisedTransaction = {

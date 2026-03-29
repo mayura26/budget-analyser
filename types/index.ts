@@ -96,6 +96,13 @@ export type CategorisationRule = {
   updatedAt: number;
 };
 
+/** AI / bulk rule creation before persisting to `categorisation_rules`. */
+export type RuleDraftInput = {
+  pattern: string;
+  categoryId: number;
+  patternType: "regex" | "keyword" | "exact";
+};
+
 export type ParsedRow = {
   date: string;
   description: string;

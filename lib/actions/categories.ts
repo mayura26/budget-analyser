@@ -3,10 +3,13 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { applyKeywordRulesToUnverifiedTransactions } from "@/lib/actions/transactions";
+import {
+  applyDraftRulesToUnverifiedTransactions,
+  applyKeywordRulesToUnverifiedTransactions,
+} from "@/lib/actions/transactions";
 import { assignableCategoryError } from "@/lib/categories/assignable";
 import { serializeCategoryDisplayName } from "@/lib/categories/display-name";
-import { keywordRuleStub, matchRule } from "@/lib/categorisation/rule-matcher";
+import { matchRule, ruleDraftStub } from "@/lib/categorisation/rule-matcher";
 import { db } from "@/lib/db";
 import { refreshSubcategoryColorsForParent } from "@/lib/db/category-hierarchy-migrate";
 import {
@@ -15,7 +18,7 @@ import {
   suppressCategorySeedKey,
 } from "@/lib/db/category-seed-suppressions";
 import { categories, categorisationRules, transactions } from "@/lib/db/schema";
-import type { ActionResult } from "@/types";
+import type { ActionResult, RuleDraftInput } from "@/types";
 
 const CategorySchema = z.object({
   name: z.string().min(1).max(100),
@@ -318,8 +321,71 @@ export async function createRulesBulk(
   return { success: true, data: { created } };
 }
 
+export async function createRulesFromDrafts(
+  drafts: RuleDraftInput[],
+): Promise<ActionResult<{ created: number }>> {
+  let created = 0;
+  for (const d of drafts) {
+    const err = assignableCategoryError(d.categoryId);
+    if (err) continue;
+    if (d.patternType === "regex") {
+      try {
+        new RegExp(d.pattern, "i");
+      } catch {
+        continue;
+      }
+    }
+    try {
+      db.insert(categorisationRules)
+        .values({
+          categoryId: d.categoryId,
+          pattern: d.pattern,
+          patternType: d.patternType,
+          priority: 10,
+          confidence: 0.9,
+          isUserDefined: true,
+        })
+        .run();
+      created++;
+    } catch {
+      // Skip duplicates or DB errors
+    }
+  }
+  revalidatePath("/categories");
+  return { success: true, data: { created } };
+}
+
+export async function createRulesFromDraftsAndApplyToUnverified(
+  drafts: RuleDraftInput[],
+): Promise<ActionResult<{ created: number; updated: number }>> {
+  const createdResult = await createRulesFromDrafts(drafts);
+  if (!createdResult.success) {
+    return { success: false, error: "Failed to create rules" };
+  }
+
+  const applyResult = await applyDraftRulesToUnverifiedTransactions(drafts);
+  if (!applyResult.success) {
+    return { success: false, error: applyResult.error };
+  }
+
+  revalidatePath("/transactions");
+  return {
+    success: true,
+    data: {
+      created: createdResult.data.created,
+      updated: applyResult.data.updated,
+    },
+  };
+}
+
+export type RulePreviewInput = {
+  pattern: string;
+  categoryId: number;
+  patternType?: "regex" | "keyword" | "exact";
+};
+
 export async function previewUnverifiedMatchesForRules(
-  rules: { pattern: string; categoryId: number }[],
+  rules: RulePreviewInput[],
 ): Promise<ActionResult<{ key: string; count: number }[]>> {
   if (rules.length === 0) return { success: true, data: [] };
 
@@ -330,9 +396,14 @@ export async function previewUnverifiedMatchesForRules(
     .all();
 
   const data = rules.map((r) => {
-    const stub = keywordRuleStub(r.pattern, r.categoryId);
+    const patternType = r.patternType ?? "keyword";
+    const stub = ruleDraftStub(r.pattern, r.categoryId, patternType);
     const count = rows.filter((row) => matchRule(row.normalised, stub)).length;
-    return { key: `${r.pattern}::${r.categoryId}`, count };
+    const key =
+      patternType === "keyword"
+        ? `${r.pattern}::${r.categoryId}`
+        : `${r.pattern}::${r.categoryId}::${patternType}`;
+    return { key, count };
   });
 
   return { success: true, data };

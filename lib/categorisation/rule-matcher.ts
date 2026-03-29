@@ -48,11 +48,20 @@ export function keywordRuleStub(
   pattern: string,
   categoryId: number,
 ): CategorisationRule {
+  return ruleDraftStub(pattern, categoryId, "keyword");
+}
+
+/** In-memory draft for preview / apply (any pattern type). */
+export function ruleDraftStub(
+  pattern: string,
+  categoryId: number,
+  patternType: "regex" | "keyword" | "exact",
+): CategorisationRule {
   return {
     id: 0,
     categoryId,
     pattern,
-    patternType: "keyword",
+    patternType,
     priority: 10,
     confidence: 0.9,
     isUserDefined: true,

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { eq, sql } from "drizzle-orm";
 import { CategoryList } from "@/components/categories/category-list";
+import { RuleBuilderChatDialog } from "@/components/categories/rule-builder-chat-dialog";
 import { db } from "@/lib/db";
 import { categories, categorisationRules } from "@/lib/db/schema";
 import type { Category } from "@/types";
@@ -46,7 +47,10 @@ export default function CategoriesPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Categories & Rules</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-semibold">Categories & Rules</h1>
+        <RuleBuilderChatDialog categories={allCategories} />
+      </div>
       <CategoryList categories={allCategories} rules={allRules} />
     </div>
   );
