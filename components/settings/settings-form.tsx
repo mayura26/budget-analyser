@@ -19,6 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveSettings } from "@/lib/actions/settings";
+import {
+  CURRENCY_LABELS,
+  SUPPORTED_CURRENCIES,
+} from "@/lib/currency/supported";
 
 const MODELS = [
   { value: "gpt-4o-mini", label: "GPT-4o Mini (recommended)" },
@@ -48,22 +52,55 @@ export function SettingsForm({
   defaultValues: {
     openai_model: string;
     ai_enabled: string;
+    home_currency: string;
   };
 }) {
   const [state, formAction, pending] = useActionState(saveSettings, null);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>AI features</CardTitle>
-        <CardDescription>
-          Set <code>OPENAI_API_KEY</code> in the server environment. When
-          enabled below, this powers automatic transaction categorisation, chat
-          categorisation, and Smart Schedule Suggestions on the Budget page.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Home currency</CardTitle>
+          <CardDescription>
+            Budget totals, dashboard charts, and cross-account balances are
+            shown in this currency. Each account can use a different currency;
+            amounts are converted using ECB rates (via Frankfurter).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="home_currency">Currency</Label>
+            <Select
+              name="home_currency"
+              defaultValue={defaultValues.home_currency}
+            >
+              <SelectTrigger id="home_currency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {CURRENCY_LABELS[code]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>AI features</CardTitle>
+          <CardDescription>
+            Set <code>OPENAI_API_KEY</code> in the server environment. When
+            enabled below, this powers automatic transaction categorisation,
+            chat categorisation, and Smart Schedule Suggestions on the Budget
+            page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Model</Label>
             <Select
@@ -109,8 +146,8 @@ export function SettingsForm({
           <Button type="submit" disabled={pending}>
             {pending ? "Saving…" : "Save settings"}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </form>
   );
 }

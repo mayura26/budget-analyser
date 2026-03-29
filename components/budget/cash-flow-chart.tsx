@@ -12,11 +12,14 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import type { SupportedCurrency } from "@/lib/currency/supported";
+import { formatCurrency } from "@/lib/utils";
 import type { BalancePoint } from "@/types";
 
 interface Props {
   points: BalancePoint[];
   currentBalance: number;
+  homeCurrency: SupportedCurrency;
 }
 
 const HORIZONS = [
@@ -25,9 +28,11 @@ const HORIZONS = [
   { label: "90 days", value: 90 },
 ] as const;
 
-function formatDollar(v: number) {
-  if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
-  return `$${v.toFixed(0)}`;
+function formatCompact(v: number, homeCurrency: SupportedCurrency) {
+  if (Math.abs(v) >= 1000) {
+    return `${(v / 1000).toFixed(1)}k ${homeCurrency}`;
+  }
+  return formatCurrency(v, homeCurrency);
 }
 
 interface TooltipPayload {
@@ -38,10 +43,12 @@ function CustomTooltip({
   active,
   payload,
   label,
+  homeCurrency,
 }: {
   active?: boolean;
   payload?: TooltipPayload[];
   label?: string;
+  homeCurrency: SupportedCurrency;
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
@@ -51,20 +58,24 @@ function CustomTooltip({
       <p>
         Balance:{" "}
         <span className={d.balance >= 0 ? "text-green-600" : "text-red-600"}>
-          {formatDollar(d.balance)}
+          {formatCurrency(d.balance, homeCurrency)}
         </span>
       </p>
       {d.dayIncome > 0 && (
-        <p className="text-green-600">+{formatDollar(d.dayIncome)}</p>
+        <p className="text-green-600">
+          +{formatCurrency(d.dayIncome, homeCurrency)}
+        </p>
       )}
       {d.dayExpense > 0 && (
-        <p className="text-red-600">-{formatDollar(d.dayExpense)}</p>
+        <p className="text-red-600">
+          -{formatCurrency(d.dayExpense, homeCurrency)}
+        </p>
       )}
     </div>
   );
 }
 
-export function CashFlowChart({ points, currentBalance }: Props) {
+export function CashFlowChart({ points, currentBalance, homeCurrency }: Props) {
   const [horizon, setHorizon] = useState(30);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -84,7 +95,7 @@ export function CashFlowChart({ points, currentBalance }: Props) {
                 currentBalance >= 0 ? "text-green-600" : "text-red-600"
               }
             >
-              {formatDollar(currentBalance)}
+              {formatCurrency(currentBalance, homeCurrency)}
             </span>
           </p>
         </div>
@@ -139,11 +150,13 @@ export function CashFlowChart({ points, currentBalance }: Props) {
                 className="text-muted-foreground"
               />
               <YAxis
-                tickFormatter={formatDollar}
+                tickFormatter={(v) => formatCompact(Number(v), homeCurrency)}
                 tick={{ fontSize: 11 }}
                 className="text-muted-foreground"
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={<CustomTooltip homeCurrency={homeCurrency} />}
+              />
               <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 4" />
               <Area
                 type="monotone"

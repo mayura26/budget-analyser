@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { and, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, gte, lte, sql } from "drizzle-orm";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -20,6 +20,11 @@ import {
   getScheduledAmountsByCategory,
   hasBudgetTargets,
 } from "@/lib/budget/queries";
+import { getHomeCurrency } from "@/lib/currency/home";
+import {
+  getCategoryTotalsInHomeCurrency,
+  getMonthlyTotalsInHomeCurrency,
+} from "@/lib/dashboard/home-currency-totals";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import {
@@ -31,61 +36,7 @@ import {
   getMonthsEndingAt,
   parseMonthParam,
 } from "@/lib/utils";
-import type { Category, CategoryTotal, MonthlyTotal } from "@/types";
-
-function getMonthlyTotals(months: string[]): MonthlyTotal[] {
-  return months.map((month) => {
-    const { start, end } = getMonthRange(month);
-    const result = db
-      .select({
-        income: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.amount} > 0 THEN ${transactions.amount} ELSE 0 END), 0)`,
-        expenses: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.amount} < 0 THEN ABS(${transactions.amount}) ELSE 0 END), 0)`,
-      })
-      .from(transactions)
-      .leftJoin(categories, eq(transactions.categoryId, categories.id))
-      .where(
-        and(
-          gte(transactions.date, start),
-          lte(transactions.date, end),
-          or(isNull(categories.type), ne(categories.type, "transfer")),
-        ),
-      )
-      .get();
-
-    return {
-      month,
-      income: result?.income ?? 0,
-      expenses: result?.expenses ?? 0,
-      net: (result?.income ?? 0) - (result?.expenses ?? 0),
-    };
-  });
-}
-
-function getCategoryTotals(start: string, end: string): CategoryTotal[] {
-  const rows = db
-    .select({
-      categoryId: transactions.categoryId,
-      categoryName: sql<string>`COALESCE(${categories.name}, 'Not processed')`,
-      color: sql<string>`COALESCE(${categories.color}, '#9ca3af')`,
-      total: sql<number>`SUM(ABS(${transactions.amount}))`,
-      count: sql<number>`COUNT(*)`,
-    })
-    .from(transactions)
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(
-      and(
-        gte(transactions.date, start),
-        lte(transactions.date, end),
-        lt(transactions.amount, sql`0`),
-        or(isNull(categories.type), ne(categories.type, "transfer")),
-      ),
-    )
-    .groupBy(transactions.categoryId)
-    .orderBy(sql`SUM(ABS(${transactions.amount})) DESC`)
-    .all();
-
-  return rows as CategoryTotal[];
-}
+import type { Category } from "@/types";
 
 function getEarliestTransactionMonth(): string | null {
   const row = db
@@ -96,20 +47,31 @@ function getEarliestTransactionMonth(): string | null {
   return row.d.slice(0, 7);
 }
 
-function DashboardBudgetStatus({ selectedMonth }: { selectedMonth: string }) {
+async function DashboardBudgetStatus({
+  selectedMonth,
+}: {
+  selectedMonth: string;
+}) {
   if (!hasBudgetTargets(selectedMonth)) return null;
 
+  const homeCurrency = getHomeCurrency();
   const allCats = db.select().from(categories).all() as Category[];
-  const rows = buildBudgetCategoryRows(selectedMonth, allCats);
-  const { income } = getScheduledAmountsByCategory(selectedMonth);
+  const rows = await buildBudgetCategoryRows(
+    selectedMonth,
+    allCats,
+    homeCurrency,
+  );
+  const { income } = await getScheduledAmountsByCategory(
+    selectedMonth,
+    homeCurrency,
+  );
   const summary = buildBudgetSummary(rows, selectedMonth, income);
 
   const budgetedRows = rows.filter((r) => r.targetAmount > 0);
   // Top categories closest to / over budget
   const topCategories = [...budgetedRows]
     .sort(
-      (a, b) =>
-        b.actualSpent / b.targetAmount - a.actualSpent / a.targetAmount,
+      (a, b) => b.actualSpent / b.targetAmount - a.actualSpent / a.targetAmount,
     )
     .slice(0, 3);
 
@@ -136,8 +98,8 @@ function DashboardBudgetStatus({ selectedMonth }: { selectedMonth: string }) {
         <div>
           <div className="flex items-center justify-between text-sm mb-1.5">
             <span>
-              {formatCurrency(summary.totalSpent)} of{" "}
-              {formatCurrency(summary.totalBudgeted)} spent
+              {formatCurrency(summary.totalSpent, homeCurrency)} of{" "}
+              {formatCurrency(summary.totalBudgeted, homeCurrency)} spent
             </span>
             <span
               className={
@@ -160,9 +122,7 @@ function DashboardBudgetStatus({ selectedMonth }: { selectedMonth: string }) {
             {topCategories.map((row) => {
               const catPct =
                 row.targetAmount > 0
-                  ? Math.round(
-                      (row.actualSpent / row.targetAmount) * 100,
-                    )
+                  ? Math.round((row.actualSpent / row.targetAmount) * 100)
                   : 0;
               return (
                 <div
@@ -173,12 +133,10 @@ function DashboardBudgetStatus({ selectedMonth }: { selectedMonth: string }) {
                     className="h-2 w-2 rounded-full shrink-0"
                     style={{ backgroundColor: row.color }}
                   />
-                  <span className="truncate flex-1">
-                    {row.categoryName}
-                  </span>
+                  <span className="truncate flex-1">{row.categoryName}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {formatCurrency(row.actualSpent)} /{" "}
-                    {formatCurrency(row.targetAmount)}
+                    {formatCurrency(row.actualSpent, homeCurrency)} /{" "}
+                    {formatCurrency(row.targetAmount, homeCurrency)}
                   </span>
                   <span
                     className={`tabular-nums w-8 text-right ${
@@ -207,6 +165,7 @@ export default async function DashboardPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const params = await searchParams;
+  const homeCurrency = getHomeCurrency();
   const maxMonth = getCurrentMonth();
   const earliest = getEarliestTransactionMonth();
   const minMonth = earliest
@@ -219,7 +178,10 @@ export default async function DashboardPage({
   const months = getMonthsEndingAt(selectedMonth, 6);
   const { start, end } = getMonthRange(selectedMonth);
 
-  const monthlyTotals = getMonthlyTotals(months);
+  const monthlyTotals = await getMonthlyTotalsInHomeCurrency(
+    months,
+    homeCurrency,
+  );
   const currentMonthData = monthlyTotals.find(
     (m) => m.month === selectedMonth,
   ) ?? {
@@ -231,7 +193,11 @@ export default async function DashboardPage({
 
   const monthOptions = enumerateMonthsInclusive(minMonth, maxMonth);
 
-  const categoryTotals = getCategoryTotals(start, end);
+  const categoryTotals = await getCategoryTotalsInHomeCurrency(
+    start,
+    end,
+    homeCurrency,
+  );
 
   const totalTransactions =
     db
@@ -274,7 +240,7 @@ export default async function DashboardPage({
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatCurrency(currentMonthData.income)}
+              {formatCurrency(currentMonthData.income, homeCurrency)}
             </p>
           </CardContent>
         </Card>
@@ -290,7 +256,7 @@ export default async function DashboardPage({
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {formatCurrency(currentMonthData.expenses)}
+              {formatCurrency(currentMonthData.expenses, homeCurrency)}
             </p>
           </CardContent>
         </Card>
@@ -313,7 +279,7 @@ export default async function DashboardPage({
               className={`text-2xl font-bold ${currentMonthData.net >= 0 ? "text-primary dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}
             >
               {currentMonthData.net >= 0 ? "+" : ""}
-              {formatCurrency(Math.abs(currentMonthData.net))}
+              {formatCurrency(Math.abs(currentMonthData.net), homeCurrency)}
             </p>
           </CardContent>
         </Card>
@@ -343,6 +309,7 @@ export default async function DashboardPage({
       <DashboardCharts
         monthlyTotals={monthlyTotals}
         categoryTotals={categoryTotals}
+        homeCurrency={homeCurrency}
       />
     </div>
   );

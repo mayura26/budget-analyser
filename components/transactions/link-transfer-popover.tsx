@@ -15,6 +15,8 @@ import {
   type TransferCandidate,
   unlinkTransaction,
 } from "@/lib/actions/transactions";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import { DEFAULT_HOME_CURRENCY } from "@/lib/currency/supported";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export function LinkTransferPopover({
@@ -142,7 +144,13 @@ export function LinkTransferPopover({
                     className={c.amount < 0 ? "text-red-600" : "text-green-600"}
                   >
                     {c.amount < 0 ? "-" : "+"}
-                    {formatCurrency(c.amount)}
+                    {formatCurrency(
+                      Math.abs(c.amount),
+                      parseAccountCurrency(
+                        c.accountCurrency,
+                        DEFAULT_HOME_CURRENCY,
+                      ),
+                    )}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-muted-foreground">

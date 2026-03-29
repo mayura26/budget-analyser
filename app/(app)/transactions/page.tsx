@@ -7,6 +7,7 @@ import { TransactionActions } from "@/components/transactions/transaction-action
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import type { Category } from "@/types";
@@ -24,6 +25,7 @@ export default async function TransactionsPage({
   }>;
 }) {
   const params = await searchParams;
+  const homeCurrency = getHomeCurrency();
 
   const allAccounts = db.select().from(accounts).all();
   const allCatsRaw = db.select().from(categories).all() as Category[];
@@ -75,6 +77,7 @@ export default async function TransactionsPage({
       accountId: transactions.accountId,
       accountName: sql<string>`${accounts.name}`,
       accountColor: sql<string>`${accounts.color}`,
+      accountCurrency: sql<string>`${accounts.currency}`,
       categorySource: transactions.categorySource,
       categoryConfirmed: transactions.categoryConfirmed,
       notes: transactions.notes,
@@ -163,6 +166,7 @@ export default async function TransactionsPage({
         categories={allCategories}
         categoryMains={categoryMains}
         currentFilters={params}
+        homeCurrency={homeCurrency}
       />
     </div>
   );

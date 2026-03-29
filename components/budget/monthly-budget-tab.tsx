@@ -8,7 +8,11 @@ import { BudgetInsightsPanel } from "@/components/budget/budget-insights-panel";
 import { BudgetSummaryStrip } from "@/components/budget/budget-summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { copyBudgetForward, initFromAverages } from "@/lib/actions/budget-targets";
+import {
+  copyBudgetForward,
+  initFromAverages,
+} from "@/lib/actions/budget-targets";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatMonth } from "@/lib/utils";
 import type { BudgetCategoryRow, BudgetSummary } from "@/types";
 
@@ -20,6 +24,7 @@ export function MonthlyBudgetTab({
   previousMonth,
   aiEnabled,
   readOnly,
+  homeCurrency,
 }: {
   month: string;
   rows: BudgetCategoryRow[];
@@ -28,6 +33,7 @@ export function MonthlyBudgetTab({
   previousMonth: string;
   aiEnabled: boolean;
   readOnly: boolean;
+  homeCurrency: SupportedCurrency;
 }) {
   const hasBudget = rows.some((r) => r.targetAmount > 0);
   const hasAnyData = rows.some((r) => r.avg3Month > 0);
@@ -52,12 +58,13 @@ export function MonthlyBudgetTab({
     <div className="space-y-4 sm:space-y-6">
       {hasBudget ? (
         <>
-          <BudgetSummaryStrip summary={summary} />
+          <BudgetSummaryStrip summary={summary} homeCurrency={homeCurrency} />
 
           <BudgetCategoryList
             rows={rows}
             month={month}
             readOnly={readOnly}
+            homeCurrency={homeCurrency}
           />
 
           {aiEnabled && (
@@ -74,8 +81,8 @@ export function MonthlyBudgetTab({
               </h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
                 Create spending targets for each category to track your monthly
-                expenses. You can start from scratch, copy last month&apos;s budget,
-                or use your spending history as a guide.
+                expenses. You can start from scratch, copy last month&apos;s
+                budget, or use your spending history as a guide.
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3">
@@ -108,6 +115,7 @@ export function MonthlyBudgetTab({
             rows={rows}
             month={month}
             readOnly={readOnly}
+            homeCurrency={homeCurrency}
           />
         </>
       )}

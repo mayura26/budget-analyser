@@ -2,9 +2,10 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { getHistoricalAverages } from "@/lib/budget/queries";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { budgets } from "@/lib/db/schema";
-import { getHistoricalAverages } from "@/lib/budget/queries";
 import type { ActionResult } from "@/types";
 
 export async function saveBudgetTargets(
@@ -70,7 +71,10 @@ export async function copyBudgetForward(
     .all();
 
   if (sourceTargets.length === 0) {
-    return { success: false, error: "No budget targets found for source month" };
+    return {
+      success: false,
+      error: "No budget targets found for source month",
+    };
   }
 
   db.transaction((tx) => {
@@ -88,14 +92,12 @@ export async function copyBudgetForward(
   return { success: true, data: undefined };
 }
 
-export async function initFromAverages(
-  month: string,
-): Promise<ActionResult> {
+export async function initFromAverages(month: string): Promise<ActionResult> {
   if (!/^\d{4}-\d{2}$/.test(month)) {
     return { success: false, error: "Invalid month" };
   }
 
-  const averages = getHistoricalAverages(month);
+  const averages = await getHistoricalAverages(month, getHomeCurrency());
   if (averages.size === 0) {
     return {
       success: false,

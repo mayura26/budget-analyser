@@ -56,6 +56,8 @@ import {
 } from "@/lib/actions/transactions";
 import type { SuggestedRule } from "@/lib/categorisation/rule-suggester";
 import { computeSuggestedRules } from "@/lib/categorisation/rule-suggester";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import { DEFAULT_HOME_CURRENCY } from "@/lib/currency/supported";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category } from "@/types";
 
@@ -450,197 +452,205 @@ export function CategoriseDialog({
                       selectedId != null &&
                       selectedId !== row.currentCategoryId;
                     return (
-                    <tr
-                      key={row.transactionId}
-                      data-testid={
-                        isCategoryChange
-                          ? "bulk-ai-row-category-change"
-                          : undefined
-                      }
-                      title={
-                        isCategoryChange && row.currentCategoryName
-                          ? `Category will change from ${row.currentCategoryName}`
-                          : undefined
-                      }
-                      className={`border-t border-border ${
-                        isCategoryChange
-                          ? "bg-amber-50/90 dark:bg-amber-950/35"
-                          : ""
-                      }`}
-                    >
-                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap align-middle">
-                        {formatDate(row.date)}
-                      </td>
-                      <td className="min-w-0 px-3 py-2 align-middle">
-                        <div className="flex items-start gap-1">
+                      <tr
+                        key={row.transactionId}
+                        data-testid={
+                          isCategoryChange
+                            ? "bulk-ai-row-category-change"
+                            : undefined
+                        }
+                        title={
+                          isCategoryChange && row.currentCategoryName
+                            ? `Category will change from ${row.currentCategoryName}`
+                            : undefined
+                        }
+                        className={`border-t border-border ${
+                          isCategoryChange
+                            ? "bg-amber-50/90 dark:bg-amber-950/35"
+                            : ""
+                        }`}
+                      >
+                        <td className="px-3 py-2 text-muted-foreground whitespace-nowrap align-middle">
+                          {formatDate(row.date)}
+                        </td>
+                        <td className="min-w-0 px-3 py-2 align-middle">
+                          <div className="flex items-start gap-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate cursor-default">
+                                      {row.description}
+                                    </p>
+                                    {row.currentCategoryId != null &&
+                                      row.currentCategoryName && (
+                                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                          Current:{" "}
+                                          <CategoryNameParts
+                                            name={row.currentCategoryName}
+                                            variant="list"
+                                          />
+                                        </p>
+                                      )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  {row.description}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            {activeScope === "mismatches" &&
+                              row.currentCategoryId != null && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive sm:hidden"
+                                  title="Dismiss"
+                                  onClick={() => {
+                                    const categoryId = row.currentCategoryId;
+                                    if (categoryId == null) return;
+                                    dismissMismatch(row.normalised, categoryId);
+                                    setSuggestions((prev) =>
+                                      prev.filter(
+                                        (s) =>
+                                          s.transactionId !== row.transactionId,
+                                      ),
+                                    );
+                                  }}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                          </div>
+                        </td>
+                        <td className="min-w-0 px-3 py-2 align-middle hidden sm:table-cell">
+                          <p className="truncate text-muted-foreground text-xs">
+                            {row.accountName}
+                          </p>
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-medium whitespace-nowrap align-middle ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
+                        >
+                          {row.amount < 0 ? "-" : "+"}
+                          {formatCurrency(
+                            Math.abs(row.amount),
+                            parseAccountCurrency(
+                              row.accountCurrency,
+                              DEFAULT_HOME_CURRENCY,
+                            ),
+                          )}
+                        </td>
+                        <td className="min-w-0 px-3 py-2 align-middle">
+                          <Select
+                            value={
+                              selections[row.transactionId] != null
+                                ? String(selections[row.transactionId])
+                                : "none"
+                            }
+                            onValueChange={(v) =>
+                              handleCategoryChange(row.transactionId, v)
+                            }
+                          >
+                            <SelectTrigger className="h-7 w-full min-w-0 text-xs">
+                              <SelectValue placeholder="Pick category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                <span className="text-muted-foreground">
+                                  Not processed
+                                </span>
+                              </SelectItem>
+                              {categoryMains && categoryMains.length > 0 ? (
+                                <CategorySelectGrouped
+                                  categories={categories}
+                                  mains={categoryMains}
+                                />
+                              ) : (
+                                categories.map((c) => (
+                                  <SelectItem key={c.id} value={String(c.id)}>
+                                    <CategoryNameParts
+                                      name={c.name}
+                                      variant="select"
+                                    />
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-2 py-2 text-right align-middle tabular-nums text-xs text-muted-foreground">
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate cursor-default">
-                                    {row.description}
-                                  </p>
-                                  {row.currentCategoryId != null &&
-                                    row.currentCategoryName && (
-                                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                                        Current:{" "}
-                                        <CategoryNameParts
-                                          name={row.currentCategoryName}
-                                          variant="list"
-                                        />
-                                      </p>
-                                    )}
-                                </div>
+                                <span className="cursor-default">
+                                  {suggestionConfidencePercent(row.confidence)}%
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-xs">
-                                {row.description}
+                                {row.source === "ai"
+                                  ? "Model estimate (self-reported confidence)."
+                                  : row.source === "rule"
+                                    ? "From the matched rule's confidence score."
+                                    : activeScope === "mismatches"
+                                      ? "Share of transactions with this description in the majority category."
+                                      : "No automatic suggestion; confidence not applicable."}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          {activeScope === "mismatches" &&
-                            row.currentCategoryId != null && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive sm:hidden"
-                                title="Dismiss"
-                                onClick={() => {
-                                  const categoryId = row.currentCategoryId;
-                                  if (categoryId == null) return;
-                                  dismissMismatch(row.normalised, categoryId);
+                        </td>
+                        <td className="px-2 py-2 align-middle text-center">
+                          <input
+                            type="checkbox"
+                            checked={
+                              verifyWhenApply[row.transactionId] !== false
+                            }
+                            disabled={selections[row.transactionId] == null}
+                            onChange={(e) =>
+                              handleVerifyWhenApplyChange(
+                                row.transactionId,
+                                e.target.checked,
+                              )
+                            }
+                            className="h-4 w-4 rounded align-middle"
+                            aria-label="Mark as verified when applying"
+                            title={
+                              selections[row.transactionId] == null
+                                ? "Choose a category first"
+                                : "Uncheck to apply without marking verified"
+                            }
+                            data-testid="bulk-verify-when-apply"
+                          />
+                        </td>
+                        <td className="px-3 py-2 align-middle hidden sm:table-cell">
+                          {activeScope === "mismatches" ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                              title="Dismiss — won't show again"
+                              data-testid="dismiss-mismatch"
+                              onClick={() => {
+                                if (row.currentCategoryId != null) {
+                                  dismissMismatch(
+                                    row.normalised,
+                                    row.currentCategoryId,
+                                  );
                                   setSuggestions((prev) =>
                                     prev.filter(
                                       (s) =>
                                         s.transactionId !== row.transactionId,
                                     ),
                                   );
-                                }}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                        </div>
-                      </td>
-                      <td className="min-w-0 px-3 py-2 align-middle hidden sm:table-cell">
-                        <p className="truncate text-muted-foreground text-xs">
-                          {row.accountName}
-                        </p>
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-right font-medium whitespace-nowrap align-middle ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
-                      >
-                        {row.amount < 0 ? "-" : "+"}
-                        {formatCurrency(Math.abs(row.amount))}
-                      </td>
-                      <td className="min-w-0 px-3 py-2 align-middle">
-                        <Select
-                          value={
-                            selections[row.transactionId] != null
-                              ? String(selections[row.transactionId])
-                              : "none"
-                          }
-                          onValueChange={(v) =>
-                            handleCategoryChange(row.transactionId, v)
-                          }
-                        >
-                          <SelectTrigger className="h-7 w-full min-w-0 text-xs">
-                            <SelectValue placeholder="Pick category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">
-                              <span className="text-muted-foreground">
-                                Not processed
-                              </span>
-                            </SelectItem>
-                            {categoryMains && categoryMains.length > 0 ? (
-                              <CategorySelectGrouped
-                                categories={categories}
-                                mains={categoryMains}
-                              />
-                            ) : (
-                              categories.map((c) => (
-                                <SelectItem key={c.id} value={String(c.id)}>
-                                  <CategoryNameParts
-                                    name={c.name}
-                                    variant="select"
-                                  />
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2 text-right align-middle tabular-nums text-xs text-muted-foreground">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-default">
-                                {suggestionConfidencePercent(row.confidence)}%
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
-                              {row.source === "ai"
-                                ? "Model estimate (self-reported confidence)."
-                                : row.source === "rule"
-                                  ? "From the matched rule's confidence score."
-                                  : activeScope === "mismatches"
-                                    ? "Share of transactions with this description in the majority category."
-                                    : "No automatic suggestion; confidence not applicable."}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </td>
-                      <td className="px-2 py-2 align-middle text-center">
-                        <input
-                          type="checkbox"
-                          checked={verifyWhenApply[row.transactionId] !== false}
-                          disabled={selections[row.transactionId] == null}
-                          onChange={(e) =>
-                            handleVerifyWhenApplyChange(
-                              row.transactionId,
-                              e.target.checked,
-                            )
-                          }
-                          className="h-4 w-4 rounded align-middle"
-                          aria-label="Mark as verified when applying"
-                          title={
-                            selections[row.transactionId] == null
-                              ? "Choose a category first"
-                              : "Uncheck to apply without marking verified"
-                          }
-                          data-testid="bulk-verify-when-apply"
-                        />
-                      </td>
-                      <td className="px-3 py-2 align-middle hidden sm:table-cell">
-                        {activeScope === "mismatches" ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                            title="Dismiss — won't show again"
-                            data-testid="dismiss-mismatch"
-                            onClick={() => {
-                              if (row.currentCategoryId != null) {
-                                dismissMismatch(
-                                  row.normalised,
-                                  row.currentCategoryId,
-                                );
-                                setSuggestions((prev) =>
-                                  prev.filter(
-                                    (s) =>
-                                      s.transactionId !== row.transactionId,
-                                  ),
-                                );
-                              }
-                            }}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          sourceLabel(row.source)
-                        )}
-                      </td>
-                    </tr>
+                                }
+                              }}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            sourceLabel(row.source)
+                          )}
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>

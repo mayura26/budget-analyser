@@ -29,9 +29,17 @@ export function BudgetProgressBar({
   }
 
   return (
-    <div className={cn("relative h-2 rounded-full bg-muted overflow-hidden", className)}>
+    <div
+      className={cn(
+        "relative h-2 rounded-full bg-muted overflow-hidden",
+        className,
+      )}
+    >
       <div
-        className={cn("h-full rounded-full transition-all duration-500", barColor)}
+        className={cn(
+          "h-full rounded-full transition-all duration-500",
+          barColor,
+        )}
         style={{ width: `${pct}%` }}
       />
       {overBudget && (

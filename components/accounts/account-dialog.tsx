@@ -27,6 +27,12 @@ import {
 } from "@/lib/accounts/account-member-colors";
 import { createAccountGroup } from "@/lib/actions/account-groups";
 import { createAccount, updateAccount } from "@/lib/actions/accounts";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import type { SupportedCurrency } from "@/lib/currency/supported";
+import {
+  CURRENCY_LABELS,
+  SUPPORTED_CURRENCIES,
+} from "@/lib/currency/supported";
 import type { Account, AccountGroup, BankProfile } from "@/types";
 
 const INLINE_NEW_GROUP_COLOR = "#6366f1";
@@ -36,12 +42,14 @@ export function AccountDialog({
   groups = [],
   groupAccountIdsByGroup = {},
   account,
+  defaultHomeCurrency,
 }: {
   bankProfiles: BankProfile[];
   groups?: AccountGroup[];
   /** Sorted account ids per group (for derived colour preview). */
   groupAccountIdsByGroup?: Record<number, number[]>;
   account?: Account;
+  defaultHomeCurrency: SupportedCurrency;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -57,6 +65,11 @@ export function AccountDialog({
     () => account?.color ?? ACCOUNT_GROUP_SWATCH_COLORS[0],
   );
   const isEdit = !!account;
+
+  const initialCurrency = account
+    ? parseAccountCurrency(account.currency, defaultHomeCurrency)
+    : defaultHomeCurrency;
+  const [currency, setCurrency] = useState<SupportedCurrency>(initialCurrency);
 
   const groupBaseHexForSuggestions = useMemo(() => {
     if (selectedGroupId === "none") return null;
@@ -103,11 +116,13 @@ export function AccountDialog({
     if (account) {
       setUseCustomColor(!!(account.groupId && account.colorCustom));
       setCustomColor(account.color);
+      setCurrency(parseAccountCurrency(account.currency, defaultHomeCurrency));
     } else {
       setUseCustomColor(false);
       setCustomColor(ACCOUNT_GROUP_SWATCH_COLORS[0]);
+      setCurrency(defaultHomeCurrency);
     }
-  }, [open, account]);
+  }, [open, account, defaultHomeCurrency]);
 
   function handleOpenChange(v: boolean) {
     setOpen(v);
@@ -240,12 +255,28 @@ export function AccountDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Currency</Label>
-            <Input
-              name="currency"
-              defaultValue={account?.currency ?? "AUD"}
-              maxLength={3}
-            />
+            <Label htmlFor="account-currency">Currency</Label>
+            <p className="text-xs text-muted-foreground">
+              Amounts imported into this account are in this currency. Changing
+              currency on an account that already has transactions will misalign
+              balances until data is fixed.
+            </p>
+            <input type="hidden" name="currency" value={currency} />
+            <Select
+              value={currency}
+              onValueChange={(v) => setCurrency(v as SupportedCurrency)}
+            >
+              <SelectTrigger id="account-currency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {CURRENCY_LABELS[code]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

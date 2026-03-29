@@ -13,6 +13,18 @@ export function formatCurrency(amount: number, currency = "AUD"): string {
   }).format(Math.abs(amount));
 }
 
+export function currencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+    }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? "$";
+  } catch {
+    return "$";
+  }
+}
+
 export function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split("-");
   const date = new Date(Number(year), Number(month) - 1, Number(day));

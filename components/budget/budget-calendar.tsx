@@ -8,11 +8,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import type { SupportedCurrency } from "@/lib/currency/supported";
+import { formatCurrency } from "@/lib/utils";
 import type { Account, Occurrence } from "@/types";
 
 interface Props {
   occurrences: Occurrence[];
   accounts: Account[];
+  homeCurrency: SupportedCurrency;
 }
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -41,7 +44,7 @@ function buildCalendarDays(year: number, month: number): CalendarCell[] {
   return cells;
 }
 
-export function BudgetCalendar({ occurrences, accounts }: Props) {
+export function BudgetCalendar({ occurrences, accounts, homeCurrency }: Props) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
@@ -179,11 +182,8 @@ export function BudgetCalendar({ occurrences, accounts }: Props) {
                           ev.amount > 0 ? "text-green-600" : "text-red-600"
                         }
                       >
-                        {ev.amount > 0 ? "+" : "-"}$
-                        {Math.abs(ev.amount).toLocaleString("en-AU", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {ev.amount > 0 ? "+" : "-"}
+                        {formatCurrency(Math.abs(ev.amount), homeCurrency)}
                       </span>
                     </div>
                     {ev.accountId && (

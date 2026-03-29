@@ -1,6 +1,16 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Settings", () => {
+  test("home currency card renders", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(
+      page.getByText("Home currency", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Frankfurter/i),
+    ).toBeVisible();
+  });
+
   test("AI card renders", async ({ page }) => {
     await page.goto("/settings");
     // CardTitle renders as a div — use exact match to avoid matching "Enable AI features" label

@@ -11,7 +11,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { saveBudgetTargets } from "@/lib/actions/budget-targets";
-import { cn, formatCurrency } from "@/lib/utils";
+import type { SupportedCurrency } from "@/lib/currency/supported";
+import { cn, currencySymbol, formatCurrency } from "@/lib/utils";
 import type { BudgetCategoryRow } from "@/types";
 
 type GroupedRows = { group: string; rows: BudgetCategoryRow[] }[];
@@ -34,12 +35,14 @@ function CategoryRow({
   onEdit,
   onBlur,
   readOnly,
+  homeCurrency,
 }: {
   row: BudgetCategoryRow;
   editingId: number | null;
   onEdit: (id: number) => void;
   onBlur: () => void;
   readOnly: boolean;
+  homeCurrency: SupportedCurrency;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const isEditing = editingId === row.categoryId;
@@ -67,7 +70,7 @@ function CategoryRow({
         {isEditing && !readOnly ? (
           <div className="relative">
             <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-              $
+              {currencySymbol(homeCurrency)}
             </span>
             <input
               ref={inputRef}
@@ -88,13 +91,18 @@ function CategoryRow({
             {(row.avg3Month > 0 || row.scheduledAmount > 0) && (
               <div className="absolute top-full left-0 right-0 mt-0.5 text-[10px] text-muted-foreground whitespace-nowrap z-10 bg-popover rounded px-1 py-0.5 shadow-sm border">
                 {row.avg3Month > 0 && (
-                  <span>Avg: {formatCurrency(row.avg3Month)}/mo</span>
+                  <span>
+                    Avg: {formatCurrency(row.avg3Month, homeCurrency)}/mo
+                  </span>
                 )}
                 {row.avg3Month > 0 && row.scheduledAmount > 0 && (
                   <span> &middot; </span>
                 )}
                 {row.scheduledAmount > 0 && (
-                  <span>Recurring: {formatCurrency(row.scheduledAmount)}/mo</span>
+                  <span>
+                    Recurring:{" "}
+                    {formatCurrency(row.scheduledAmount, homeCurrency)}/mo
+                  </span>
                 )}
               </div>
             )}
@@ -112,7 +120,7 @@ function CategoryRow({
           >
             {row.targetAmount > 0 ? (
               <span className="flex items-center gap-1 justify-end">
-                {formatCurrency(row.targetAmount)}
+                {formatCurrency(row.targetAmount, homeCurrency)}
                 {belowScheduled && (
                   <TooltipProvider>
                     <Tooltip>
@@ -121,7 +129,7 @@ function CategoryRow({
                       </TooltipTrigger>
                       <TooltipContent>
                         Target is below recurring scheduled amount (
-                        {formatCurrency(row.scheduledAmount)}/mo)
+                        {formatCurrency(row.scheduledAmount, homeCurrency)}/mo)
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -138,10 +146,12 @@ function CategoryRow({
       <div className="text-right text-sm tabular-nums">
         {row.actualSpent > 0 ? (
           <span className="text-red-600 dark:text-red-400">
-            {formatCurrency(row.actualSpent)}
+            {formatCurrency(row.actualSpent, homeCurrency)}
           </span>
         ) : (
-          <span className="text-muted-foreground">$0.00</span>
+          <span className="text-muted-foreground">
+            {formatCurrency(0, homeCurrency)}
+          </span>
         )}
       </div>
 
@@ -174,7 +184,7 @@ function CategoryRow({
             }
           >
             {remaining >= 0 ? "" : "-"}
-            {formatCurrency(Math.abs(remaining))}
+            {formatCurrency(Math.abs(remaining), homeCurrency)}
           </span>
         ) : (
           <span className="text-muted-foreground">&mdash;</span>
@@ -188,10 +198,12 @@ export function BudgetCategoryList({
   rows,
   month,
   readOnly,
+  homeCurrency,
 }: {
   rows: BudgetCategoryRow[];
   month: string;
   readOnly: boolean;
+  homeCurrency: SupportedCurrency;
 }) {
   const groups = groupRows(rows);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
@@ -258,10 +270,7 @@ export function BudgetCategoryList({
               (s, r) => s + r.targetAmount,
               0,
             );
-            const groupSpent = groupRows.reduce(
-              (s, r) => s + r.actualSpent,
-              0,
-            );
+            const groupSpent = groupRows.reduce((s, r) => s + r.actualSpent, 0);
 
             return (
               <div key={group} className="mt-2">
@@ -277,7 +286,8 @@ export function BudgetCategoryList({
                   )}
                   <span>{group}</span>
                   <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
-                    {formatCurrency(groupSpent)} / {formatCurrency(groupBudgeted)}
+                    {formatCurrency(groupSpent, homeCurrency)} /{" "}
+                    {formatCurrency(groupBudgeted, homeCurrency)}
                   </span>
                 </button>
 
@@ -291,6 +301,7 @@ export function BudgetCategoryList({
                         onEdit={setEditingId}
                         onBlur={handleBlur}
                         readOnly={readOnly}
+                        homeCurrency={homeCurrency}
                       />
                     ))}
                   </div>

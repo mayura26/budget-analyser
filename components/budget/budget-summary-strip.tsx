@@ -1,16 +1,18 @@
 "use client";
 
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Gauge,
-  Target,
-} from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Gauge, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 import type { BudgetSummary } from "@/types";
 
-export function BudgetSummaryStrip({ summary }: { summary: BudgetSummary }) {
+export function BudgetSummaryStrip({
+  summary,
+  homeCurrency,
+}: {
+  summary: BudgetSummary;
+  homeCurrency: SupportedCurrency;
+}) {
   const pctUsed =
     summary.totalBudgeted > 0
       ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100)
@@ -29,7 +31,7 @@ export function BudgetSummaryStrip({ summary }: { summary: BudgetSummary }) {
         </CardHeader>
         <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
           <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
-            {formatCurrency(summary.expectedIncome)}
+            {formatCurrency(summary.expectedIncome, homeCurrency)}
           </p>
           <p className="text-xs text-muted-foreground">From scheduled income</p>
         </CardContent>
@@ -46,11 +48,9 @@ export function BudgetSummaryStrip({ summary }: { summary: BudgetSummary }) {
         </CardHeader>
         <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
           <p className="text-xl sm:text-2xl font-semibold">
-            {formatCurrency(summary.totalBudgeted)}
+            {formatCurrency(summary.totalBudgeted, homeCurrency)}
           </p>
-          <p className="text-xs text-muted-foreground">
-            Across all categories
-          </p>
+          <p className="text-xs text-muted-foreground">Across all categories</p>
         </CardContent>
       </Card>
 
@@ -65,7 +65,7 @@ export function BudgetSummaryStrip({ summary }: { summary: BudgetSummary }) {
         </CardHeader>
         <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
           <p className="text-xl sm:text-2xl font-semibold text-red-600 dark:text-red-400">
-            {formatCurrency(summary.totalSpent)}
+            {formatCurrency(summary.totalSpent, homeCurrency)}
           </p>
           <p className="text-xs text-muted-foreground">
             {pctUsed}% of budget used
@@ -80,9 +80,7 @@ export function BudgetSummaryStrip({ summary }: { summary: BudgetSummary }) {
           </CardTitle>
           <div
             className={`h-9 w-9 rounded-full flex items-center justify-center ${
-              summary.onTrack
-                ? "bg-green-500/10"
-                : "bg-red-500/10"
+              summary.onTrack ? "bg-green-500/10" : "bg-red-500/10"
             }`}
           >
             <Gauge
@@ -102,15 +100,15 @@ export function BudgetSummaryStrip({ summary }: { summary: BudgetSummary }) {
                 : "text-red-600 dark:text-red-400"
             }`}
           >
-            {formatCurrency(summary.dailyBurnRate)}
+            {formatCurrency(summary.dailyBurnRate, homeCurrency)}
             <span className="text-sm font-normal text-muted-foreground">
               /day
             </span>
           </p>
           <p className="text-xs text-muted-foreground">
             {summary.onTrack ? "On track" : "Over pace"} &middot;{" "}
-            {formatCurrency(summary.allowedDailyRate)}/day allowed &middot;{" "}
-            {summary.daysRemaining}d left
+            {formatCurrency(summary.allowedDailyRate, homeCurrency)}/day allowed
+            &middot; {summary.daysRemaining}d left
           </p>
         </CardContent>
       </Card>

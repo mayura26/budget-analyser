@@ -9,10 +9,11 @@ import { MonthlyBudgetTab } from "@/components/budget/monthly-budget-tab";
 import { ScheduleList } from "@/components/budget/schedule-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { buildBalancePoints, generateOccurrences } from "@/lib/budget/generate";
 import {
-  buildBalancePoints,
-  generateOccurrences,
-} from "@/lib/budget/generate";
+  convertOccurrencesToHomeCurrency,
+  getTotalBalanceInHomeCurrency,
+} from "@/lib/budget/home-currency-cashflow";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -20,6 +21,7 @@ import {
   hasBudgetTargets,
 } from "@/lib/budget/queries";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import {
   accounts,
@@ -31,7 +33,7 @@ import {
 import {
   addCalendarMonths,
   enumerateMonthsInclusive,
-  formatMonth,
+  formatCurrency,
   getCurrentMonth,
   parseMonthParam,
 } from "@/lib/utils";
@@ -58,6 +60,7 @@ export default async function BudgetPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const params = await searchParams;
+  const homeCurrency = getHomeCurrency();
   const today = new Date().toISOString().slice(0, 10);
   const currentMonth = getCurrentMonth();
   // Allow one month into the future for budget planning
@@ -100,25 +103,14 @@ export default async function BudgetPage({
       : null,
   }));
 
-  // Total balance across all accounts
-  const balanceRows = db
-    .select({
-      accountId: transactions.accountId,
-      balance: sql<number>`SUM(${transactions.amount})`,
-    })
-    .from(transactions)
-    .groupBy(transactions.accountId)
-    .all();
+  const totalBalance = await getTotalBalanceInHomeCurrency(homeCurrency);
 
-  const totalBalance = balanceRows.reduce(
-    (sum, r) => sum + (r.balance ?? 0),
-    0,
+  const occurrencesRaw = generateOccurrences(schedulesWithColor, today, end90);
+  const occurrences = await convertOccurrencesToHomeCurrency(
+    occurrencesRaw,
+    homeCurrency,
   );
 
-  // Generate occurrences for 90 days
-  const occurrences = generateOccurrences(schedulesWithColor, today, end90);
-
-  // Build balance points for chart
   const balancePoints = buildBalancePoints(
     occurrences,
     totalBalance,
@@ -126,7 +118,6 @@ export default async function BudgetPage({
     end90,
   );
 
-  // 30-day summary
   const occ30 = occurrences.filter((o) => o.date <= end30);
   const income30 = occ30
     .filter((o) => o.amount > 0)
@@ -136,10 +127,15 @@ export default async function BudgetPage({
     .reduce((s, o) => s + Math.abs(o.amount), 0);
   const net30 = income30 - expense30;
 
-  // Monthly budget data
-  const budgetRows = buildBudgetCategoryRows(selectedMonth, allCatsRaw);
-  const { income: expectedIncome } =
-    getScheduledAmountsByCategory(selectedMonth);
+  const budgetRows = await buildBudgetCategoryRows(
+    selectedMonth,
+    allCatsRaw,
+    homeCurrency,
+  );
+  const { income: expectedIncome } = await getScheduledAmountsByCategory(
+    selectedMonth,
+    homeCurrency,
+  );
   const budgetSummary = buildBudgetSummary(
     budgetRows,
     selectedMonth,
@@ -184,6 +180,7 @@ export default async function BudgetPage({
             previousMonth={previousMonth}
             aiEnabled={aiEnabled}
             readOnly={isReadOnly}
+            homeCurrency={homeCurrency}
           />
         </TabsContent>
 
@@ -199,11 +196,7 @@ export default async function BudgetPage({
               </CardHeader>
               <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
                 <p className="text-xl sm:text-2xl font-semibold text-green-600">
-                  $
-                  {income30.toLocaleString("en-AU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(income30, homeCurrency)}
                 </p>
                 <p className="text-xs text-muted-foreground">Next 30 days</p>
               </CardContent>
@@ -218,11 +211,7 @@ export default async function BudgetPage({
               </CardHeader>
               <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
                 <p className="text-xl sm:text-2xl font-semibold text-red-600">
-                  $
-                  {expense30.toLocaleString("en-AU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(expense30, homeCurrency)}
                 </p>
                 <p className="text-xs text-muted-foreground">Next 30 days</p>
               </CardContent>
@@ -239,11 +228,8 @@ export default async function BudgetPage({
                 <p
                   className={`text-xl sm:text-2xl font-semibold ${net30 >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
-                  {net30 >= 0 ? "+" : "-"}$
-                  {Math.abs(net30).toLocaleString("en-AU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {net30 >= 0 ? "+" : "-"}
+                  {formatCurrency(Math.abs(net30), homeCurrency)}
                 </p>
                 <p className="text-xs text-muted-foreground">Next 30 days</p>
               </CardContent>
@@ -255,6 +241,7 @@ export default async function BudgetPage({
               <CashFlowChart
                 points={balancePoints}
                 currentBalance={totalBalance}
+                homeCurrency={homeCurrency}
               />
             </CardContent>
           </Card>
@@ -266,6 +253,7 @@ export default async function BudgetPage({
               <BudgetCalendar
                 occurrences={occurrences}
                 accounts={allAccounts}
+                homeCurrency={homeCurrency}
               />
             </CardContent>
           </Card>

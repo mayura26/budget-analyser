@@ -40,10 +40,7 @@ export function BudgetMonthPicker({
           className="h-9 w-9 shrink-0"
           asChild
         >
-          <Link
-            href={`/budget?month=${prevMonth}`}
-            aria-label="Previous month"
-          >
+          <Link href={`/budget?month=${prevMonth}`} aria-label="Previous month">
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>

@@ -37,6 +37,7 @@ export type SuggestionRow = {
   normalised: string;
   amount: number;
   accountName: string;
+  accountCurrency: string;
   /** Present when the row already had a category (e.g. re-suggesting unconfirmed). */
   currentCategoryId: number | null;
   currentCategoryName: string | null;
@@ -359,6 +360,7 @@ async function getMismatchSuggestions(): Promise<SuggestionRow[]> {
         normalised: transactions.normalised,
         amount: transactions.amount,
         accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+        accountCurrency: sql<string>`COALESCE(${accounts.currency}, 'AUD')`,
       })
       .from(transactions)
       .leftJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -379,6 +381,7 @@ async function getMismatchSuggestions(): Promise<SuggestionRow[]> {
         normalised: row.normalised,
         amount: row.amount,
         accountName: row.accountName,
+        accountCurrency: row.accountCurrency,
         currentCategoryId: mf.minorityCategoryId,
         currentCategoryName:
           categoryMap.get(mf.minorityCategoryId) ?? "Unknown",
@@ -429,6 +432,7 @@ export async function getAISuggestions(
       amount: transactions.amount,
       accountId: transactions.accountId,
       accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+      accountCurrency: sql<string>`COALESCE(${accounts.currency}, 'AUD')`,
       currentCategoryId: transactions.categoryId,
       currentCategoryName: categories.name,
     })
@@ -469,6 +473,7 @@ export async function getAISuggestions(
         normalised: txn.normalised,
         amount: txn.amount,
         accountName: txn.accountName,
+        accountCurrency: txn.accountCurrency,
         ...rowMeta(txn),
         suggestedCategoryId: match.categoryId,
         suggestedCategoryName: categoryMap.get(match.categoryId) ?? "Unknown",
@@ -521,6 +526,7 @@ export async function getAISuggestions(
             normalised: txn.normalised,
             amount: txn.amount,
             accountName: txn.accountName,
+            accountCurrency: txn.accountCurrency,
             ...rowMeta(txn),
             suggestedCategoryId: aiCat,
             suggestedCategoryName: ai?.categoryName ?? "Not processed",
@@ -538,6 +544,7 @@ export async function getAISuggestions(
             normalised: txn.normalised,
             amount: txn.amount,
             accountName: txn.accountName,
+            accountCurrency: txn.accountCurrency,
             ...rowMeta(txn),
             suggestedCategoryId: null,
             suggestedCategoryName: "Not processed",
@@ -555,6 +562,7 @@ export async function getAISuggestions(
           normalised: txn.normalised,
           amount: txn.amount,
           accountName: txn.accountName,
+          accountCurrency: txn.accountCurrency,
           ...rowMeta(txn),
           suggestedCategoryId: null,
           suggestedCategoryName: "Not processed",
@@ -688,6 +696,7 @@ export type UncategorisedTransaction = {
   normalised: string;
   amount: number;
   accountName: string;
+  accountCurrency: string;
 };
 
 export async function getUncategorisedTransactions(): Promise<
@@ -701,6 +710,7 @@ export async function getUncategorisedTransactions(): Promise<
       normalised: transactions.normalised,
       amount: transactions.amount,
       accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+      accountCurrency: sql<string>`COALESCE(${accounts.currency}, 'AUD')`,
     })
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -719,6 +729,7 @@ export type TransferCandidate = {
   amount: number;
   accountId: number;
   accountName: string;
+  accountCurrency: string;
   sameGroup: boolean;
 };
 
@@ -749,6 +760,7 @@ export async function findTransferCandidates(
       amount: transactions.amount,
       accountId: transactions.accountId,
       accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+      accountCurrency: sql<string>`COALESCE(${accounts.currency}, 'AUD')`,
       groupId: accounts.groupId,
     })
     .from(transactions)
@@ -772,6 +784,7 @@ export async function findTransferCandidates(
     amount: c.amount,
     accountId: c.accountId,
     accountName: c.accountName,
+    accountCurrency: c.accountCurrency,
     sameGroup:
       source.groupId !== null &&
       c.groupId !== null &&

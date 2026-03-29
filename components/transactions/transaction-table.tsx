@@ -48,6 +48,8 @@ import {
   updateTransactionCategory,
 } from "@/lib/actions/transactions";
 import { parseCategoryDisplayName } from "@/lib/categories/display-name";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Account, Category } from "@/types";
 
@@ -63,6 +65,7 @@ type Row = {
   accountId: number;
   accountName: string | null;
   accountColor: string | null;
+  accountCurrency: string | null;
   categorySource: string | null;
   categoryConfirmed: boolean;
   notes: string | null;
@@ -91,6 +94,7 @@ export function TransactionTable({
   categories,
   categoryMains,
   currentFilters,
+  homeCurrency,
 }: {
   rows: Row[];
   accounts: Account[];
@@ -98,6 +102,7 @@ export function TransactionTable({
   /** Main groups for optgroup labels (optional, falls back to flat list). */
   categoryMains?: Category[];
   currentFilters: Record<string, string | undefined>;
+  homeCurrency: SupportedCurrency;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -228,6 +233,7 @@ export function TransactionTable({
         const amount = info.getValue();
         const row = info.row.original;
         const isTransfer = row.categoryType === "transfer";
+        const ccy = parseAccountCurrency(row.accountCurrency, homeCurrency);
         return (
           <div className="flex items-center justify-end gap-1">
             {isTransfer && (
@@ -242,7 +248,7 @@ export function TransactionTable({
               }`}
             >
               {amount < 0 ? "-" : "+"}
-              {formatCurrency(amount)}
+              {formatCurrency(Math.abs(amount), ccy)}
             </span>
           </div>
         );

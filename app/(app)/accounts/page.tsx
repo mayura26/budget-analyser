@@ -7,6 +7,7 @@ import { CreateGroupDialog } from "@/components/accounts/create-group-dialog";
 import { DeleteAccountButton } from "@/components/accounts/delete-account-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import {
   accountGroups,
@@ -17,6 +18,7 @@ import {
 import type { AccountGroup } from "@/types";
 
 export default function AccountsPage() {
+  const defaultHomeCurrency = getHomeCurrency();
   const allProfiles = db.select().from(bankProfiles).all();
   const allGroups = db.select().from(accountGroups).all() as AccountGroup[];
 
@@ -78,6 +80,7 @@ export default function AccountsPage() {
               <AccountDialog
                 bankProfiles={allProfiles}
                 groups={allGroups}
+                defaultHomeCurrency={defaultHomeCurrency}
                 account={{
                   id: account.id,
                   name: account.name,
@@ -122,6 +125,7 @@ export default function AccountsPage() {
             bankProfiles={allProfiles}
             groups={allGroups}
             groupAccountIdsByGroup={groupAccountIdsByGroup}
+            defaultHomeCurrency={defaultHomeCurrency}
           />
         </div>
       </div>

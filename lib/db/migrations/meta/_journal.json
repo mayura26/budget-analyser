@@ -57,6 +57,13 @@
       "when": 1774900000000,
       "tag": "0007_dismissed_mismatches",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1775000000000,
+      "tag": "0008_fx_rates_home_currency",
+      "breakpoints": true
     }
   ]
 }

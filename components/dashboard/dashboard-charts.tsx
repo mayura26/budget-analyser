@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 import type { CategoryTotal, MonthlyTotal } from "@/types";
 
@@ -27,9 +28,10 @@ interface TooltipProps {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
   label?: string;
+  homeCurrency: SupportedCurrency;
 }
 
-function ChartTooltip({ active, payload, label }: TooltipProps) {
+function ChartTooltip({ active, payload, label, homeCurrency }: TooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="chart-tooltip">
@@ -41,7 +43,9 @@ function ChartTooltip({ active, payload, label }: TooltipProps) {
             style={{ background: entry.color }}
           />
           <span className="opacity-70">{entry.name}:</span>
-          <span className="font-semibold">{formatCurrency(entry.value)}</span>
+          <span className="font-semibold">
+            {formatCurrency(entry.value, homeCurrency)}
+          </span>
         </div>
       ))}
     </div>
@@ -51,9 +55,11 @@ function ChartTooltip({ active, payload, label }: TooltipProps) {
 export function DashboardCharts({
   monthlyTotals,
   categoryTotals,
+  homeCurrency,
 }: {
   monthlyTotals: MonthlyTotal[];
   categoryTotals: CategoryTotal[];
+  homeCurrency: SupportedCurrency;
 }) {
   const barData = monthlyTotals.map((m) => ({
     month: formatMonthShort(m.month),
@@ -103,14 +109,16 @@ export function DashboardCharts({
                   tickLine={false}
                 />
                 <YAxis
-                  tickFormatter={(v) => `$${(Number(v) / 1000).toFixed(0)}k`}
+                  tickFormatter={(v) =>
+                    `${(Number(v) / 1000).toFixed(0)}k ${homeCurrency}`
+                  }
                   tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                   width={44}
                 />
                 <Tooltip
-                  content={<ChartTooltip />}
+                  content={<ChartTooltip homeCurrency={homeCurrency} />}
                   cursor={{ fill: "var(--color-accent)" }}
                 />
                 <Legend
@@ -157,7 +165,9 @@ export function DashboardCharts({
                         />
                       ))}
                     </Pie>
-                    <Tooltip content={<ChartTooltip />} />
+                    <Tooltip
+                      content={<ChartTooltip homeCurrency={homeCurrency} />}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -176,7 +186,7 @@ export function DashboardCharts({
                       {entry.name}
                     </span>
                     <span className="font-medium tabular-nums shrink-0">
-                      {formatCurrency(entry.value)}
+                      {formatCurrency(entry.value, homeCurrency)}
                     </span>
                   </li>
                 ))}

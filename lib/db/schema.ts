@@ -209,3 +209,23 @@ export const dismissedMismatches = sqliteTable(
     ),
   ],
 );
+
+/** Cached FX: units of quote per one unit of base on rateDate (Frankfurter/ECB). */
+export const fxRates = sqliteTable(
+  "fx_rates",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    rateDate: text("rate_date").notNull(),
+    baseCurrency: text("base_currency").notNull(),
+    quoteCurrency: text("quote_currency").notNull(),
+    rate: real("rate").notNull(),
+    fetchedAt: integer("fetched_at").notNull().default(sql`(unixepoch())`),
+  },
+  (table) => [
+    uniqueIndex("fx_rates_date_base_quote").on(
+      table.rateDate,
+      table.baseCurrency,
+      table.quoteCurrency,
+    ),
+  ],
+);

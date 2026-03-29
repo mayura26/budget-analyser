@@ -143,7 +143,9 @@ export function BudgetInsightsPanel({
                     key={i}
                     className={`flex items-start gap-3 rounded-lg border p-3 ${config.bg} ${config.border}`}
                   >
-                    <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${config.text}`} />
+                    <Icon
+                      className={`h-4 w-4 mt-0.5 shrink-0 ${config.text}`}
+                    />
                     <div className="min-w-0">
                       {insight.category && (
                         <span className="text-xs font-medium text-muted-foreground block mb-0.5">

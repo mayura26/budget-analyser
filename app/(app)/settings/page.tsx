@@ -20,6 +20,7 @@ export default function SettingsPage() {
         defaultValues={{
           openai_model: settingsMap.openai_model ?? "gpt-4o-mini",
           ai_enabled: settingsMap.ai_enabled ?? "false",
+          home_currency: settingsMap.home_currency ?? "AUD",
         }}
       />
       <BankProfilesSection profiles={allProfiles} />

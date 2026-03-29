@@ -18,9 +18,11 @@ test.describe("Accounts", () => {
     await dialog.getByRole("combobox").nth(1).click();
     await page.getByRole("option", { name: "CommBank" }).click();
 
-    // Currency
-    await dialog.locator('input[name="currency"]').clear();
-    await dialog.locator('input[name="currency"]').fill("AUD");
+    // Currency (third combobox: group, bank profile, currency)
+    await dialog.getByRole("combobox").nth(2).click();
+    await page
+      .getByRole("option", { name: /Australian dollar \(AUD\)/i })
+      .click();
 
     // Color swatch
     await page.locator('label:has(input[value="#3b82f6"])').click();

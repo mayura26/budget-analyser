@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { recomputeAccountColorsForGroup } from "@/lib/accounts/account-colors";
+import { getHomeCurrency } from "@/lib/currency/home";
+import { SUPPORTED_CURRENCIES } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
 import { accounts } from "@/lib/db/schema";
 import type { ActionResult } from "@/types";
@@ -12,7 +14,7 @@ const AccountSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   bankProfileId: z.coerce.number().optional(),
   groupId: z.coerce.number().optional(),
-  currency: z.string().min(3).max(3).default("AUD"),
+  currency: z.enum(SUPPORTED_CURRENCIES),
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Invalid color")
@@ -27,7 +29,7 @@ export async function createAccount(
     name: formData.get("name"),
     bankProfileId: formData.get("bankProfileId") || undefined,
     groupId: formData.get("groupId") || undefined,
-    currency: formData.get("currency") || "AUD",
+    currency: formData.get("currency") || getHomeCurrency(),
     color: formData.get("color") || "#6366f1",
   });
 
@@ -86,7 +88,7 @@ export async function updateAccount(
     name: formData.get("name"),
     bankProfileId: formData.get("bankProfileId") || undefined,
     groupId: formData.get("groupId") || undefined,
-    currency: formData.get("currency") || "AUD",
+    currency: formData.get("currency") || getHomeCurrency(),
     color: formData.get("color") || "#6366f1",
   });
 

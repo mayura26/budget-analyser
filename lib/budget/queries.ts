@@ -1,6 +1,10 @@
 import { and, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
 import {
+  accounts,
   budgets,
   categories,
   scheduledTransactions,
@@ -11,7 +15,12 @@ import {
   getMonthRange,
   getMonthsEndingAt,
 } from "@/lib/utils";
-import type { Budget, BudgetCategoryRow, BudgetSummary, Category } from "@/types";
+import type {
+  Budget,
+  BudgetCategoryRow,
+  BudgetSummary,
+  Category,
+} from "@/types";
 import { generateOccurrences } from "./generate";
 
 export function getBudgetTargetsForMonth(month: string): Budget[] {
@@ -31,16 +40,20 @@ export function hasBudgetTargets(month: string): boolean {
   return (row?.count ?? 0) > 0;
 }
 
-export function getActualSpendingByCategory(
+export async function getActualSpendingByCategory(
   month: string,
-): Map<number, number> {
+  homeCurrency: SupportedCurrency,
+): Promise<Map<number, number>> {
   const { start, end } = getMonthRange(month);
   const rows = db
     .select({
       categoryId: transactions.categoryId,
-      total: sql<number>`SUM(ABS(${transactions.amount}))`,
+      amount: transactions.amount,
+      date: transactions.date,
+      currency: accounts.currency,
     })
     .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .where(
       and(
@@ -50,22 +63,38 @@ export function getActualSpendingByCategory(
         or(isNull(categories.type), ne(categories.type, "transfer")),
       ),
     )
-    .groupBy(transactions.categoryId)
     .all();
+
+  await prefetchRatesToHome(
+    db,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.currency, homeCurrency),
+    })),
+    homeCurrency,
+  );
 
   const map = new Map<number, number>();
   for (const row of rows) {
-    if (row.categoryId != null) {
-      map.set(row.categoryId, row.total);
-    }
+    if (row.categoryId == null) continue;
+    const cur = parseAccountCurrency(row.currency, homeCurrency);
+    const conv = convertToHome(
+      db,
+      Math.abs(row.amount),
+      cur,
+      homeCurrency,
+      row.date,
+    );
+    map.set(row.categoryId, (map.get(row.categoryId) ?? 0) + conv);
   }
   return map;
 }
 
-export function getHistoricalAverages(
+export async function getHistoricalAverages(
   month: string,
+  homeCurrency: SupportedCurrency,
   lookback = 3,
-): Map<number, number> {
+): Promise<Map<number, number>> {
   const prevMonth = addCalendarMonths(month, -1);
   const months = getMonthsEndingAt(prevMonth, lookback);
   if (months.length === 0) return new Map();
@@ -76,9 +105,12 @@ export function getHistoricalAverages(
   const rows = db
     .select({
       categoryId: transactions.categoryId,
-      total: sql<number>`SUM(ABS(${transactions.amount}))`,
+      amount: transactions.amount,
+      date: transactions.date,
+      currency: accounts.currency,
     })
     .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .where(
       and(
@@ -88,30 +120,56 @@ export function getHistoricalAverages(
         or(isNull(categories.type), ne(categories.type, "transfer")),
       ),
     )
-    .groupBy(transactions.categoryId)
     .all();
 
-  const map = new Map<number, number>();
+  await prefetchRatesToHome(
+    db,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.currency, homeCurrency),
+    })),
+    homeCurrency,
+  );
+
+  const totals = new Map<number, number>();
   for (const row of rows) {
-    if (row.categoryId != null) {
-      map.set(
-        row.categoryId,
-        Math.round((row.total / months.length) * 100) / 100,
-      );
-    }
+    if (row.categoryId == null) continue;
+    const cur = parseAccountCurrency(row.currency, homeCurrency);
+    const conv = convertToHome(
+      db,
+      Math.abs(row.amount),
+      cur,
+      homeCurrency,
+      row.date,
+    );
+    totals.set(row.categoryId, (totals.get(row.categoryId) ?? 0) + conv);
+  }
+
+  const map = new Map<number, number>();
+  for (const [categoryId, total] of totals) {
+    map.set(categoryId, Math.round((total / months.length) * 100) / 100);
   }
   return map;
 }
 
-export function getScheduledAmountsByCategory(
+export async function getScheduledAmountsByCategory(
   month: string,
-): { expenses: Map<number, number>; income: number } {
+  homeCurrency: SupportedCurrency,
+): Promise<{ expenses: Map<number, number>; income: number }> {
   const { start, end } = getMonthRange(month);
 
   const allCats = db.select().from(categories).all() as Category[];
   const categoryColorMap = new Map(allCats.map((c) => [c.id, c.color]));
 
   const rawSchedules = db.select().from(scheduledTransactions).all();
+  const accountRows = db.select().from(accounts).all();
+  const accountCurrency = new Map(
+    accountRows.map((a) => [
+      a.id,
+      parseAccountCurrency(a.currency, homeCurrency),
+    ]),
+  );
+
   const schedulesWithColor = rawSchedules.map((s) => ({
     ...s,
     categoryColor: s.categoryId
@@ -121,16 +179,30 @@ export function getScheduledAmountsByCategory(
 
   const occurrences = generateOccurrences(schedulesWithColor, start, end);
 
+  const keys = occurrences.map((o) => ({
+    date: o.date,
+    from:
+      o.accountId != null
+        ? (accountCurrency.get(o.accountId) ?? homeCurrency)
+        : homeCurrency,
+  }));
+  await prefetchRatesToHome(db, keys, homeCurrency);
+
   const expenses = new Map<number, number>();
   let income = 0;
 
   for (const occ of occurrences) {
-    if (occ.amount > 0) {
-      income += occ.amount;
+    const cur =
+      occ.accountId != null
+        ? (accountCurrency.get(occ.accountId) ?? homeCurrency)
+        : homeCurrency;
+    const conv = convertToHome(db, occ.amount, cur, homeCurrency, occ.date);
+    if (conv > 0) {
+      income += conv;
     } else if (occ.categoryId != null) {
       expenses.set(
         occ.categoryId,
-        (expenses.get(occ.categoryId) ?? 0) + Math.abs(occ.amount),
+        (expenses.get(occ.categoryId) ?? 0) + Math.abs(conv),
       );
     }
   }
@@ -138,24 +210,25 @@ export function getScheduledAmountsByCategory(
   return { expenses, income: Math.round(income * 100) / 100 };
 }
 
-export function buildBudgetCategoryRows(
+export async function buildBudgetCategoryRows(
   month: string,
   allCategories: Category[],
-): BudgetCategoryRow[] {
+  homeCurrency: SupportedCurrency,
+): Promise<BudgetCategoryRow[]> {
   const targets = getBudgetTargetsForMonth(month);
   const targetMap = new Map(targets.map((t) => [t.categoryId, t.targetAmount]));
 
-  const actual = getActualSpendingByCategory(month);
-  const averages = getHistoricalAverages(month);
-  const { expenses: scheduled } = getScheduledAmountsByCategory(month);
-
-  const mainGroups = new Map(
-    allCategories
-      .filter((c) => c.parentId === null)
-      .map((c) => [c.id, c.name]),
+  const actual = await getActualSpendingByCategory(month, homeCurrency);
+  const averages = await getHistoricalAverages(month, homeCurrency);
+  const { expenses: scheduled } = await getScheduledAmountsByCategory(
+    month,
+    homeCurrency,
   );
 
-  // Only expense sub-categories
+  const mainGroups = new Map(
+    allCategories.filter((c) => c.parentId === null).map((c) => [c.id, c.name]),
+  );
+
   const expenseSubs = allCategories.filter(
     (c) => c.parentId !== null && c.type === "expense",
   );
@@ -172,7 +245,6 @@ export function buildBudgetCategoryRows(
       avg3Month: averages.get(cat.id) ?? 0,
     }))
     .sort((a, b) => {
-      // Sort by parent group, then by name
       const groupCmp = a.parentName.localeCompare(b.parentName);
       if (groupCmp !== 0) return groupCmp;
       return a.categoryName.localeCompare(b.categoryName);
@@ -216,8 +288,7 @@ export function buildBudgetSummary(
 
   const daysRemaining = daysInMonth - daysElapsed;
   const dailyBurnRate = daysElapsed > 0 ? totalSpent / daysElapsed : 0;
-  const allowedDailyRate =
-    totalBudgeted > 0 ? totalBudgeted / daysInMonth : 0;
+  const allowedDailyRate = totalBudgeted > 0 ? totalBudgeted / daysInMonth : 0;
   const projectedSpend =
     daysElapsed > 0 ? dailyBurnRate * daysInMonth : totalSpent;
   const onTrack = totalBudgeted === 0 || projectedSpend <= totalBudgeted;

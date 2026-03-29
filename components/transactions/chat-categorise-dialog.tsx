@@ -41,6 +41,8 @@ import {
   computeSuggestedRules,
   type SuggestedRule,
 } from "@/lib/categorisation/rule-suggester";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import { DEFAULT_HOME_CURRENCY } from "@/lib/currency/supported";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category } from "@/types";
 
@@ -384,7 +386,13 @@ export function ChatCategoriseDialog({
                     }`}
                   >
                     {currentTxn.amount < 0 ? "-" : "+"}
-                    {formatCurrency(Math.abs(currentTxn.amount))}
+                    {formatCurrency(
+                      Math.abs(currentTxn.amount),
+                      parseAccountCurrency(
+                        currentTxn.accountCurrency,
+                        DEFAULT_HOME_CURRENCY,
+                      ),
+                    )}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">

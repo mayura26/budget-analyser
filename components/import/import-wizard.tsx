@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { confirmImport, previewImport } from "@/lib/actions/import";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import { DEFAULT_HOME_CURRENCY } from "@/lib/currency/supported";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Account, BankProfile, ImportPreview } from "@/types";
 
@@ -42,6 +44,11 @@ export function ImportWizard({
     bankProfiles[0] ? String(bankProfiles[0].id) : "",
   );
   const [file, setFile] = useState<File | null>(null);
+
+  const previewAccountCurrency = parseAccountCurrency(
+    accounts.find((a) => String(a.id) === accountId)?.currency,
+    DEFAULT_HOME_CURRENCY,
+  );
 
   async function handlePreview() {
     if (!file || !accountId || !profileId) {
@@ -246,7 +253,7 @@ export function ImportWizard({
                     className={`px-3 py-1 text-right font-medium whitespace-nowrap ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
                   >
                     {row.amount < 0 ? "-" : "+"}
-                    {formatCurrency(row.amount)}
+                    {formatCurrency(Math.abs(row.amount), previewAccountCurrency)}
                   </td>
                 </tr>
               ))}

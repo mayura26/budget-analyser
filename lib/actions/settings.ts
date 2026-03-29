@@ -3,6 +3,7 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { SUPPORTED_CURRENCIES } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
 import { bankProfiles, settings } from "@/lib/db/schema";
 import type { ActionResult } from "@/types";
@@ -10,6 +11,7 @@ import type { ActionResult } from "@/types";
 const SettingsSchema = z.object({
   openai_model: z.string().default("gpt-4o-mini"),
   ai_enabled: z.enum(["true", "false"]).default("false"),
+  home_currency: z.enum(SUPPORTED_CURRENCIES),
 });
 
 export async function saveSettings(
@@ -19,6 +21,7 @@ export async function saveSettings(
   const data = {
     openai_model: (formData.get("openai_model") as string) || "gpt-4o-mini",
     ai_enabled: (formData.get("ai_enabled") as string) || "false",
+    home_currency: (formData.get("home_currency") as string) || "AUD",
   };
 
   const parsed = SettingsSchema.safeParse(data);
@@ -46,6 +49,10 @@ export async function saveSettings(
   }
 
   revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/budget");
+  revalidatePath("/accounts");
+  revalidatePath("/transactions");
   return { success: true, data: undefined };
 }
 

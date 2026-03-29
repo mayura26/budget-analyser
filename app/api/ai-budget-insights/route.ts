@@ -6,6 +6,7 @@ import {
   buildBudgetSummary,
   getScheduledAmountsByCategory,
 } from "@/lib/budget/queries";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { categories, settings } from "@/lib/db/schema";
 import {
@@ -59,9 +60,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
+  const homeCurrency = getHomeCurrency();
   const allCats = db.select().from(categories).all() as Category[];
-  const rows = buildBudgetCategoryRows(month, allCats);
-  const { income } = getScheduledAmountsByCategory(month);
+  const rows = await buildBudgetCategoryRows(month, allCats, homeCurrency);
+  const { income } = await getScheduledAmountsByCategory(month, homeCurrency);
   const summary = buildBudgetSummary(rows, month, income);
 
   const budgetedRows = rows.filter((r) => r.targetAmount > 0);
@@ -72,7 +74,11 @@ export async function POST(request: Request) {
 
   // Get previous month data for comparison
   const prevMonth = addCalendarMonths(month, -1);
-  const prevRows = buildBudgetCategoryRows(prevMonth, allCats);
+  const prevRows = await buildBudgetCategoryRows(
+    prevMonth,
+    allCats,
+    homeCurrency,
+  );
 
   const prevSpendMap = new Map(
     prevRows.map((r) => [r.categoryId, r.actualSpent]),
@@ -87,7 +93,7 @@ export async function POST(request: Request) {
           ? Math.round((r.actualSpent / r.targetAmount) * 100)
           : 0;
       const prevSpend = prevSpendMap.get(r.categoryId) ?? 0;
-      return `- ${r.categoryName} (${r.parentName}): Target ${formatCurrency(r.targetAmount)}, Spent ${formatCurrency(r.actualSpent)} (${pct}%), Last month: ${formatCurrency(prevSpend)}, 3mo avg: ${formatCurrency(r.avg3Month)}, Scheduled recurring: ${formatCurrency(r.scheduledAmount)}`;
+      return `- ${r.categoryName} (${r.parentName}): Target ${formatCurrency(r.targetAmount, homeCurrency)}, Spent ${formatCurrency(r.actualSpent, homeCurrency)} (${pct}%), Last month: ${formatCurrency(prevSpend, homeCurrency)}, 3mo avg: ${formatCurrency(r.avg3Month, homeCurrency)}, Scheduled recurring: ${formatCurrency(r.scheduledAmount, homeCurrency)}`;
     })
     .join("\n");
 
@@ -98,11 +104,11 @@ Budget month: ${formatMonth(month)}
 Days elapsed: ${summary.daysElapsed} of ${summary.daysInMonth} (${summary.daysRemaining} remaining)
 
 Overall:
-- Expected income: ${formatCurrency(summary.expectedIncome)}
-- Total budgeted: ${formatCurrency(summary.totalBudgeted)}
-- Total spent: ${formatCurrency(summary.totalSpent)} (${summary.totalBudgeted > 0 ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100) : 0}%)
-- Daily burn rate: ${formatCurrency(summary.dailyBurnRate)}/day (allowed: ${formatCurrency(summary.allowedDailyRate)}/day)
-- Projected month-end spend: ${formatCurrency(summary.projectedSpend)}
+- Expected income: ${formatCurrency(summary.expectedIncome, homeCurrency)}
+- Total budgeted: ${formatCurrency(summary.totalBudgeted, homeCurrency)}
+- Total spent: ${formatCurrency(summary.totalSpent, homeCurrency)} (${summary.totalBudgeted > 0 ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100) : 0}%)
+- Daily burn rate: ${formatCurrency(summary.dailyBurnRate, homeCurrency)}/day (allowed: ${formatCurrency(summary.allowedDailyRate, homeCurrency)}/day)
+- Projected month-end spend: ${formatCurrency(summary.projectedSpend, homeCurrency)}
 - On track: ${summary.onTrack ? "Yes" : "No"}
 
 Category breakdown:
@@ -137,9 +143,7 @@ Rules:
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);
-    const insights = Array.isArray(parsed)
-      ? parsed
-      : (parsed.insights ?? []);
+    const insights = Array.isArray(parsed) ? parsed : (parsed.insights ?? []);
 
     return NextResponse.json({ insights });
   } catch {
