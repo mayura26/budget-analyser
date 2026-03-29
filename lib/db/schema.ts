@@ -174,6 +174,24 @@ export const transactions = sqliteTable(
   ],
 );
 
+export const budgets = sqliteTable(
+  "budgets",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    month: text("month").notNull(), // YYYY-MM
+    categoryId: integer("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    targetAmount: real("target_amount").notNull(), // Always positive (spending limit)
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+  },
+  (table) => [
+    uniqueIndex("budgets_month_category").on(table.month, table.categoryId),
+    index("budgets_month_idx").on(table.month),
+  ],
+);
+
 export const dismissedMismatches = sqliteTable(
   "dismissed_mismatches",
   {

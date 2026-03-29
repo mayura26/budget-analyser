@@ -4,13 +4,22 @@ import { and, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  Target,
   TrendingDown,
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
+import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  buildBudgetCategoryRows,
+  buildBudgetSummary,
+  getScheduledAmountsByCategory,
+  hasBudgetTargets,
+} from "@/lib/budget/queries";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import {
@@ -22,7 +31,7 @@ import {
   getMonthsEndingAt,
   parseMonthParam,
 } from "@/lib/utils";
-import type { CategoryTotal, MonthlyTotal } from "@/types";
+import type { Category, CategoryTotal, MonthlyTotal } from "@/types";
 
 function getMonthlyTotals(months: string[]): MonthlyTotal[] {
   return months.map((month) => {
@@ -85,6 +94,111 @@ function getEarliestTransactionMonth(): string | null {
     .get();
   if (!row?.d) return null;
   return row.d.slice(0, 7);
+}
+
+function DashboardBudgetStatus({ selectedMonth }: { selectedMonth: string }) {
+  if (!hasBudgetTargets(selectedMonth)) return null;
+
+  const allCats = db.select().from(categories).all() as Category[];
+  const rows = buildBudgetCategoryRows(selectedMonth, allCats);
+  const { income } = getScheduledAmountsByCategory(selectedMonth);
+  const summary = buildBudgetSummary(rows, selectedMonth, income);
+
+  const budgetedRows = rows.filter((r) => r.targetAmount > 0);
+  // Top categories closest to / over budget
+  const topCategories = [...budgetedRows]
+    .sort(
+      (a, b) =>
+        b.actualSpent / b.targetAmount - a.actualSpent / a.targetAmount,
+    )
+    .slice(0, 3);
+
+  const pctUsed =
+    summary.totalBudgeted > 0
+      ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100)
+      : 0;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          Budget Status
+        </CardTitle>
+        <Link
+          href={`/budget?month=${selectedMonth}`}
+          className="text-xs text-primary hover:underline"
+        >
+          View full budget
+        </Link>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <div className="flex items-center justify-between text-sm mb-1.5">
+            <span>
+              {formatCurrency(summary.totalSpent)} of{" "}
+              {formatCurrency(summary.totalBudgeted)} spent
+            </span>
+            <span
+              className={
+                summary.onTrack
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }
+            >
+              {pctUsed}%
+            </span>
+          </div>
+          <BudgetProgressBar
+            spent={summary.totalSpent}
+            target={summary.totalBudgeted}
+          />
+        </div>
+
+        {topCategories.length > 0 && (
+          <div className="space-y-1.5">
+            {topCategories.map((row) => {
+              const catPct =
+                row.targetAmount > 0
+                  ? Math.round(
+                      (row.actualSpent / row.targetAmount) * 100,
+                    )
+                  : 0;
+              return (
+                <div
+                  key={row.categoryId}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <div
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: row.color }}
+                  />
+                  <span className="truncate flex-1">
+                    {row.categoryName}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatCurrency(row.actualSpent)} /{" "}
+                    {formatCurrency(row.targetAmount)}
+                  </span>
+                  <span
+                    className={`tabular-nums w-8 text-right ${
+                      catPct > 100
+                        ? "text-red-600 dark:text-red-400"
+                        : catPct >= 75
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-green-600 dark:text-green-400"
+                    }`}
+                  >
+                    {catPct}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default async function DashboardPage({
@@ -221,6 +335,9 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Budget Status */}
+      <DashboardBudgetStatus selectedMonth={selectedMonth} />
 
       {/* Charts */}
       <DashboardCharts

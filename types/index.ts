@@ -157,6 +157,46 @@ export type BalancePoint = {
   dayExpense: number;
 };
 
+export type Budget = {
+  id: number;
+  month: string;
+  categoryId: number;
+  targetAmount: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type BudgetCategoryRow = {
+  categoryId: number;
+  categoryName: string;
+  parentName: string;
+  color: string;
+  targetAmount: number;
+  actualSpent: number;
+  scheduledAmount: number;
+  avg3Month: number;
+};
+
+export type BudgetSummary = {
+  totalBudgeted: number;
+  totalSpent: number;
+  totalRemaining: number;
+  expectedIncome: number;
+  daysInMonth: number;
+  daysElapsed: number;
+  daysRemaining: number;
+  dailyBurnRate: number;
+  allowedDailyRate: number;
+  projectedSpend: number;
+  onTrack: boolean;
+};
+
+export type BudgetInsight = {
+  type: "warning" | "suggestion" | "win";
+  category?: string;
+  message: string;
+};
+
 export type MonthlyTotal = {
   month: string; // YYYY-MM
   income: number;

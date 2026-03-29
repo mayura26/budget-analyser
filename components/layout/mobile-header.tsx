@@ -2,6 +2,7 @@
 
 import { LogOut, Menu, X } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import iconSrc from "@/app/icon.png";
 import { MainNav } from "@/components/layout/main-nav";
@@ -23,16 +24,20 @@ export function MobileHeader() {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="flex items-center gap-2">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 rounded-md hover:bg-sidebar-accent/30 transition-colors -my-1 py-1 px-1"
+        >
           <Image
             src={iconSrc}
-            alt="Budget Analyser"
+            alt=""
             width={22}
             height={22}
             className="rounded-md"
+            aria-hidden
           />
           <span className="font-semibold text-sm">Budget Analyser</span>
-        </div>
+        </Link>
         {/* Spacer to centre the logo */}
         <div className="w-7" />
       </header>
@@ -56,18 +61,23 @@ export function MobileHeader() {
       >
         {/* Drawer header */}
         <div className="h-14 flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
-          <div className="flex items-center gap-2.5">
+          <Link
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-md hover:bg-sidebar-accent/30 transition-colors -my-1 py-1 pr-2"
+          >
             <Image
               src={iconSrc}
-              alt="Budget Analyser"
+              alt=""
               width={28}
               height={28}
               className="rounded-md"
+              aria-hidden
             />
             <span className="font-semibold text-sm tracking-tight">
               Budget Analyser
             </span>
-          </div>
+          </Link>
           <button
             type="button"
             onClick={() => setOpen(false)}

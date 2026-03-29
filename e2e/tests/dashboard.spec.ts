@@ -48,4 +48,27 @@ test.describe("Dashboard", () => {
     });
     await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
   });
+
+  test("sidebar brand links to dashboard from another page", async ({
+    page,
+  }) => {
+    await page.goto("/budget");
+    await page
+      .locator("aside")
+      .getByRole("link", { name: "Budget Analyser" })
+      .click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
+  test("mobile header brand links to dashboard from another page", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/budget");
+    await page
+      .locator("header")
+      .getByRole("link", { name: "Budget Analyser" })
+      .click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
 });

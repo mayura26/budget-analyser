@@ -2,6 +2,7 @@
 
 import { LogOut } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import iconSrc from "@/app/icon.png";
 import { MainNav } from "@/components/layout/main-nav";
 import { logout } from "@/lib/actions/auth";
@@ -10,18 +11,22 @@ export function Sidebar() {
   return (
     <aside className="w-60 shrink-0 hidden md:flex flex-col h-full bg-sidebar text-sidebar-foreground">
       {/* Logo header */}
-      <div className="h-14 flex items-center gap-2.5 px-4 border-b border-sidebar-border">
+      <Link
+        href="/dashboard"
+        className="h-14 flex items-center gap-2.5 px-4 border-b border-sidebar-border hover:bg-sidebar-accent/30 transition-colors"
+      >
         <Image
           src={iconSrc}
-          alt="Budget Analyser"
+          alt=""
           width={28}
           height={28}
           className="rounded-md"
+          aria-hidden
         />
         <span className="font-semibold text-sm tracking-tight">
           Budget Analyser
         </span>
-      </div>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 py-3 overflow-y-auto px-2">

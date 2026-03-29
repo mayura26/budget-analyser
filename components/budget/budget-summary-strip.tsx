@@ -1,0 +1,119 @@
+"use client";
+
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Gauge,
+  Target,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
+import type { BudgetSummary } from "@/types";
+
+export function BudgetSummaryStrip({ summary }: { summary: BudgetSummary }) {
+  const pctUsed =
+    summary.totalBudgeted > 0
+      ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100)
+      : 0;
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Expected Income
+          </CardTitle>
+          <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center">
+            <ArrowUpCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
+          <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
+            {formatCurrency(summary.expectedIncome)}
+          </p>
+          <p className="text-xs text-muted-foreground">From scheduled income</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Total Budgeted
+          </CardTitle>
+          <div className="h-9 w-9 rounded-full bg-blue-500/10 flex items-center justify-center">
+            <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
+          <p className="text-xl sm:text-2xl font-semibold">
+            {formatCurrency(summary.totalBudgeted)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Across all categories
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Total Spent
+          </CardTitle>
+          <div className="h-9 w-9 rounded-full bg-red-500/10 flex items-center justify-center">
+            <ArrowDownCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
+          <p className="text-xl sm:text-2xl font-semibold text-red-600 dark:text-red-400">
+            {formatCurrency(summary.totalSpent)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {pctUsed}% of budget used
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Daily Pace
+          </CardTitle>
+          <div
+            className={`h-9 w-9 rounded-full flex items-center justify-center ${
+              summary.onTrack
+                ? "bg-green-500/10"
+                : "bg-red-500/10"
+            }`}
+          >
+            <Gauge
+              className={`h-4 w-4 ${
+                summary.onTrack
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }`}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
+          <p
+            className={`text-xl sm:text-2xl font-semibold ${
+              summary.onTrack
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            {formatCurrency(summary.dailyBurnRate)}
+            <span className="text-sm font-normal text-muted-foreground">
+              /day
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {summary.onTrack ? "On track" : "Over pace"} &middot;{" "}
+            {formatCurrency(summary.allowedDailyRate)}/day allowed &middot;{" "}
+            {summary.daysRemaining}d left
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

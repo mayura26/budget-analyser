@@ -5,8 +5,24 @@ async function cleanupSchedules(browser: Browser) {
     storageState: "e2e/.auth/user.json",
   });
   const page = await context.newPage();
-  await page.goto("/budget");
-  await page.getByRole("tab", { name: "Schedules" }).click();
+  // Navigate to budget page, retrying if dev error overlay blocks
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.goto("/budget");
+    await page.waitForTimeout(500);
+    // Dismiss any Next.js dev error overlay
+    await page.evaluate(() => {
+      document
+        .querySelectorAll("nextjs-portal")
+        .forEach((el) => el.remove());
+    });
+    const tab = page.getByRole("tab", { name: "Schedules" });
+    if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await tab.click();
+      break;
+    }
+    // If tab not visible, try reloading
+    await page.reload();
+  }
   await page.waitForTimeout(500);
   // Delete all existing scheduled transactions
   let count = await page.locator('button[aria-label="Delete"]').count();
@@ -30,6 +46,38 @@ test.describe("Budget", () => {
     ).toBeVisible();
   });
 
+  test("monthly budget tab is default", async ({ page }) => {
+    await page.goto("/budget");
+    await expect(
+      page.getByRole("tab", { name: "Monthly Budget" }),
+    ).toHaveAttribute("data-state", "active");
+  });
+
+  test("monthly budget tab shows empty state with setup prompt", async ({
+    page,
+  }) => {
+    await page.goto("/budget");
+    await expect(
+      page.getByText("Set up your budget for"),
+    ).toBeVisible();
+  });
+
+  test("monthly budget tab shows category list with headers", async ({
+    page,
+  }) => {
+    await page.goto("/budget");
+    await expect(page.getByText("Category")).toBeVisible();
+    await expect(page.getByText("Target")).toBeVisible();
+    await expect(page.getByText("Spent")).toBeVisible();
+  });
+
+  test("month picker is visible and functional", async ({ page }) => {
+    await page.goto("/budget");
+    // Month picker should show the current month
+    const monthSelect = page.getByRole("combobox").first();
+    await expect(monthSelect).toBeVisible();
+  });
+
   test("empty state shows no scheduled transactions message", async ({
     page,
   }) => {
@@ -40,8 +88,9 @@ test.describe("Budget", () => {
     ).toBeVisible();
   });
 
-  test("summary strip cards visible", async ({ page }) => {
+  test("cash flow tab shows summary strip cards", async ({ page }) => {
     await page.goto("/budget");
+    await page.getByRole("tab", { name: "Cash Flow" }).click();
     await expect(page.getByText("Expected Income")).toBeVisible();
     await expect(page.getByText("Expected Expenses")).toBeVisible();
     await expect(page.getByText("Projected Net")).toBeVisible();
@@ -86,10 +135,11 @@ test.describe("Budget", () => {
     await expect(page.getByText("-$2,000.00")).toBeVisible();
   });
 
-  test("summary strip shows income value after creating schedule", async ({
+  test("cash flow summary strip shows income value after creating schedule", async ({
     page,
   }) => {
     await page.goto("/budget");
+    await page.getByRole("tab", { name: "Cash Flow" }).click();
     const incomeCard = page
       .locator(".rounded-lg")
       .filter({ hasText: "Expected Income" })
@@ -123,13 +173,15 @@ test.describe("Budget", () => {
 
   test("cash flow chart renders on overview tab", async ({ page }) => {
     await page.goto("/budget");
-    // Overview is default tab — use .first() since recharts nests two containers
+    await page.getByRole("tab", { name: "Cash Flow" }).click();
+    // Recharts nests two containers
     const chart = page.locator(".recharts-responsive-container").first();
     await expect(chart).toBeVisible({ timeout: 10000 });
   });
 
   test("30/60/90 day horizon toggle works", async ({ page }) => {
     await page.goto("/budget");
+    await page.getByRole("tab", { name: "Cash Flow" }).click();
     await page.getByRole("button", { name: "60 days" }).click();
     await expect(page.getByRole("button", { name: "60 days" })).toBeVisible();
     await page.getByRole("button", { name: "90 days" }).click();
@@ -189,6 +241,14 @@ test.describe("Budget", () => {
     // In the test environment, AI is not configured so the button should not render
     await expect(
       page.getByRole("button", { name: "AI Suggestions" }),
+    ).not.toBeVisible();
+  });
+
+  test("AI insights panel hidden when AI disabled", async ({ page }) => {
+    await page.goto("/budget");
+    // On the monthly budget tab (default), AI insights should not appear
+    await expect(
+      page.getByText("AI Budget Insights"),
     ).not.toBeVisible();
   });
 

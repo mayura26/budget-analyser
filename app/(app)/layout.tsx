@@ -1,5 +1,6 @@
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Sidebar } from "@/components/layout/sidebar";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <MobileHeader />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+      <PwaInstallPrompt />
     </div>
   );
 }

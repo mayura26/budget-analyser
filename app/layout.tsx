@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: [{ url: "/icon1.png", type: "image/png" }],
-    shortcut: "/favicon.ico",
+    shortcut: [{ url: "/favicon.png", type: "image/png" }],
     apple: [{ url: "/apple-icon.png", type: "image/png" }],
   },
   appleWebApp: {
