@@ -28,7 +28,12 @@
       "Bash(favicon)",
       "Bash(sw)",
       "Bash(service \")",
-      "Bash(find 'D:/VSCode Projects/budget-analyser' -type f \\\\\\(-name *.png -o -name *.ico -o -name *.svg -o -name *apple* -o -name *icon* -o -name *favicon* \\\\\\))"
+      "Bash(find 'D:/VSCode Projects/budget-analyser' -type f \\\\\\(-name *.png -o -name *.ico -o -name *.svg -o -name *apple* -o -name *icon* -o -name *favicon* \\\\\\))",
+      "WebSearch",
+      "Bash(DATABASE_PATH=./data/test.db npx next build)",
+      "Bash(DATABASE_PATH=./data/test.db npx drizzle-kit push)",
+      "Bash(DATABASE_PATH=./data/test.db APP_PASSWORD=changeme JWT_SECRET=test node -e \":*)",
+      "Bash(taskkill:*)"
     ]
   }
 }
