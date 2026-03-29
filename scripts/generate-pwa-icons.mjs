@@ -33,16 +33,6 @@ async function main() {
   await writeSquarePng("apple-icon.png", 180);
   await writeSquarePng("favicon.png", 32);
 
-  await sharp({
-    create: {
-      width: 32,
-      height: 32,
-      channels: 4,
-      background: brand,
-    },
-  })
-    .png()
-    .toFile(path.join(appDir, "icon.png"));
 }
 
 main().catch((err) => {

@@ -3,7 +3,7 @@
 import { LogOut } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import iconSrc from "@/app/icon.png";
+import iconSrc from "@/app/icon1.png";
 import { MainNav } from "@/components/layout/main-nav";
 import { logout } from "@/lib/actions/auth";
 
