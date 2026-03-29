@@ -193,7 +193,7 @@ export default async function DashboardPage({
 
   const monthOptions = enumerateMonthsInclusive(minMonth, maxMonth);
 
-  const { expenseTotals, netTotals } = await getCategoryBreakdownInHomeCurrency(
+  const { expenseTotals } = await getCategoryBreakdownInHomeCurrency(
     start,
     end,
     homeCurrency,
@@ -309,7 +309,7 @@ export default async function DashboardPage({
       <DashboardCharts
         monthlyTotals={monthlyTotals}
         categoryExpenseTotals={expenseTotals}
-        categoryNetTotals={netTotals}
+        monthNet={currentMonthData.net}
         homeCurrency={homeCurrency}
       />
     </div>

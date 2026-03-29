@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const DASHBOARD_PIE_ACCOUNT = "Dashboard Pie Test Account";
+
 test.describe("Dashboard", () => {
   test("page title renders", async ({ page }) => {
     await page.goto("/dashboard");
@@ -13,7 +15,7 @@ test.describe("Dashboard", () => {
     await expect(
       page.getByText(/summary and category breakdown for/i),
     ).toBeVisible();
-    await expect(page.getByText(/\w+ \d{4}/)).toBeVisible();
+    await expect(page.getByText(/\w+ \d{4}/).first()).toBeVisible();
   });
 
   test("month picker controls visible", async ({ page }) => {
@@ -49,7 +51,10 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
   });
 
-  test("pie chart net slider toggles copy", async ({ page }) => {
+  test("include net slider disabled when monthly net is zero", async ({
+    page,
+  }) => {
+    await page.request.delete("/api/test-cleanup?transactions=1");
     await page.goto("/dashboard");
     await expect(page.getByText(/monthly overview/i)).toBeVisible({
       timeout: 10000,
@@ -57,20 +62,75 @@ test.describe("Dashboard", () => {
     await expect(
       page.getByText("Spending by Category", { exact: true }),
     ).toBeVisible();
-    const slider = page.getByRole("slider", { name: /net in pie/i });
+    const slider = page.getByRole("slider", { name: /include net/i });
     await expect(slider).toBeVisible();
-    const box = await slider.boundingBox();
-    expect(box).toBeTruthy();
-    await page.mouse.click(box?.x + box?.width - 2, box?.y + box?.height / 2);
-    await expect(
-      page.getByText("Net by Category", { exact: true }),
-    ).toBeVisible({
-      timeout: 10000,
+    await expect(slider).toHaveAttribute("data-disabled", "");
+  });
+
+  test.describe("pie chart with positive net", () => {
+    test.beforeAll(async ({ browser }) => {
+      const context = await browser.newContext({
+        storageState: "e2e/.auth/user.json",
+      });
+      const page = await context.newPage();
+
+      await page.goto("/accounts");
+
+      while (true) {
+        const card = page
+          .locator(".rounded-lg.border")
+          .filter({ hasText: DASHBOARD_PIE_ACCOUNT })
+          .first();
+        if (!(await card.isVisible({ timeout: 2000 }).catch(() => false)))
+          break;
+        await card.locator("button:has(.lucide-trash-2)").click();
+        await page.getByRole("button", { name: "Delete" }).click();
+        await page.waitForSelector('[role="dialog"]', { state: "hidden" });
+        await page.waitForTimeout(300);
+      }
+
+      await page.getByRole("button", { name: "Add account" }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await dialog.locator('input[name="name"]').fill(DASHBOARD_PIE_ACCOUNT);
+      await dialog.getByRole("combobox").nth(1).click();
+      await page.getByRole("option", { name: "CommBank" }).click();
+      await dialog.getByRole("button", { name: "Create account" }).click();
+      await page.waitForSelector(`text=${DASHBOARD_PIE_ACCOUNT}`);
+
+      await context.close();
     });
-    await page.mouse.click(box?.x + 2, box?.y + box?.height / 2);
-    await expect(
-      page.getByText("Spending by Category", { exact: true }),
-    ).toBeVisible({ timeout: 10000 });
+
+    test("include net adds Unspent slice and Income allocation title", async ({
+      page,
+    }) => {
+      const now = new Date();
+      const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const seed = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName: DASHBOARD_PIE_ACCOUNT,
+          count: 2,
+          reset: true,
+          seedMonth,
+          addIncome: true,
+        },
+      });
+      expect(seed.ok()).toBeTruthy();
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      await expect(page.getByText(/monthly overview/i)).toBeVisible({
+        timeout: 10000,
+      });
+
+      const slider = page.getByRole("slider", { name: /include net/i });
+      await expect(slider).not.toHaveAttribute("data-disabled");
+      await slider.focus();
+      await page.keyboard.press("End");
+      await expect(
+        page.getByText("Income allocation", { exact: true }),
+      ).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText("Unspent").first()).toBeVisible();
+    });
   });
 
   test("sidebar brand links to dashboard from another page", async ({

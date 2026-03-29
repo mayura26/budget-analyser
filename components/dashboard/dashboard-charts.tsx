@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -16,15 +16,18 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 import type { CategoryTotal, MonthlyTotal } from "@/types";
+
+const UNSPENT_SLICE_COLOR = "#10b981";
 
 type PieDatum = {
   name: string;
   value: number;
   color: string;
-  /** Present when pie uses net mode; tooltip and legend show signed amounts. */
+  /** Unspent slice: show signed +amount in tooltip and legend */
   signedAmount?: number;
 };
 
@@ -83,15 +86,19 @@ function ChartTooltip({ active, payload, label, homeCurrency }: TooltipProps) {
 export function DashboardCharts({
   monthlyTotals,
   categoryExpenseTotals,
-  categoryNetTotals,
+  monthNet,
   homeCurrency,
 }: {
   monthlyTotals: MonthlyTotal[];
   categoryExpenseTotals: CategoryTotal[];
-  categoryNetTotals: CategoryTotal[];
+  monthNet: number;
   homeCurrency: SupportedCurrency;
 }) {
-  const [pieUseNet, setPieUseNet] = useState(false);
+  const [includeNet, setIncludeNet] = useState(false);
+
+  useEffect(() => {
+    if (monthNet <= 0) setIncludeNet(false);
+  }, [monthNet]);
 
   const barData = monthlyTotals.map((m) => ({
     month: formatMonthShort(m.month),
@@ -99,17 +106,36 @@ export function DashboardCharts({
     Expenses: m.expenses,
   }));
 
+  const includeNetEffective = includeNet && monthNet > 0;
+
   const pieData: PieDatum[] = useMemo(() => {
-    const source = pieUseNet ? categoryNetTotals : categoryExpenseTotals;
-    return source.slice(0, 8).map((c) => ({
+    const expenseSlices = categoryExpenseTotals.slice(0, 8).map((c) => ({
       name: c.categoryName,
-      value: pieUseNet ? Math.abs(c.total) : c.total,
+      value: c.total,
       color: c.color,
-      signedAmount: pieUseNet ? c.total : undefined,
     }));
-  }, [pieUseNet, categoryExpenseTotals, categoryNetTotals]);
+
+    if (!includeNetEffective) {
+      return expenseSlices;
+    }
+
+    const unspent: PieDatum = {
+      name: "Unspent",
+      value: monthNet,
+      color: UNSPENT_SLICE_COLOR,
+      signedAmount: monthNet,
+    };
+
+    if (expenseSlices.length === 0) {
+      return [unspent];
+    }
+
+    return [...expenseSlices, unspent];
+  }, [includeNetEffective, categoryExpenseTotals, monthNet]);
 
   const hasBarData = barData.some((d) => d.Income > 0 || d.Expenses > 0);
+  const hasPieData = pieData.length > 0;
+  const sliderDisabled = monthNet <= 0;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -173,40 +199,40 @@ export function DashboardCharts({
         <CardHeader className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <CardTitle className="text-base font-semibold">
-              {pieUseNet ? "Net by Category" : "Spending by Category"}
+              {includeNetEffective
+                ? "Income allocation"
+                : "Spending by Category"}
             </CardTitle>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3 shrink-0 min-w-0">
               <Label
-                htmlFor="dashboard-pie-net-slider"
+                htmlFor="dashboard-pie-include-net-slider"
                 className="text-xs text-muted-foreground font-normal whitespace-nowrap"
               >
-                Net in pie
+                Include Net
               </Label>
-              <input
-                id="dashboard-pie-net-slider"
-                type="range"
+              <Slider
+                id="dashboard-pie-include-net-slider"
+                className="w-28"
                 min={0}
                 max={1}
                 step={1}
-                value={pieUseNet ? 1 : 0}
-                onChange={(e) => setPieUseNet(Number(e.target.value) === 1)}
-                className="w-24 h-2 accent-primary cursor-pointer"
-                aria-valuetext={pieUseNet ? "Net amounts" : "Expenses only"}
+                disabled={sliderDisabled}
+                value={[includeNet && !sliderDisabled ? 1 : 0]}
+                onValueChange={(v) => setIncludeNet(v[0] === 1)}
+                aria-label="Include Net"
               />
             </div>
           </div>
           <p className="text-xs text-muted-foreground font-normal leading-snug">
-            {pieUseNet
-              ? "Slice size is the magnitude of net flow (income minus spending) per category."
-              : "Outflows only — same as expense totals elsewhere."}
+            {includeNetEffective
+              ? "Top spending categories plus unspent income (same net as the summary card)."
+              : "Outflows only — same as expense totals elsewhere. Turn on Include Net when net is positive to add unspent income to the chart."}
           </p>
         </CardHeader>
         <CardContent>
-          {pieData.length === 0 ? (
+          {!hasPieData ? (
             <div className="flex h-48 items-center justify-center text-muted-foreground text-sm">
-              {pieUseNet
-                ? "No net activity by category for this month"
-                : "No expense data for this month"}
+              No expense data for this month
             </div>
           ) : (
             <div className="flex items-center gap-4">

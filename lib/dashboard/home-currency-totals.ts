@@ -62,14 +62,13 @@ export async function getMonthlyTotalsInHomeCurrency(
   return results;
 }
 
-/** Expense-only slices (outflows) and signed net per category (same non-transfer filter). */
+/** Expense-only slices (outflows) per category (same non-transfer filter). */
 export async function getCategoryBreakdownInHomeCurrency(
   start: string,
   end: string,
   homeCurrency: SupportedCurrency,
 ): Promise<{
   expenseTotals: CategoryTotal[];
-  netTotals: CategoryTotal[];
 }> {
   const rows = db
     .select({
@@ -108,8 +107,6 @@ export async function getCategoryBreakdownInHomeCurrency(
       color: string;
       expenseTotal: number;
       expenseCount: number;
-      netTotal: number;
-      netCount: number;
     }
   >();
 
@@ -122,11 +119,7 @@ export async function getCategoryBreakdownInHomeCurrency(
       color: row.color,
       expenseTotal: 0,
       expenseCount: 0,
-      netTotal: 0,
-      netCount: 0,
     };
-    existing.netTotal += conv;
-    existing.netCount += 1;
     if (conv < 0) {
       existing.expenseTotal += Math.abs(conv);
       existing.expenseCount += 1;
@@ -145,16 +138,5 @@ export async function getCategoryBreakdownInHomeCurrency(
     }));
   expenseTotals.sort((a, b) => b.total - a.total);
 
-  const netTotals: CategoryTotal[] = Array.from(byCat.entries())
-    .filter(([, v]) => v.netTotal !== 0)
-    .map(([categoryId, v]) => ({
-      categoryId,
-      categoryName: v.name,
-      color: v.color,
-      total: Math.round(v.netTotal * 100) / 100,
-      count: v.netCount,
-    }));
-  netTotals.sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
-
-  return { expenseTotals, netTotals };
+  return { expenseTotals };
 }

@@ -19,6 +19,10 @@ export async function POST(request: Request) {
     reset?: boolean;
     /** Categorised but not verified — for bulk AI “all unconfirmed” E2E. */
     variant?: "uncategorised" | "needs_review";
+    /** YYYY-MM — transaction dates use the first day of this month (default 2024-06-01). */
+    seedMonth?: string;
+    /** Insert one large income row so monthly net is positive (E2E dashboard pie). */
+    addIncome?: boolean;
   };
   try {
     body = await request.json();
@@ -71,7 +75,11 @@ export async function POST(request: Request) {
   }
 
   const inserted: number[] = [];
-  const baseDate = "2024-06-01";
+  const seedMonth =
+    typeof body.seedMonth === "string" && /^\d{4}-\d{2}$/.test(body.seedMonth)
+      ? body.seedMonth
+      : null;
+  const baseDate = seedMonth ? `${seedMonth}-01` : "2024-06-01";
   for (let i = 0; i < count; i++) {
     const suffix = crypto.randomUUID();
     const description = `E2E categorise seed ${suffix}`;
@@ -102,8 +110,39 @@ export async function POST(request: Request) {
     inserted.push(row.id);
   }
 
+  if (body.addIncome === true) {
+    const suffix = crypto.randomUUID();
+    const description = `E2E income seed ${suffix}`;
+    const normalised = normaliseDescription(description);
+    const amount = 10_000;
+    const fingerprint = generateFingerprint(
+      account.id,
+      baseDate,
+      amount,
+      normalised,
+    );
+    const row = db
+      .insert(transactions)
+      .values({
+        accountId: account.id,
+        date: baseDate,
+        description,
+        normalised,
+        fingerprint,
+        amount,
+        categoryId: null,
+        categorySource: null,
+        categoryConfirmed: false,
+        isManual: false,
+      })
+      .returning({ id: transactions.id })
+      .get();
+    inserted.push(row.id);
+  }
+
   revalidatePath("/transactions");
   revalidatePath("/import");
+  revalidatePath("/dashboard");
 
   return NextResponse.json({ ok: true, ids: inserted });
 }
