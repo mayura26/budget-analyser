@@ -13,7 +13,7 @@ const appDir = path.join(root, "app");
 
 const brand = { r: 0, g: 59, b: 102, alpha: 1 };
 
-async function writeSquarePng(filename, size) {
+async function writeSquarePng(dir, filename, size) {
   await sharp({
     create: {
       width: size,
@@ -23,16 +23,16 @@ async function writeSquarePng(filename, size) {
     },
   })
     .png()
-    .toFile(path.join(publicDir, filename));
+    .toFile(path.join(dir, filename));
 }
 
 async function main() {
-  await writeSquarePng("web-app-manifest-192x192.png", 192);
-  await writeSquarePng("web-app-manifest-512x512.png", 512);
-  await writeSquarePng("icon1.png", 32);
-  await writeSquarePng("apple-icon.png", 180);
-  await writeSquarePng("favicon.png", 32);
-
+  await writeSquarePng(publicDir, "web-app-manifest-192x192.png", 192);
+  await writeSquarePng(publicDir, "web-app-manifest-512x512.png", 512);
+  await writeSquarePng(publicDir, "icon1.png", 32);
+  await writeSquarePng(appDir, "icon1.png", 32);
+  await writeSquarePng(publicDir, "apple-icon.png", 180);
+  await writeSquarePng(publicDir, "favicon.png", 32);
 }
 
 main().catch((err) => {
