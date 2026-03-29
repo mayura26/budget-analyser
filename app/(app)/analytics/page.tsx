@@ -145,6 +145,7 @@ export default async function AnalyticsPage({
 
       <AnalyticsCategoryExplorer
         categoryRoots={data.categoryRoots}
+        expenseTransactionsByCategory={data.expenseTransactionsByCategory}
         rangeStart={start}
         rangeEnd={end}
         homeCurrency={homeCurrency}

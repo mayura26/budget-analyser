@@ -31,17 +31,3 @@ export function buildTreemapDatumForNodes(
     children,
   };
 }
-
-export function sliceCategoryTreeForDrill(
-  roots: CategoryHierarchyNode[],
-  path: number[],
-): CategoryHierarchyNode[] {
-  if (path.length === 0) return roots;
-  let cur: CategoryHierarchyNode[] = roots;
-  for (const id of path) {
-    const next = cur.find((n) => n.id === id);
-    if (!next) return [];
-    cur = next.children;
-  }
-  return cur;
-}

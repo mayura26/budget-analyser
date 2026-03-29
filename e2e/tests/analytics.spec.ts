@@ -22,4 +22,29 @@ test.describe("Analytics", () => {
     await page.getByRole("option", { name: /Year to date/i }).click();
     await expect(page).toHaveURL(/preset=ytd/);
   });
+
+  test("spending by category describes expand behavior", async ({ page }) => {
+    await page.goto("/analytics");
+    await expect(
+      page.getByText(/Expand a category to see subcategories and transactions/i),
+    ).toBeVisible();
+  });
+
+  test("category expand toggles aria-expanded when data exists", async ({
+    page,
+  }) => {
+    await page.goto("/analytics");
+    const expandBtn = page.getByRole("button", { name: /^Expand / });
+    const count = await expandBtn.count();
+    test.skip(
+      count === 0,
+      "No expandable category rows (no spending data in period)",
+    );
+    const first = expandBtn.first();
+    await expect(first).toHaveAttribute("aria-expanded", "false");
+    await first.click();
+    await expect(first).toHaveAttribute("aria-expanded", "true");
+    await first.click();
+    await expect(first).toHaveAttribute("aria-expanded", "false");
+  });
 });

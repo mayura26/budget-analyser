@@ -228,6 +228,15 @@ export type AccountCashflowRow = {
   net: number;
 };
 
+/** Single expense line for analytics category drill-down (home-currency amount). */
+export type AnalyticsExpenseTransactionLine = {
+  id: number;
+  date: string;
+  description: string;
+  converted: number;
+  accountName: string;
+};
+
 /** Spending hierarchy for analytics (expense debits, transfers excluded). */
 export type CategoryHierarchyNode = {
   id: number | null;

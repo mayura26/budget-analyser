@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import type {
   AccountCashflowRow,
+  AnalyticsExpenseTransactionLine,
   AnalyticsSummary,
   AnalyticsTreemapDatum,
   Category,
@@ -26,6 +27,7 @@ function nonTransferFilter() {
 }
 
 type LoadedRow = {
+  transactionId: number;
   amount: number;
   date: string;
   converted: number;
@@ -36,6 +38,7 @@ type LoadedRow = {
   categoryName: string | null;
   categoryColor: string | null;
   categoryType: string | null;
+  description: string;
 };
 
 async function loadConvertedRows(
@@ -45,8 +48,10 @@ async function loadConvertedRows(
 ): Promise<LoadedRow[]> {
   const rows = db
     .select({
+      transactionId: transactions.id,
       amount: transactions.amount,
       date: transactions.date,
+      description: transactions.description,
       currency: accounts.currency,
       accountId: accounts.id,
       accountName: accounts.name,
@@ -81,6 +86,7 @@ async function loadConvertedRows(
     const cur = parseAccountCurrency(r.currency, homeCurrency);
     const converted = convertToHome(db, r.amount, cur, homeCurrency, r.date);
     return {
+      transactionId: r.transactionId,
       amount: r.amount,
       date: r.date,
       converted,
@@ -91,6 +97,7 @@ async function loadConvertedRows(
       categoryName: r.categoryName,
       categoryColor: r.categoryColor,
       categoryType: r.categoryType,
+      description: r.description,
     };
   });
 }
@@ -178,6 +185,40 @@ function isExpenseDebit(row: LoadedRow): boolean {
   if (row.converted >= 0) return false;
   if (row.categoryType === "transfer") return false;
   return true;
+}
+
+function categoryKey(categoryId: number | null): string {
+  return categoryId === null ? "none" : String(categoryId);
+}
+
+function aggregateExpenseDebitsByCategory(
+  loaded: LoadedRow[],
+): Record<string, AnalyticsExpenseTransactionLine[]> {
+  const buckets = new Map<string, AnalyticsExpenseTransactionLine[]>();
+
+  for (const r of loaded) {
+    if (!isExpenseDebit(r)) continue;
+    const key = categoryKey(r.categoryId);
+    const list = buckets.get(key) ?? [];
+    list.push({
+      id: r.transactionId,
+      date: r.date,
+      description: r.description,
+      converted: roundMoney(Math.abs(r.converted)),
+      accountName: r.accountName,
+    });
+    buckets.set(key, list);
+  }
+
+  const out: Record<string, AnalyticsExpenseTransactionLine[]> = {};
+  for (const [key, list] of buckets) {
+    list.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.id - a.id;
+    });
+    out[key] = list;
+  }
+  return out;
 }
 
 function buildCategoryHierarchy(loaded: LoadedRow[]): {
@@ -293,6 +334,8 @@ export type AnalyticsPageData = {
   monthly: MonthlyTotal[];
   categoryRoots: CategoryHierarchyNode[];
   treemapData: AnalyticsTreemapDatum | null;
+  /** Expense debits grouped by category id (`"none"` for uncategorised). */
+  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
 };
 
 /** Single DB round-trip + FX prefetch for all analytics aggregates. */
@@ -306,12 +349,14 @@ export async function getAnalyticsPageData(
   const accounts = aggregateAccounts(loaded);
   const monthly = aggregateMonthly(loaded, start, end);
   const { roots, treemapData } = buildCategoryHierarchy(loaded);
+  const expenseTransactionsByCategory = aggregateExpenseDebitsByCategory(loaded);
   return {
     summary,
     accounts,
     monthly,
     categoryRoots: roots,
     treemapData,
+    expenseTransactionsByCategory,
   };
 }
 

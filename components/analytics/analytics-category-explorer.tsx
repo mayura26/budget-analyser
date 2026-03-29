@@ -1,32 +1,21 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { transactionsInRangeUrl } from "@/lib/analytics/transaction-links";
-import {
-  buildTreemapDatumForNodes,
-  sliceCategoryTreeForDrill,
-} from "@/lib/analytics/treemap-helpers";
+import { buildTreemapDatumForNodes } from "@/lib/analytics/treemap-helpers";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
-import type { CategoryHierarchyNode } from "@/types";
+import type {
+  AnalyticsExpenseTransactionLine,
+  CategoryHierarchyNode,
+} from "@/types";
 
-function breadcrumbTrail(
-  roots: CategoryHierarchyNode[],
-  path: number[],
-): { id: number; name: string }[] {
-  const out: { id: number; name: string }[] = [];
-  let cur = roots;
-  for (const id of path) {
-    const n = cur.find((x) => x.id === id);
-    if (!n) break;
-    out.push({ id: n.id as number, name: n.name });
-    cur = n.children;
-  }
-  return out;
+function categoryKey(id: number | null): string {
+  return id === null ? "none" : String(id);
 }
 
 /** Treemap node payload from Recharts (partial). */
@@ -36,47 +25,219 @@ type TreemapTooltipPayload = {
   fill?: string;
 };
 
+function CategoryTreeRows({
+  nodes,
+  parentTotal,
+  depth,
+  expenseTransactionsByCategory,
+  expanded,
+  toggleExpanded,
+  rangeStart,
+  rangeEnd,
+  homeCurrency,
+}: {
+  nodes: CategoryHierarchyNode[];
+  parentTotal: number;
+  depth: number;
+  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
+  expanded: Set<string>;
+  toggleExpanded: (key: string) => void;
+  rangeStart: string;
+  rangeEnd: string;
+  homeCurrency: SupportedCurrency;
+}) {
+  const visible = nodes.filter((n) => n.total > 0);
+  return (
+    <>
+      {visible.map((node) => (
+        <CategoryRow
+          key={categoryKey(node.id)}
+          node={node}
+          parentTotal={parentTotal}
+          depth={depth}
+          expenseTransactionsByCategory={expenseTransactionsByCategory}
+          expanded={expanded}
+          toggleExpanded={toggleExpanded}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          homeCurrency={homeCurrency}
+        />
+      ))}
+    </>
+  );
+}
+
+function CategoryRow({
+  node,
+  parentTotal,
+  depth,
+  expenseTransactionsByCategory,
+  expanded,
+  toggleExpanded,
+  rangeStart,
+  rangeEnd,
+  homeCurrency,
+}: {
+  node: CategoryHierarchyNode;
+  parentTotal: number;
+  depth: number;
+  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
+  expanded: Set<string>;
+  toggleExpanded: (key: string) => void;
+  rangeStart: string;
+  rangeEnd: string;
+  homeCurrency: SupportedCurrency;
+}) {
+  const key = categoryKey(node.id);
+  const directTxns = expenseTransactionsByCategory[key] ?? [];
+  const hasChildCategories = node.children.length > 0;
+  const canExpand = hasChildCategories || directTxns.length > 0;
+  const isExpanded = expanded.has(key);
+  const pct =
+    parentTotal > 0 ? Math.round((node.total / parentTotal) * 100) : 0;
+
+  const padLeft = 8 + depth * 16;
+
+  return (
+    <>
+      <tr className="border-b last:border-0">
+        <td className="p-2 align-top" style={{ paddingLeft: padLeft }}>
+          <div className="flex items-start gap-2 min-w-0">
+            <div className="w-6 shrink-0 flex justify-center pt-0.5">
+              {canExpand ? (
+                <button
+                  type="button"
+                  className="p-0.5 rounded hover:bg-muted text-foreground"
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? "Collapse" : "Expand"} ${node.name}`}
+                  onClick={() => toggleExpanded(key)}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: node.color }}
+                />
+                <span className="font-medium truncate">{node.name}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {node.transactionCount} transaction
+                {node.transactionCount !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+        </td>
+        <td className="p-2 text-right tabular-nums align-top">
+          {formatCurrency(node.total, homeCurrency)}
+        </td>
+        <td className="p-2 text-right tabular-nums text-muted-foreground hidden sm:table-cell align-top">
+          {pct}%
+        </td>
+        <td className="p-2 text-right whitespace-nowrap align-top">
+          <Link
+            href={transactionsInRangeUrl({
+              from: rangeStart,
+              to: rangeEnd,
+              categoryId: node.id === null ? "none" : node.id,
+            })}
+            className="text-xs text-primary hover:underline"
+          >
+            Transactions
+          </Link>
+        </td>
+      </tr>
+      {isExpanded && (
+        <>
+          {hasChildCategories ? (
+            <CategoryTreeRows
+              nodes={node.children}
+              parentTotal={node.total}
+              depth={depth + 1}
+              expenseTransactionsByCategory={expenseTransactionsByCategory}
+              expanded={expanded}
+              toggleExpanded={toggleExpanded}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              homeCurrency={homeCurrency}
+            />
+          ) : null}
+          {directTxns.map((t) => {
+            const txnPct =
+              node.total > 0
+                ? Math.round((t.converted / node.total) * 100)
+                : 0;
+            const txnPad = 8 + (depth + 1) * 16;
+            return (
+              <tr
+                key={`txn-${t.id}`}
+                className="border-b last:border-0 bg-muted/25 text-muted-foreground"
+              >
+                <td className="p-2 py-1.5" style={{ paddingLeft: txnPad }}>
+                  <div className="text-xs tabular-nums">{t.date}</div>
+                  <div className="text-sm text-foreground/90 truncate">
+                    {t.description}
+                  </div>
+                  <div className="text-xs truncate">{t.accountName}</div>
+                </td>
+                <td className="p-2 py-1.5 text-right tabular-nums text-foreground text-sm">
+                  {formatCurrency(t.converted, homeCurrency)}
+                </td>
+                <td className="p-2 py-1.5 text-right tabular-nums text-xs hidden sm:table-cell">
+                  {txnPct}%
+                </td>
+                <td className="p-2 py-1.5 text-right text-xs">—</td>
+              </tr>
+            );
+          })}
+        </>
+      )}
+    </>
+  );
+}
+
 export function AnalyticsCategoryExplorer({
   categoryRoots,
+  expenseTransactionsByCategory,
   rangeStart,
   rangeEnd,
   homeCurrency,
 }: {
   categoryRoots: CategoryHierarchyNode[];
+  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
   rangeStart: string;
   rangeEnd: string;
   homeCurrency: SupportedCurrency;
 }) {
-  const [drillPath, setDrillPath] = useState<number[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
-  const displayedNodes = useMemo(
-    () => sliceCategoryTreeForDrill(categoryRoots, drillPath),
-    [categoryRoots, drillPath],
-  );
+  const toggleExpanded = useCallback((key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const treemapData = useMemo(
-    () => buildTreemapDatumForNodes(displayedNodes),
-    [displayedNodes],
+    () => buildTreemapDatumForNodes(categoryRoots),
+    [categoryRoots],
   );
 
-  const crumbs = useMemo(
-    () => breadcrumbTrail(categoryRoots, drillPath),
-    [categoryRoots, drillPath],
+  const rootParentTotal = useMemo(
+    () => categoryRoots.reduce((s, n) => s + n.total, 0),
+    [categoryRoots],
   );
 
-  const parentTotal = useMemo(() => {
-    if (drillPath.length === 0) {
-      return categoryRoots.reduce((s, n) => s + n.total, 0);
-    }
-    let cur = categoryRoots;
-    let parent: CategoryHierarchyNode | undefined;
-    for (const id of drillPath) {
-      parent = cur.find((x) => x.id === id);
-      if (!parent) return 0;
-      cur = parent.children;
-    }
-    return parent?.total ?? 0;
-  }, [categoryRoots, drillPath]);
+  const hasAnySpending = categoryRoots.some((n) => n.total > 0);
 
   return (
     <Card>
@@ -85,41 +246,12 @@ export function AnalyticsCategoryExplorer({
           Spending by category
         </CardTitle>
         <p className="text-xs text-muted-foreground font-normal">
-          Expense debits in home currency; transfers excluded. Click a row to
-          drill into subcategories.
+          Expense debits in home currency; transfers excluded. Expand a category
+          to see subcategories and transactions.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <nav
-          aria-label="Category drill-down"
-          className="flex flex-wrap items-center gap-1 text-sm"
-        >
-          <button
-            type="button"
-            className="text-primary hover:underline"
-            onClick={() => setDrillPath([])}
-          >
-            All
-          </button>
-          {crumbs.map((c, i) => (
-            <span key={c.id} className="flex items-center gap-1">
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <button
-                type="button"
-                className={
-                  i === crumbs.length - 1
-                    ? "font-medium text-foreground"
-                    : "text-primary hover:underline"
-                }
-                onClick={() => setDrillPath(drillPath.slice(0, i + 1))}
-              >
-                {c.name}
-              </button>
-            </span>
-          ))}
-        </nav>
-
-        {treemapData && displayedNodes.some((n) => n.total > 0) ? (
+        {treemapData && hasAnySpending ? (
           <div className="hidden md:block h-[280px] w-full min-h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <Treemap
@@ -166,7 +298,7 @@ export function AnalyticsCategoryExplorer({
               </tr>
             </thead>
             <tbody>
-              {displayedNodes.filter((n) => n.total > 0).length === 0 ? (
+              {!hasAnySpending ? (
                 <tr>
                   <td
                     colSpan={4}
@@ -176,64 +308,17 @@ export function AnalyticsCategoryExplorer({
                   </td>
                 </tr>
               ) : (
-                displayedNodes
-                  .filter((n) => n.total > 0)
-                  .map((n) => {
-                    const pct =
-                      parentTotal > 0
-                        ? Math.round((n.total / parentTotal) * 100)
-                        : 0;
-                    const canDrill = n.children.some((c) => c.total > 0);
-                    return (
-                      <tr key={String(n.id)} className="border-b last:border-0">
-                        <td className="p-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className="h-2 w-2 rounded-full shrink-0"
-                              style={{ backgroundColor: n.color }}
-                            />
-                            {canDrill && n.id !== null ? (
-                              <button
-                                type="button"
-                                className="text-left font-medium hover:underline truncate"
-                                onClick={() =>
-                                  setDrillPath([...drillPath, n.id as number])
-                                }
-                              >
-                                {n.name}
-                              </button>
-                            ) : (
-                              <span className="font-medium truncate">
-                                {n.name}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground pl-4 mt-0.5">
-                            {n.transactionCount} transaction
-                            {n.transactionCount !== 1 ? "s" : ""}
-                          </p>
-                        </td>
-                        <td className="p-2 text-right tabular-nums">
-                          {formatCurrency(n.total, homeCurrency)}
-                        </td>
-                        <td className="p-2 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                          {pct}%
-                        </td>
-                        <td className="p-2 text-right whitespace-nowrap">
-                          <Link
-                            href={transactionsInRangeUrl({
-                              from: rangeStart,
-                              to: rangeEnd,
-                              categoryId: n.id === null ? "none" : n.id,
-                            })}
-                            className="text-xs text-primary hover:underline"
-                          >
-                            Transactions
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })
+                <CategoryTreeRows
+                  nodes={categoryRoots}
+                  parentTotal={rootParentTotal}
+                  depth={0}
+                  expenseTransactionsByCategory={expenseTransactionsByCategory}
+                  expanded={expanded}
+                  toggleExpanded={toggleExpanded}
+                  rangeStart={rangeStart}
+                  rangeEnd={rangeEnd}
+                  homeCurrency={homeCurrency}
+                />
               )}
             </tbody>
           </table>
