@@ -41,7 +41,13 @@ export async function POST(request: Request) {
 
   let reviewCategoryId: number | null = null;
   if (variant === "needs_review") {
-    const cat = db.select().from(categories).limit(1).get();
+    // Prefer Health so E2E can switch to Groceries and assert category-change highlight.
+    const health = db
+      .select()
+      .from(categories)
+      .where(eq(categories.name, "Health (medical, pharmacy, gym)"))
+      .get();
+    const cat = health ?? db.select().from(categories).limit(1).get();
     if (!cat) {
       return NextResponse.json(
         { error: "No categories — seed defaults first" },

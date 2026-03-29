@@ -59,6 +59,13 @@ import { computeSuggestedRules } from "@/lib/categorisation/rule-suggester";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category } from "@/types";
 
+/** Normalise stored confidence (0–1 or 0–100) to an integer percent for display. */
+function suggestionConfidencePercent(raw: number): number {
+  const n = Number.isFinite(raw) ? raw : 0;
+  const pct = n <= 1 ? n * 100 : n;
+  return Math.min(100, Math.max(0, Math.round(pct)));
+}
+
 type DialogState =
   | "idle"
   | "loading"
@@ -415,11 +422,17 @@ export function CategoriseDialog({
                     <th className="w-[11%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
                       Amount
                     </th>
-                    <th className="w-[20%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className="w-[18%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                       Category
                     </th>
                     <th
-                      className="w-[9%] px-2 py-2 text-center text-xs font-medium text-muted-foreground whitespace-nowrap"
+                      className="w-[8%] px-2 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap tabular-nums"
+                      title="Suggestion confidence: rule strength, model estimate for AI, or consistency for mismatches."
+                    >
+                      Confidence
+                    </th>
+                    <th
+                      className="w-[8%] px-2 py-2 text-center text-xs font-medium text-muted-foreground whitespace-nowrap"
                       title="Mark as verified when applying (green on the list). Untick to save the category but leave it unconfirmed."
                     >
                       Verify
@@ -430,10 +443,30 @@ export function CategoriseDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {suggestions.map((row) => (
+                  {suggestions.map((row) => {
+                    const selectedId = selections[row.transactionId];
+                    const isCategoryChange =
+                      row.currentCategoryId != null &&
+                      selectedId != null &&
+                      selectedId !== row.currentCategoryId;
+                    return (
                     <tr
                       key={row.transactionId}
-                      className="border-t border-border"
+                      data-testid={
+                        isCategoryChange
+                          ? "bulk-ai-row-category-change"
+                          : undefined
+                      }
+                      title={
+                        isCategoryChange && row.currentCategoryName
+                          ? `Category will change from ${row.currentCategoryName}`
+                          : undefined
+                      }
+                      className={`border-t border-border ${
+                        isCategoryChange
+                          ? "bg-amber-50/90 dark:bg-amber-950/35"
+                          : ""
+                      }`}
                     >
                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap align-middle">
                         {formatDate(row.date)}
@@ -537,6 +570,26 @@ export function CategoriseDialog({
                           </SelectContent>
                         </Select>
                       </td>
+                      <td className="px-2 py-2 text-right align-middle tabular-nums text-xs text-muted-foreground">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default">
+                                {suggestionConfidencePercent(row.confidence)}%
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              {row.source === "ai"
+                                ? "Model estimate (self-reported confidence)."
+                                : row.source === "rule"
+                                  ? "From the matched rule's confidence score."
+                                  : activeScope === "mismatches"
+                                    ? "Share of transactions with this description in the majority category."
+                                    : "No automatic suggestion; confidence not applicable."}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </td>
                       <td className="px-2 py-2 align-middle text-center">
                         <input
                           type="checkbox"
@@ -588,7 +641,8 @@ export function CategoriseDialog({
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

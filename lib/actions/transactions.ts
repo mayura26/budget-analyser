@@ -46,6 +46,11 @@ export type SuggestionRow = {
   confidence: number;
 };
 
+function clampConfidence01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
+}
+
 const ManualTransactionSchema = z.object({
   accountId: z.coerce.number(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -381,7 +386,7 @@ async function getMismatchSuggestions(): Promise<SuggestionRow[]> {
         suggestedCategoryName:
           categoryMap.get(mf.majorityCategoryId) ?? "Unknown",
         source: "none",
-        confidence: mf.confidence,
+        confidence: clampConfidence01(mf.confidence),
       });
     }
   }
@@ -468,7 +473,7 @@ export async function getAISuggestions(
         suggestedCategoryId: match.categoryId,
         suggestedCategoryName: categoryMap.get(match.categoryId) ?? "Unknown",
         source: "rule",
-        confidence: match.confidence,
+        confidence: clampConfidence01(match.confidence),
       });
     } else {
       needsAI.push(txn);
@@ -520,7 +525,7 @@ export async function getAISuggestions(
             suggestedCategoryId: aiCat,
             suggestedCategoryName: ai?.categoryName ?? "Not processed",
             source: aiCat ? "ai" : "none",
-            confidence: ai?.confidence ?? 0,
+            confidence: clampConfidence01(ai?.confidence ?? 0),
           });
         }
       } catch (err) {

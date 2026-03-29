@@ -21,6 +21,11 @@ type TransactionInput = {
   accountName?: string;
 };
 
+function clamp01(n: number, fallback: number): number {
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(1, Math.max(0, n));
+}
+
 export async function categoriseWithAI(
   transactions: TransactionInput[],
   categories: Category[],
@@ -89,7 +94,7 @@ Only return the JSON object, no other text.`;
       transactionId: r.id as number,
       categoryId: r.categoryId as number | null,
       categoryName: (r.categoryName as string) ?? "Unknown",
-      confidence: (r.confidence as number) ?? 0.7,
+      confidence: clamp01(r.confidence as number, 0.7),
     }));
   } catch {
     return [];
