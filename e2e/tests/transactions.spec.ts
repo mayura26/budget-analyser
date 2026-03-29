@@ -188,9 +188,7 @@ test.describe("Transactions", () => {
     await page.goto("/transactions");
     await expect(page.getByTestId("transaction-amount-display")).toBeVisible();
     await page.getByTestId("transaction-amount-display").click();
-    await page
-      .getByRole("option", { name: /Amounts: home currency/i })
-      .click();
+    await page.getByRole("option", { name: /Amounts: home currency/i }).click();
     await expect(page.getByTestId("transaction-amount-display")).toContainText(
       /home currency/i,
     );

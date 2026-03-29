@@ -33,7 +33,9 @@
       "Bash(DATABASE_PATH=./data/test.db npx next build)",
       "Bash(DATABASE_PATH=./data/test.db npx drizzle-kit push)",
       "Bash(DATABASE_PATH=./data/test.db APP_PASSWORD=changeme JWT_SECRET=test node -e \":*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(sqlite3 data/test.db \"SELECT * FROM __drizzle_migrations ORDER BY created_at;\")",
+      "Bash(wait)"
     ]
   }
 }

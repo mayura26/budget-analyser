@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -177,10 +178,10 @@ export function AccountGroupHeader({
               <DialogHeader>
                 <DialogTitle>Delete group?</DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-muted-foreground">
+              <DialogDescription>
                 This will remove the <strong>{group.name}</strong> group. The
                 accounts inside will become ungrouped.
-              </p>
+              </DialogDescription>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setDeleteOpen(false)}>
                   Cancel

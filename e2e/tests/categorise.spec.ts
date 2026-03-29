@@ -313,7 +313,10 @@ test.describe("Categorise Dialog", () => {
 
       const firstRow = dialog.locator("tbody tr").first();
       await firstRow.getByRole("combobox").click();
-      await page.getByRole("option", { name: /Groceries/i }).first().click();
+      await page
+        .getByRole("option", { name: /Groceries/i })
+        .first()
+        .click();
       await expect(
         dialog.locator('[data-testid="bulk-ai-row-category-change"]').first(),
       ).toBeVisible();

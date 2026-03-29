@@ -26,7 +26,9 @@ test.describe("Analytics", () => {
   test("spending by category describes expand behavior", async ({ page }) => {
     await page.goto("/analytics");
     await expect(
-      page.getByText(/Expand a category to see subcategories and transactions/i),
+      page.getByText(
+        /Expand a category to see subcategories and transactions/i,
+      ),
     ).toBeVisible();
   });
 

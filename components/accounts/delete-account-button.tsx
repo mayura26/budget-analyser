@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -37,10 +38,10 @@ export function DeleteAccountButton({
         <DialogHeader>
           <DialogTitle>Delete account?</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
+        <DialogDescription>
           This will permanently delete <strong>{name}</strong> and all its
           transactions.
-        </p>
+        </DialogDescription>
         <div className="flex gap-2 justify-end">
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel

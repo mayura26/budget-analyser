@@ -135,12 +135,12 @@ export function BudgetInsightsPanel({
 
           {insights.length > 0 && (
             <div className="space-y-2">
-              {insights.map((insight, i) => {
+              {insights.map((insight) => {
                 const config = insightConfig[insight.type];
                 const Icon = config.icon;
                 return (
                   <div
-                    key={i}
+                    key={`${insight.type}:${insight.category ?? ""}:${insight.message}`}
                     className={`flex items-start gap-3 rounded-lg border p-3 ${config.bg} ${config.border}`}
                   >
                     <Icon

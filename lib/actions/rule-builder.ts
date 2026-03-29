@@ -19,9 +19,9 @@ export type RuleBuilderTransactionRow = {
 const MAX_SAMPLE = 150;
 
 /** Recent transactions for AI rule-builder context (capped for token limits). */
-export async function getRuleBuilderTransactionSample(options: {
-  unverifiedOnly?: boolean;
-} = {}): Promise<ActionResult<RuleBuilderTransactionRow[]>> {
+export async function getRuleBuilderTransactionSample(
+  options: { unverifiedOnly?: boolean } = {},
+): Promise<ActionResult<RuleBuilderTransactionRow[]>> {
   const unverifiedOnly = options.unverifiedOnly ?? false;
 
   const base = db

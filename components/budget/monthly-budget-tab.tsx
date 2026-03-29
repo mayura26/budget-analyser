@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Copy, Sparkles, TrendingUp } from "lucide-react";
+import { CalendarClock, Copy, TrendingUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { BudgetCategoryList } from "@/components/budget/budget-category-list";

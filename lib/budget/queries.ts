@@ -237,7 +237,10 @@ export async function buildBudgetCategoryRows(
     .map((cat) => ({
       categoryId: cat.id,
       categoryName: cat.name,
-      parentName: mainGroups.get(cat.parentId!) ?? "Other",
+      parentName:
+        cat.parentId != null
+          ? (mainGroups.get(cat.parentId) ?? "Other")
+          : "Other",
       color: cat.color,
       targetAmount: targetMap.get(cat.id) ?? 0,
       actualSpent: actual.get(cat.id) ?? 0,

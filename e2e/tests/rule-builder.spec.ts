@@ -50,7 +50,9 @@ test.describe("Rule builder chat", () => {
       .fill("Map ice cream and takeout");
     await page.getByTestId("rule-builder-chat-send").click();
 
-    await expect(page.getByText("Proposed rules")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Proposed rules")).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByText("MESSINA")).toBeVisible();
     await expect(page.getByText("DOMINOS")).toBeVisible();
 

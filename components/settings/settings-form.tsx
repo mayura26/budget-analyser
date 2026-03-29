@@ -101,7 +101,9 @@ export function SettingsForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="account">Account (transaction) currency</SelectItem>
+                <SelectItem value="account">
+                  Account (transaction) currency
+                </SelectItem>
                 <SelectItem value="home">Home currency</SelectItem>
               </SelectContent>
             </Select>

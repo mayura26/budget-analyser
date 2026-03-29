@@ -61,11 +61,13 @@ test.describe("Dashboard", () => {
     await expect(slider).toBeVisible();
     const box = await slider.boundingBox();
     expect(box).toBeTruthy();
-    await page.mouse.click(box!.x + box!.width - 2, box!.y + box!.height / 2);
-    await expect(page.getByText("Net by Category", { exact: true })).toBeVisible({
+    await page.mouse.click(box?.x + box?.width - 2, box?.y + box?.height / 2);
+    await expect(
+      page.getByText("Net by Category", { exact: true }),
+    ).toBeVisible({
       timeout: 10000,
     });
-    await page.mouse.click(box!.x + 2, box!.y + box!.height / 2);
+    await page.mouse.click(box?.x + 2, box?.y + box?.height / 2);
     await expect(
       page.getByText("Spending by Category", { exact: true }),
     ).toBeVisible({ timeout: 10000 });

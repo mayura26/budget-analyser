@@ -22,7 +22,7 @@ function groupRows(rows: BudgetCategoryRow[]): GroupedRows {
   for (const row of rows) {
     const group = row.parentName;
     if (!map.has(group)) map.set(group, []);
-    map.get(group)!.push(row);
+    map.get(group)?.push(row);
   }
   return [...map.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -80,7 +80,6 @@ function CategoryRow({
               min="0"
               defaultValue={row.targetAmount || ""}
               className="w-full h-7 rounded border bg-background px-1.5 pl-4 text-right text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
-              autoFocus
               onBlur={onBlur}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === "Escape") {
@@ -227,9 +226,10 @@ export function BudgetCategoryList({
     // Small delay to let the new value be captured
     setTimeout(() => {
       setEditingId(null);
-      if (formRef.current) {
+      const form = formRef.current;
+      if (form) {
         startTransition(() => {
-          const fd = new FormData(formRef.current!);
+          const fd = new FormData(form);
           formAction(fd);
         });
       }

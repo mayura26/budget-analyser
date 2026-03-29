@@ -335,7 +335,10 @@ export type AnalyticsPageData = {
   categoryRoots: CategoryHierarchyNode[];
   treemapData: AnalyticsTreemapDatum | null;
   /** Expense debits grouped by category id (`"none"` for uncategorised). */
-  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
+  expenseTransactionsByCategory: Record<
+    string,
+    AnalyticsExpenseTransactionLine[]
+  >;
 };
 
 /** Single DB round-trip + FX prefetch for all analytics aggregates. */
@@ -349,7 +352,8 @@ export async function getAnalyticsPageData(
   const accounts = aggregateAccounts(loaded);
   const monthly = aggregateMonthly(loaded, start, end);
   const { roots, treemapData } = buildCategoryHierarchy(loaded);
-  const expenseTransactionsByCategory = aggregateExpenseDebitsByCategory(loaded);
+  const expenseTransactionsByCategory =
+    aggregateExpenseDebitsByCategory(loaded);
   return {
     summary,
     accounts,

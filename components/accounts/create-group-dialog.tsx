@@ -45,7 +45,7 @@ export function CreateGroupDialog() {
           Add group
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>New group</DialogTitle>
         </DialogHeader>

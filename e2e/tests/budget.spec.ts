@@ -11,9 +11,9 @@ async function cleanupSchedules(browser: Browser) {
     await page.waitForTimeout(500);
     // Dismiss any Next.js dev error overlay
     await page.evaluate(() => {
-      document
-        .querySelectorAll("nextjs-portal")
-        .forEach((el) => el.remove());
+      for (const el of document.querySelectorAll("nextjs-portal")) {
+        el.remove();
+      }
     });
     const tab = page.getByRole("tab", { name: "Schedules" });
     if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -57,9 +57,7 @@ test.describe("Budget", () => {
     page,
   }) => {
     await page.goto("/budget");
-    await expect(
-      page.getByText("Set up your budget for"),
-    ).toBeVisible();
+    await expect(page.getByText("Set up your budget for")).toBeVisible();
   });
 
   test("monthly budget tab shows category list with headers", async ({
@@ -68,7 +66,9 @@ test.describe("Budget", () => {
     await page.goto("/budget");
     // Wait for the category list to render (it loads with server data)
     await expect(
-      page.getByText("Set up your budget for").or(page.getByText("Total Budgeted")),
+      page
+        .getByText("Set up your budget for")
+        .or(page.getByText("Total Budgeted")),
     ).toBeVisible({ timeout: 10000 });
     // Column headers
     await expect(page.getByText("Target").first()).toBeVisible();
@@ -259,9 +259,7 @@ test.describe("Budget", () => {
   test("AI insights panel hidden when AI disabled", async ({ page }) => {
     await page.goto("/budget");
     // On the monthly budget tab (default), AI insights should not appear
-    await expect(
-      page.getByText("AI Budget Insights"),
-    ).not.toBeVisible();
+    await expect(page.getByText("AI Budget Insights")).not.toBeVisible();
   });
 
   test("Smart Schedule dialog shows Open Settings when API reports AI disabled", async ({

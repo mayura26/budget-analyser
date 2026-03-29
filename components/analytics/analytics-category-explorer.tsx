@@ -39,7 +39,10 @@ function CategoryTreeRows({
   nodes: CategoryHierarchyNode[];
   parentTotal: number;
   depth: number;
-  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
+  expenseTransactionsByCategory: Record<
+    string,
+    AnalyticsExpenseTransactionLine[]
+  >;
   expanded: Set<string>;
   toggleExpanded: (key: string) => void;
   rangeStart: string;
@@ -81,7 +84,10 @@ function CategoryRow({
   node: CategoryHierarchyNode;
   parentTotal: number;
   depth: number;
-  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
+  expenseTransactionsByCategory: Record<
+    string,
+    AnalyticsExpenseTransactionLine[]
+  >;
   expanded: Set<string>;
   toggleExpanded: (key: string) => void;
   rangeStart: string;
@@ -171,9 +177,7 @@ function CategoryRow({
           ) : null}
           {directTxns.map((t) => {
             const txnPct =
-              node.total > 0
-                ? Math.round((t.converted / node.total) * 100)
-                : 0;
+              node.total > 0 ? Math.round((t.converted / node.total) * 100) : 0;
             const txnPad = 8 + (depth + 1) * 16;
             return (
               <tr
@@ -211,7 +215,10 @@ export function AnalyticsCategoryExplorer({
   homeCurrency,
 }: {
   categoryRoots: CategoryHierarchyNode[];
-  expenseTransactionsByCategory: Record<string, AnalyticsExpenseTransactionLine[]>;
+  expenseTransactionsByCategory: Record<
+    string,
+    AnalyticsExpenseTransactionLine[]
+  >;
   rangeStart: string;
   rangeEnd: string;
   homeCurrency: SupportedCurrency;

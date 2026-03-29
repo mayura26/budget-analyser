@@ -253,7 +253,10 @@ export function ImportWizard({
                     className={`px-3 py-1 text-right font-medium whitespace-nowrap ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
                   >
                     {row.amount < 0 ? "-" : "+"}
-                    {formatCurrency(Math.abs(row.amount), previewAccountCurrency)}
+                    {formatCurrency(
+                      Math.abs(row.amount),
+                      previewAccountCurrency,
+                    )}
                   </td>
                 </tr>
               ))}

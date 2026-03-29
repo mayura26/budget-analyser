@@ -355,7 +355,7 @@ function AddMainGroupDialog() {
           Add main group
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>New main group</DialogTitle>
         </DialogHeader>
@@ -452,7 +452,7 @@ function AddSubCategoryDialog({
           Add sub-category
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>New sub-category</DialogTitle>
         </DialogHeader>
@@ -569,7 +569,7 @@ function EditCategoryDialog({
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
             {isMain ? "Edit main group" : "Edit sub-category"}
@@ -681,7 +681,7 @@ function AddRuleDialog({
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
             Add rule for {parseCategoryDisplayName(categoryName).title}

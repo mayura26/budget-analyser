@@ -45,9 +45,7 @@ export default async function AnalyticsPage({
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Analytics
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{rangeLabel}</p>
           <p className="text-xs text-muted-foreground mt-1">
             Amounts in {homeCurrency}. Transfers are excluded from income,

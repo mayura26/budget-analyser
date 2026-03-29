@@ -1,6 +1,12 @@
 "use client";
 
-import { Loader2, MessageSquare, RefreshCw, Send, Sparkles } from "lucide-react";
+import {
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { Button } from "@/components/ui/button";
@@ -20,8 +26,8 @@ import {
   createRulesFromDraftsAndApplyToUnverified,
   previewUnverifiedMatchesForRules,
 } from "@/lib/actions/categories";
-import { getRuleBuilderTransactionSample } from "@/lib/actions/rule-builder";
 import type { RuleBuilderTransactionRow } from "@/lib/actions/rule-builder";
+import { getRuleBuilderTransactionSample } from "@/lib/actions/rule-builder";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category, RuleDraftInput } from "@/types";
 
@@ -35,7 +41,11 @@ function ruleKey(r: RuleDraftInput): string {
   return `${r.pattern}::${r.categoryId}::${r.patternType}`;
 }
 
-export function RuleBuilderChatDialog({ categories }: { categories: Category[] }) {
+export function RuleBuilderChatDialog({
+  categories,
+}: {
+  categories: Category[];
+}) {
   const [open, setOpen] = useState(false);
   const [loadingSample, setLoadingSample] = useState(false);
   const [sample, setSample] = useState<RuleBuilderTransactionRow[]>([]);
@@ -170,9 +180,7 @@ export function RuleBuilderChatDialog({ categories }: { categories: Category[] }
   }
 
   function handlePreview() {
-    const selected = proposedRules.filter((r) =>
-      selectedRules.has(ruleKey(r)),
-    );
+    const selected = proposedRules.filter((r) => selectedRules.has(ruleKey(r)));
     if (selected.length === 0) return;
     startTransition(async () => {
       const result = await previewUnverifiedMatchesForRules(selected);
@@ -186,9 +194,7 @@ export function RuleBuilderChatDialog({ categories }: { categories: Category[] }
   }
 
   function handleSave() {
-    const selected = proposedRules.filter((r) =>
-      selectedRules.has(ruleKey(r)),
-    );
+    const selected = proposedRules.filter((r) => selectedRules.has(ruleKey(r)));
     if (selected.length === 0) return;
     startTransition(async () => {
       await createRulesFromDrafts(selected);
@@ -197,9 +203,7 @@ export function RuleBuilderChatDialog({ categories }: { categories: Category[] }
   }
 
   function handleSaveAndApply() {
-    const selected = proposedRules.filter((r) =>
-      selectedRules.has(ruleKey(r)),
-    );
+    const selected = proposedRules.filter((r) => selectedRules.has(ruleKey(r)));
     if (selected.length === 0) return;
     startTransition(async () => {
       const result = await createRulesFromDraftsAndApplyToUnverified(selected);
@@ -236,8 +240,8 @@ export function RuleBuilderChatDialog({ categories }: { categories: Category[] }
           </DialogTitle>
           <DialogDescription>
             Use your transaction sample as context. Describe patterns (e.g.
-            merchant names) and map them to sub-categories. Save keyword or regex
-            rules when you are happy with the preview.
+            merchant names) and map them to sub-categories. Save keyword or
+            regex rules when you are happy with the preview.
           </DialogDescription>
         </DialogHeader>
 
@@ -429,7 +433,9 @@ export function RuleBuilderChatDialog({ categories }: { categories: Category[] }
                           <code className="text-xs bg-muted px-1 rounded">
                             {r.patternType}
                           </code>{" "}
-                          <span className="font-mono break-all">{r.pattern}</span>
+                          <span className="font-mono break-all">
+                            {r.pattern}
+                          </span>
                           <div className="text-muted-foreground mt-0.5">
                             →{" "}
                             {cat ? (
