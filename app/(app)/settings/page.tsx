@@ -21,6 +21,8 @@ export default function SettingsPage() {
           openai_model: settingsMap.openai_model ?? "gpt-4o-mini",
           ai_enabled: settingsMap.ai_enabled ?? "false",
           home_currency: settingsMap.home_currency ?? "AUD",
+          transaction_amount_display:
+            settingsMap.transaction_amount_display ?? "account",
         }}
       />
       <BankProfilesSection profiles={allProfiles} />

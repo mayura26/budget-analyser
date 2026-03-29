@@ -59,10 +59,7 @@ test.describe("Transactions", () => {
   test("search filter narrows results", async ({ page }) => {
     await page.goto("/transactions");
     // Scope to the known account so we don't match rows from other suites.
-    const accountSelect = page
-      .getByRole("combobox")
-      .filter({ hasText: /all accounts/i });
-    await accountSelect.click();
+    await page.getByTestId("filter-account").click();
     await page.getByRole("option", { name: "Import Test Account" }).click();
     await page.getByPlaceholder("Search transactions…").fill("CHEMIST");
     await expect(
@@ -78,10 +75,7 @@ test.describe("Transactions", () => {
 
   test("account filter updates URL", async ({ page }) => {
     await page.goto("/transactions");
-    const accountSelect = page
-      .getByRole("combobox")
-      .filter({ hasText: /all accounts/i });
-    await accountSelect.click();
+    await page.getByTestId("filter-account").click();
     await page.getByRole("option", { name: "Import Test Account" }).click();
     await expect(page).toHaveURL(/accountId=/);
   });
@@ -115,10 +109,7 @@ test.describe("Transactions", () => {
     page,
   }) => {
     await page.goto("/transactions");
-    const accountSelect = page
-      .getByRole("combobox")
-      .filter({ hasText: /all accounts/i });
-    await accountSelect.click();
+    await page.getByTestId("filter-account").click();
     await page.getByRole("option", { name: "Import Test Account" }).click();
 
     const firstRow = page.locator("tbody tr").first();
@@ -189,5 +180,30 @@ test.describe("Transactions", () => {
     await expect(deleteButtons).toHaveCount(initialCount - 1, {
       timeout: 5000,
     });
+  });
+
+  test("amount display mode combobox persists after reload", async ({
+    page,
+  }) => {
+    await page.goto("/transactions");
+    await expect(page.getByTestId("transaction-amount-display")).toBeVisible();
+    await page.getByTestId("transaction-amount-display").click();
+    await page
+      .getByRole("option", { name: /Amounts: home currency/i })
+      .click();
+    await expect(page.getByTestId("transaction-amount-display")).toContainText(
+      /home currency/i,
+    );
+    await page.reload();
+    await expect(page.getByTestId("transaction-amount-display")).toContainText(
+      /home currency/i,
+    );
+    await page.getByTestId("transaction-amount-display").click();
+    await page
+      .getByRole("option", { name: /Amounts: account currency/i })
+      .click();
+    await expect(page.getByTestId("transaction-amount-display")).toContainText(
+      /account currency/i,
+    );
   });
 });

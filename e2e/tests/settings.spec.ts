@@ -9,6 +9,9 @@ test.describe("Settings", () => {
     await expect(
       page.getByText(/Frankfurter/i),
     ).toBeVisible();
+    await expect(
+      page.getByText("Transaction list amounts", { exact: true }),
+    ).toBeVisible();
   });
 
   test("AI card renders", async ({ page }) => {

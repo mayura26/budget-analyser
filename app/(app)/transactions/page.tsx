@@ -6,8 +6,11 @@ import Link from "next/link";
 import { TransactionActions } from "@/components/transactions/transaction-actions";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
+import { getSettings } from "@/lib/actions/settings";
 import { isValidISODate } from "@/lib/analytics/date-range";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
+import { parseAccountCurrency } from "@/lib/currency/account-currency";
+import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
@@ -29,6 +32,9 @@ export default async function TransactionsPage({
 }) {
   const params = await searchParams;
   const homeCurrency = getHomeCurrency();
+  const settingsMap = await getSettings();
+  const transactionAmountDisplay =
+    settingsMap.transaction_amount_display === "home" ? "home" : "account";
 
   const allAccounts = db.select().from(accounts).all();
   const allCatsRaw = db.select().from(categories).all() as Category[];
@@ -103,6 +109,21 @@ export default async function TransactionsPage({
     .orderBy(sql`${transactions.date} DESC, ${transactions.id} DESC`)
     .limit(1000)
     .all();
+
+  await prefetchRatesToHome(
+    db,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.accountCurrency, homeCurrency),
+    })),
+    homeCurrency,
+  );
+
+  const rowsWithHome = rows.map((r) => {
+    const ccy = parseAccountCurrency(r.accountCurrency, homeCurrency);
+    const amountInHome = convertToHome(db, r.amount, ccy, homeCurrency, r.date);
+    return { ...r, amountInHome };
+  });
 
   const uncategorisedCount =
     db
@@ -180,12 +201,13 @@ export default async function TransactionsPage({
       </div>
 
       <TransactionTable
-        rows={rows}
+        rows={rowsWithHome}
         accounts={allAccounts}
         categories={allCategories}
         categoryMains={categoryMains}
         currentFilters={params}
         homeCurrency={homeCurrency}
+        transactionAmountDisplay={transactionAmountDisplay}
       />
     </div>
   );
