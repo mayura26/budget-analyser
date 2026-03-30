@@ -1,5 +1,5 @@
 /**
- * Generates PWA and metadata icons (solid brand color, maskable-safe).
+ * Generates PWA and metadata icons from `public/iconBase.png`.
  * Run: node scripts/generate-pwa-icons.mjs
  */
 import path from "node:path";
@@ -11,28 +11,36 @@ const root = path.join(__dirname, "..");
 const publicDir = path.join(root, "public");
 const appDir = path.join(root, "app");
 
-const brand = { r: 0, g: 59, b: 102, alpha: 1 };
+const baseIconPath = path.join(publicDir, "iconBase.png");
 
-async function writeSquarePng(dir, filename, size) {
-  await sharp({
-    create: {
-      width: size,
-      height: size,
-      channels: 4,
-      background: brand,
-    },
-  })
+async function writeIconPngFromBase(dir, filename, size) {
+  // `iconBase.png` is already square, but `fit: contain` keeps this robust
+  // if the base ever changes.
+  await sharp(baseIconPath)
+    .resize(size, size, {
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
     .png()
     .toFile(path.join(dir, filename));
 }
 
 async function main() {
-  await writeSquarePng(publicDir, "web-app-manifest-192x192.png", 192);
-  await writeSquarePng(publicDir, "web-app-manifest-512x512.png", 512);
-  await writeSquarePng(publicDir, "icon1.png", 32);
-  await writeSquarePng(appDir, "icon1.png", 32);
-  await writeSquarePng(publicDir, "apple-icon.png", 180);
-  await writeSquarePng(publicDir, "favicon.png", 32);
+  await writeIconPngFromBase(
+    publicDir,
+    "web-app-manifest-192x192.png",
+    192,
+  );
+  await writeIconPngFromBase(
+    publicDir,
+    "web-app-manifest-512x512.png",
+    512,
+  );
+  await writeIconPngFromBase(publicDir, "icon1.png", 32);
+  // Used by `components/layout/*` via `import iconSrc from "@/app/icon1.png"`.
+  await writeIconPngFromBase(appDir, "icon1.png", 32);
+  await writeIconPngFromBase(publicDir, "apple-icon.png", 180);
+  await writeIconPngFromBase(publicDir, "favicon.png", 32);
 }
 
 main().catch((err) => {

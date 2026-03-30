@@ -23,7 +23,8 @@ export const metadata: Metadata = {
     "Track your income, expenses, and savings with a personal budget analyser.",
   manifest: "/manifest.json",
   icons: {
-    icon: [{ url: "/icon1.png", type: "image/png" }],
+    // Use the generated favicon so browser tab icons match the brand.
+    icon: [{ url: "/favicon.png", type: "image/png" }],
     shortcut: [{ url: "/favicon.png", type: "image/png" }],
     apple: [{ url: "/apple-icon.png", type: "image/png" }],
   },
