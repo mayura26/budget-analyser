@@ -204,6 +204,19 @@ export type BudgetInsight = {
   message: string;
 };
 
+export type AiBudgetSuggestion = {
+  categoryId: number;
+  categoryName: string;
+  suggestedAmount: number;
+  reasoning: string;
+  trend: "increasing" | "decreasing" | "stable" | "new";
+};
+
+export type AiBudgetSuggestionsResponse = {
+  suggestions: AiBudgetSuggestion[];
+  overallNotes: string;
+};
+
 export type MonthlyTotal = {
   month: string; // YYYY-MM
   income: number;

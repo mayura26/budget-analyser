@@ -1,8 +1,9 @@
 "use client";
 
-import { CalendarClock, Copy, TrendingUp } from "lucide-react";
+import { CalendarClock, Copy, Sparkles, TrendingUp } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { AiBudgetSuggestionsDialog } from "@/components/budget/ai-budget-suggestions-dialog";
 import { BudgetCategoryList } from "@/components/budget/budget-category-list";
 import { BudgetInsightsPanel } from "@/components/budget/budget-insights-panel";
 import { BudgetSummaryStrip } from "@/components/budget/budget-summary-strip";
@@ -39,6 +40,7 @@ export function MonthlyBudgetTab({
   const hasAnyData = rows.some((r) => r.avg3Month > 0);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [showAiDialog, setShowAiDialog] = useState(false);
 
   const handleCopyForward = () => {
     startTransition(async () => {
@@ -106,6 +108,16 @@ export function MonthlyBudgetTab({
                     Start from 3-month averages
                   </Button>
                 )}
+                {aiEnabled && hasAnyData && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAiDialog(true)}
+                    disabled={pending}
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    AI-suggested budget
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -115,6 +127,13 @@ export function MonthlyBudgetTab({
             rows={rows}
             month={month}
             readOnly={readOnly}
+            homeCurrency={homeCurrency}
+          />
+
+          <AiBudgetSuggestionsDialog
+            month={month}
+            open={showAiDialog}
+            onClose={() => setShowAiDialog(false)}
             homeCurrency={homeCurrency}
           />
         </>

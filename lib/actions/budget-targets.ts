@@ -92,6 +92,35 @@ export async function copyBudgetForward(
   return { success: true, data: undefined };
 }
 
+export async function applyAiSuggestions(
+  month: string,
+  entries: { categoryId: number; amount: number }[],
+): Promise<ActionResult> {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return { success: false, error: "Invalid month" };
+  }
+  if (entries.length === 0) {
+    return { success: false, error: "No suggestions to apply" };
+  }
+
+  db.transaction((tx) => {
+    for (const { categoryId, amount } of entries) {
+      const rounded = Math.ceil(amount / 10) * 10;
+      if (rounded > 0) {
+        tx.run(sql`
+          INSERT INTO budgets (month, category_id, target_amount, created_at, updated_at)
+          VALUES (${month}, ${categoryId}, ${rounded}, unixepoch(), unixepoch())
+          ON CONFLICT (month, category_id) DO NOTHING
+        `);
+      }
+    }
+  });
+
+  revalidatePath("/budget");
+  revalidatePath("/dashboard");
+  return { success: true, data: undefined };
+}
+
 export async function initFromAverages(month: string): Promise<ActionResult> {
   if (!/^\d{4}-\d{2}$/.test(month)) {
     return { success: false, error: "Invalid month" };

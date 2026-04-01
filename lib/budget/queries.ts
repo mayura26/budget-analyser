@@ -152,6 +152,75 @@ export async function getHistoricalAverages(
   return map;
 }
 
+export async function getMonthlySpendingByCategory(
+  month: string,
+  homeCurrency: SupportedCurrency,
+  lookback = 6,
+): Promise<Map<number, { month: string; amount: number }[]>> {
+  const prevMonth = addCalendarMonths(month, -1);
+  const months = getMonthsEndingAt(prevMonth, lookback);
+  if (months.length === 0) return new Map();
+
+  const firstStart = getMonthRange(months[0]).start;
+  const lastEnd = getMonthRange(months[months.length - 1]).end;
+
+  const rows = db
+    .select({
+      categoryId: transactions.categoryId,
+      amount: transactions.amount,
+      date: transactions.date,
+      currency: accounts.currency,
+    })
+    .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        gte(transactions.date, firstStart),
+        lte(transactions.date, lastEnd),
+        lt(transactions.amount, sql`0`),
+        or(isNull(categories.type), ne(categories.type, "transfer")),
+      ),
+    )
+    .all();
+
+  await prefetchRatesToHome(
+    db,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.currency, homeCurrency),
+    })),
+    homeCurrency,
+  );
+
+  const map = new Map<number, Map<string, number>>();
+  for (const row of rows) {
+    if (row.categoryId == null) continue;
+    const cur = parseAccountCurrency(row.currency, homeCurrency);
+    const conv = convertToHome(
+      db,
+      Math.abs(row.amount),
+      cur,
+      homeCurrency,
+      row.date,
+    );
+    const rowMonth = row.date.slice(0, 7);
+    if (!map.has(row.categoryId)) map.set(row.categoryId, new Map());
+    const catMap = map.get(row.categoryId)!;
+    catMap.set(rowMonth, (catMap.get(rowMonth) ?? 0) + conv);
+  }
+
+  const result = new Map<number, { month: string; amount: number }[]>();
+  for (const [categoryId, monthMap] of map) {
+    const entries = months.map((m) => ({
+      month: m,
+      amount: Math.round((monthMap.get(m) ?? 0) * 100) / 100,
+    }));
+    result.set(categoryId, entries);
+  }
+  return result;
+}
+
 export async function getScheduledAmountsByCategory(
   month: string,
   homeCurrency: SupportedCurrency,
