@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
 
+const PWA_PUBLIC_PATHS = [
+  "/manifest.json",
+  "/sw.js",
+  "/offline",
+  "/favicon.png",
+  "/apple-icon.png",
+  "/web-app-manifest-192x192.png",
+  "/web-app-manifest-512x512.png",
+  "/icon1.png",
+] as const;
+
 test.describe("Auth", () => {
   test("login page renders", async ({ page }) => {
     await page.goto("/login");
@@ -41,6 +52,21 @@ test.describe("Auth", () => {
     const page = await context.newPage();
     await page.goto("/accounts");
     await expect(page).toHaveURL("/login");
+    await context.close();
+  });
+
+  test("unauthenticated PWA assets stay public", async ({ browser }) => {
+    const context = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
+    const page = await context.newPage();
+
+    for (const path of PWA_PUBLIC_PATHS) {
+      const response = await page.goto(path);
+      expect(response?.ok()).toBeTruthy();
+      expect(new URL(page.url()).pathname).toBe(path);
+    }
+
     await context.close();
   });
 

@@ -25,7 +25,7 @@ test.describe("Accounts", () => {
       .click();
 
     // Color swatch
-    await page.locator('label:has(input[value="#3b82f6"])').click();
+    await dialog.getByRole("button", { name: "Colour #3b82f6" }).click();
 
     await dialog.getByRole("button", { name: "Create account" }).click();
 

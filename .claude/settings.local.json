@@ -35,7 +35,8 @@
       "Bash(DATABASE_PATH=./data/test.db APP_PASSWORD=changeme JWT_SECRET=test node -e \":*)",
       "Bash(taskkill:*)",
       "Bash(sqlite3 data/test.db \"SELECT * FROM __drizzle_migrations ORDER BY created_at;\")",
-      "Bash(wait)"
+      "Bash(wait)",
+      "Bash(cat app/\\\\\\(app\\\\\\)/transactions/new/page.tsx)"
     ]
   }
 }
