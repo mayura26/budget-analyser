@@ -29,6 +29,15 @@ function isLikelyIOS(): boolean {
   );
 }
 
+/** Phones / tablets — exclude desktop browsers (including desktop Chrome that can fire `beforeinstallprompt`). */
+function isLikelyMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (isLikelyIOS()) return true;
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua)) return true;
+  return /webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+}
+
 export function PwaInstallPrompt() {
   const [mode, setMode] = useState<"android" | "ios" | null>(null);
   const [deferredPrompt, setDeferredPrompt] =
@@ -54,6 +63,7 @@ export function PwaInstallPrompt() {
 
   useEffect(() => {
     if (isStandalone()) return;
+    if (!isLikelyMobileDevice()) return;
 
     try {
       if (localStorage.getItem(DISMISS_KEY) === "1") return;
