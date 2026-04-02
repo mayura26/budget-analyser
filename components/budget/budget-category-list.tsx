@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { useActionState, useRef, useState, useTransition } from "react";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,10 +11,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { transactionsInRangeUrl } from "@/lib/analytics/transaction-links";
 import { saveBudgetTargets } from "@/lib/actions/budget-targets";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { cn, currencySymbol, formatCurrency } from "@/lib/utils";
-import type { BudgetCategoryRow } from "@/types";
+import type { AnalyticsExpenseTransactionLine, BudgetCategoryRow } from "@/types";
 
 type GroupedRows = { group: string; rows: BudgetCategoryRow[] }[];
 
@@ -29,6 +31,11 @@ function groupRows(rows: BudgetCategoryRow[]): GroupedRows {
     .map(([group, rows]) => ({ group, rows }));
 }
 
+const gridColsBase =
+  "grid-cols-[auto_1fr_auto_auto_1fr_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
+const gridColsDrilldown =
+  "grid-cols-[auto_auto_1fr_auto_auto_1fr_auto] sm:grid-cols-[auto_auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
+
 function CategoryRow({
   row,
   editingId,
@@ -36,6 +43,11 @@ function CategoryRow({
   onBlur,
   readOnly,
   homeCurrency,
+  expenseTransactionsByCategory,
+  monthRangeStart,
+  monthRangeEnd,
+  expanded,
+  onToggleExpand,
 }: {
   row: BudgetCategoryRow;
   editingId: number | null;
@@ -43,6 +55,13 @@ function CategoryRow({
   onBlur: () => void;
   readOnly: boolean;
   homeCurrency: SupportedCurrency;
+  expenseTransactionsByCategory?:
+    | Record<string, AnalyticsExpenseTransactionLine[]>
+    | undefined;
+  monthRangeStart: string;
+  monthRangeEnd: string;
+  expanded: boolean;
+  onToggleExpand: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const isEditing = editingId === row.categoryId;
@@ -54,141 +73,218 @@ function CategoryRow({
   const belowScheduled =
     row.targetAmount > 0 && row.targetAmount < row.scheduledAmount;
 
+  const catKey = String(row.categoryId);
+  const lines = expenseTransactionsByCategory?.[catKey] ?? [];
+  const drilldownContext = expenseTransactionsByCategory != null;
+  const canDrillDown =
+    readOnly && row.actualSpent > 0 && lines.length > 0;
+
+  const gridClass = drilldownContext ? gridColsDrilldown : gridColsBase;
+
   return (
-    <div className="grid grid-cols-[auto_1fr_auto_auto_1fr_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem] items-center gap-x-2 sm:gap-x-3 py-2 px-2 sm:px-3 hover:bg-muted/50 rounded-md transition-colors">
-      {/* Color dot */}
+    <div className="rounded-md">
       <div
-        className="h-3 w-3 rounded-full shrink-0"
-        style={{ backgroundColor: row.color }}
-      />
-
-      {/* Category name */}
-      <div className="min-w-0 truncate text-sm">{row.categoryName}</div>
-
-      {/* Target (editable) */}
-      <div className="text-right">
-        {isEditing && !readOnly ? (
-          <div className="relative">
-            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-              {currencySymbol(homeCurrency)}
-            </span>
-            <input
-              ref={inputRef}
-              name={`target_${row.categoryId}`}
-              type="number"
-              step="10"
-              min="0"
-              defaultValue={row.targetAmount || ""}
-              className="w-full h-7 rounded border bg-background px-1.5 pl-4 text-right text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
-              onBlur={onBlur}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === "Escape") {
-                  e.currentTarget.blur();
-                }
-              }}
-            />
-            {(row.avg3Month > 0 || row.scheduledAmount > 0) && (
-              <div className="absolute top-full left-0 right-0 mt-0.5 text-[10px] text-muted-foreground whitespace-nowrap z-10 bg-popover rounded px-1 py-0.5 shadow-sm border">
-                {row.avg3Month > 0 && (
-                  <span>
-                    Avg: {formatCurrency(row.avg3Month, homeCurrency)}/mo
-                  </span>
+        className={cn(
+          "grid items-center gap-x-2 sm:gap-x-3 py-2 px-2 sm:px-3 hover:bg-muted/50 rounded-md transition-colors",
+          gridClass,
+        )}
+      >
+        {drilldownContext ? (
+          <div className="w-6 shrink-0 flex justify-center">
+            {canDrillDown ? (
+              <button
+                type="button"
+                className="p-0.5 rounded hover:bg-muted text-foreground"
+                aria-expanded={expanded}
+                aria-label={`${expanded ? "Hide" : "Show"} transactions for ${row.categoryName}`}
+                onClick={onToggleExpand}
+              >
+                {expanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 )}
-                {row.avg3Month > 0 && row.scheduledAmount > 0 && (
-                  <span> &middot; </span>
-                )}
-                {row.scheduledAmount > 0 && (
-                  <span>
-                    Recurring:{" "}
-                    {formatCurrency(row.scheduledAmount, homeCurrency)}/mo
-                  </span>
-                )}
-              </div>
-            )}
+              </button>
+            ) : null}
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => !readOnly && onEdit(row.categoryId)}
-            className={cn(
-              "text-sm tabular-nums px-1.5 py-0.5 rounded transition-colors",
-              !readOnly && "hover:bg-muted cursor-pointer",
-              row.targetAmount === 0 && "text-muted-foreground",
-            )}
-            disabled={readOnly}
-          >
-            {row.targetAmount > 0 ? (
-              <span className="flex items-center gap-1 justify-end">
-                {formatCurrency(row.targetAmount, homeCurrency)}
-                {belowScheduled && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <AlertTriangle className="h-3 w-3 text-amber-500" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Target is below recurring scheduled amount (
-                        {formatCurrency(row.scheduledAmount, homeCurrency)}/mo)
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+        ) : null}
+
+        {/* Color dot */}
+        <div
+          className="h-3 w-3 rounded-full shrink-0"
+          style={{ backgroundColor: row.color }}
+        />
+
+        {/* Category name */}
+        <div className="min-w-0 truncate text-sm">{row.categoryName}</div>
+
+        {/* Target (editable) */}
+        <div className="text-right">
+          {isEditing && !readOnly ? (
+            <div className="relative">
+              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                {currencySymbol(homeCurrency)}
               </span>
-            ) : (
-              <span className="italic">Set target</span>
-            )}
-          </button>
-        )}
-      </div>
+              <input
+                ref={inputRef}
+                name={`target_${row.categoryId}`}
+                type="number"
+                step="10"
+                min="0"
+                defaultValue={row.targetAmount || ""}
+                className="w-full h-7 rounded border bg-background px-1.5 pl-4 text-right text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+                onBlur={onBlur}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape") {
+                    e.currentTarget.blur();
+                  }
+                }}
+              />
+              {(row.avg3Month > 0 || row.scheduledAmount > 0) && (
+                <div className="absolute top-full left-0 right-0 mt-0.5 text-[10px] text-muted-foreground whitespace-nowrap z-10 bg-popover rounded px-1 py-0.5 shadow-sm border">
+                  {row.avg3Month > 0 && (
+                    <span>
+                      Avg: {formatCurrency(row.avg3Month, homeCurrency)}/mo
+                    </span>
+                  )}
+                  {row.avg3Month > 0 && row.scheduledAmount > 0 && (
+                    <span> &middot; </span>
+                  )}
+                  {row.scheduledAmount > 0 && (
+                    <span>
+                      Recurring:{" "}
+                      {formatCurrency(row.scheduledAmount, homeCurrency)}/mo
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => !readOnly && onEdit(row.categoryId)}
+              className={cn(
+                "text-sm tabular-nums px-1.5 py-0.5 rounded transition-colors",
+                !readOnly && "hover:bg-muted cursor-pointer",
+                row.targetAmount === 0 && "text-muted-foreground",
+              )}
+              disabled={readOnly}
+            >
+              {row.targetAmount > 0 ? (
+                <span className="flex items-center gap-1 justify-end">
+                  {formatCurrency(row.targetAmount, homeCurrency)}
+                  {belowScheduled && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Target is below recurring scheduled amount (
+                          {formatCurrency(row.scheduledAmount, homeCurrency)}
+                          /mo)
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </span>
+              ) : (
+                <span className="italic">Set target</span>
+              )}
+            </button>
+          )}
+        </div>
 
-      {/* Actual spent */}
-      <div className="text-right text-sm tabular-nums">
-        {row.actualSpent > 0 ? (
-          <span className="text-red-600 dark:text-red-400">
-            {formatCurrency(row.actualSpent, homeCurrency)}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">
-            {formatCurrency(0, homeCurrency)}
-          </span>
-        )}
-      </div>
-
-      {/* Progress bar */}
-      <div className="hidden sm:block">
-        {row.targetAmount > 0 ? (
-          <div className="flex items-center gap-2">
-            <BudgetProgressBar
-              spent={row.actualSpent}
-              target={row.targetAmount}
-              className="flex-1"
-            />
-            <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
-              {pct}%
+        {/* Actual spent */}
+        <div className="text-right text-sm tabular-nums">
+          {row.actualSpent > 0 ? (
+            <span className="text-red-600 dark:text-red-400">
+              {formatCurrency(row.actualSpent, homeCurrency)}
             </span>
-          </div>
-        ) : (
-          <div className="h-2" />
-        )}
+          ) : (
+            <span className="text-muted-foreground">
+              {formatCurrency(0, homeCurrency)}
+            </span>
+          )}
+        </div>
+
+        {/* Progress bar */}
+        <div className="hidden sm:block">
+          {row.targetAmount > 0 ? (
+            <div className="flex items-center gap-2">
+              <BudgetProgressBar
+                spent={row.actualSpent}
+                target={row.targetAmount}
+                className="flex-1"
+              />
+              <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
+                {pct}%
+              </span>
+            </div>
+          ) : (
+            <div className="h-2" />
+          )}
+        </div>
+
+        {/* Remaining */}
+        <div className="text-right text-sm tabular-nums">
+          {row.targetAmount > 0 ? (
+            <span
+              className={
+                remaining >= 0
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }
+            >
+              {remaining >= 0 ? "" : "-"}
+              {formatCurrency(Math.abs(remaining), homeCurrency)}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">&mdash;</span>
+          )}
+        </div>
       </div>
 
-      {/* Remaining */}
-      <div className="text-right text-sm tabular-nums">
-        {row.targetAmount > 0 ? (
-          <span
-            className={
-              remaining >= 0
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-600 dark:text-red-400"
-            }
-          >
-            {remaining >= 0 ? "" : "-"}
-            {formatCurrency(Math.abs(remaining), homeCurrency)}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">&mdash;</span>
-        )}
-      </div>
+      {expanded && canDrillDown && (
+        <div className="mt-1 mb-2 ml-2 sm:ml-8 pl-3 border-l border-muted space-y-1">
+          <div className="flex justify-end pb-1">
+            <Link
+              href={transactionsInRangeUrl({
+                from: monthRangeStart,
+                to: monthRangeEnd,
+                categoryId: row.categoryId,
+              })}
+              className="text-xs text-primary hover:underline"
+            >
+              Transactions
+            </Link>
+          </div>
+          {lines.map((t) => {
+            const txnPct =
+              row.actualSpent > 0
+                ? Math.round((t.converted / row.actualSpent) * 100)
+                : 0;
+            return (
+              <div
+                key={t.id}
+                className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-0.5 py-1.5 px-2 rounded bg-muted/25 text-muted-foreground text-sm"
+              >
+                <div className="min-w-0">
+                  <div className="text-xs tabular-nums">{t.date}</div>
+                  <div className="text-foreground/90 truncate">{t.description}</div>
+                  <div className="text-xs truncate">{t.accountName}</div>
+                </div>
+                <div className="text-right tabular-nums text-foreground sm:col-start-2 sm:row-span-2 sm:self-center">
+                  {formatCurrency(t.converted, homeCurrency)}
+                </div>
+                <div className="text-right text-xs tabular-nums hidden sm:block sm:col-start-3 sm:row-span-2 sm:self-center">
+                  {txnPct}%
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -198,26 +294,49 @@ export function BudgetCategoryList({
   month,
   readOnly,
   homeCurrency,
+  expenseTransactionsByCategory,
+  monthRangeStart,
+  monthRangeEnd,
 }: {
   rows: BudgetCategoryRow[];
   month: string;
   readOnly: boolean;
   homeCurrency: SupportedCurrency;
+  expenseTransactionsByCategory?:
+    | Record<string, AnalyticsExpenseTransactionLine[]>
+    | undefined;
+  monthRangeStart: string;
+  monthRangeEnd: string;
 }) {
   const groups = groupRows(rows);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(groups.map((g) => g.group)),
+  );
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(
+    () => new Set(),
   );
   const [editingId, setEditingId] = useState<number | null>(null);
   const [, formAction] = useActionState(saveBudgetTargets, null);
   const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
+  const drilldownContext = expenseTransactionsByCategory != null;
+  const headerGrid = drilldownContext ? gridColsDrilldown : gridColsBase;
+
   const toggleGroup = (group: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
       else next.add(group);
+      return next;
+    });
+  };
+
+  const toggleCategoryExpand = (categoryId: number) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   };
@@ -255,7 +374,13 @@ export function BudgetCategoryList({
           )}
 
           {/* Column headers */}
-          <div className="grid grid-cols-[auto_1fr_auto_auto_1fr_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem] items-center gap-x-2 sm:gap-x-3 px-2 sm:px-3 pb-2 border-b text-xs font-medium text-muted-foreground">
+          <div
+            className={cn(
+              "grid items-center gap-x-2 sm:gap-x-3 px-2 sm:px-3 pb-2 border-b text-xs font-medium text-muted-foreground",
+              headerGrid,
+            )}
+          >
+            {drilldownContext ? <div /> : null}
             <div />
             <div>Category</div>
             <div className="text-right">Target</div>
@@ -302,6 +427,15 @@ export function BudgetCategoryList({
                         onBlur={handleBlur}
                         readOnly={readOnly}
                         homeCurrency={homeCurrency}
+                        expenseTransactionsByCategory={
+                          expenseTransactionsByCategory
+                        }
+                        monthRangeStart={monthRangeStart}
+                        monthRangeEnd={monthRangeEnd}
+                        expanded={expandedCategories.has(row.categoryId)}
+                        onToggleExpand={() =>
+                          toggleCategoryExpand(row.categoryId)
+                        }
                       />
                     ))}
                   </div>

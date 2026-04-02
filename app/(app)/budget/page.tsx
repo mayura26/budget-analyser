@@ -14,6 +14,7 @@ import {
   convertOccurrencesToHomeCurrency,
   getTotalBalanceInHomeCurrency,
 } from "@/lib/budget/home-currency-cashflow";
+import { getExpenseDebitLinesByCategoryForRange } from "@/lib/analytics/queries";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -35,6 +36,7 @@ import {
   enumerateMonthsInclusive,
   formatCurrency,
   getCurrentMonth,
+  getMonthRange,
   parseMonthParam,
 } from "@/lib/utils";
 import type { Category } from "@/types";
@@ -145,6 +147,16 @@ export default async function BudgetPage({
   const hasPrevBudget = hasBudgetTargets(previousMonth);
   const isReadOnly = selectedMonth < currentMonth;
 
+  const { start: monthRangeStart, end: monthRangeEnd } =
+    getMonthRange(selectedMonth);
+  const expenseTransactionsByCategory = isReadOnly
+    ? await getExpenseDebitLinesByCategoryForRange(
+        monthRangeStart,
+        monthRangeEnd,
+        homeCurrency,
+      )
+    : undefined;
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -181,6 +193,9 @@ export default async function BudgetPage({
             aiEnabled={aiEnabled}
             readOnly={isReadOnly}
             homeCurrency={homeCurrency}
+            expenseTransactionsByCategory={expenseTransactionsByCategory}
+            monthRangeStart={monthRangeStart}
+            monthRangeEnd={monthRangeEnd}
           />
         </TabsContent>
 

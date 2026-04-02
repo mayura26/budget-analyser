@@ -15,7 +15,11 @@ import {
 } from "@/lib/actions/budget-targets";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatMonth } from "@/lib/utils";
-import type { BudgetCategoryRow, BudgetSummary } from "@/types";
+import type {
+  AnalyticsExpenseTransactionLine,
+  BudgetCategoryRow,
+  BudgetSummary,
+} from "@/types";
 
 export function MonthlyBudgetTab({
   month,
@@ -26,6 +30,9 @@ export function MonthlyBudgetTab({
   aiEnabled,
   readOnly,
   homeCurrency,
+  expenseTransactionsByCategory,
+  monthRangeStart,
+  monthRangeEnd,
 }: {
   month: string;
   rows: BudgetCategoryRow[];
@@ -35,6 +42,11 @@ export function MonthlyBudgetTab({
   aiEnabled: boolean;
   readOnly: boolean;
   homeCurrency: SupportedCurrency;
+  expenseTransactionsByCategory?:
+    | Record<string, AnalyticsExpenseTransactionLine[]>
+    | undefined;
+  monthRangeStart: string;
+  monthRangeEnd: string;
 }) {
   const hasBudget = rows.some((r) => r.targetAmount > 0);
   const hasAnyData = rows.some((r) => r.avg3Month > 0);
@@ -67,6 +79,9 @@ export function MonthlyBudgetTab({
             month={month}
             readOnly={readOnly}
             homeCurrency={homeCurrency}
+            expenseTransactionsByCategory={expenseTransactionsByCategory}
+            monthRangeStart={monthRangeStart}
+            monthRangeEnd={monthRangeEnd}
           />
 
           {aiEnabled && (
@@ -128,6 +143,9 @@ export function MonthlyBudgetTab({
             month={month}
             readOnly={readOnly}
             homeCurrency={homeCurrency}
+            expenseTransactionsByCategory={expenseTransactionsByCategory}
+            monthRangeStart={monthRangeStart}
+            monthRangeEnd={monthRangeEnd}
           />
 
           <AiBudgetSuggestionsDialog

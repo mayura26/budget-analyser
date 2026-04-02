@@ -402,3 +402,13 @@ export async function getCategorySpendingHierarchy(
   const loaded = await loadConvertedRows(start, end, homeCurrency);
   return buildCategoryHierarchy(loaded);
 }
+
+/** Expense debits in home currency, grouped by category id (`"none"` for uncategorised). */
+export async function getExpenseDebitLinesByCategoryForRange(
+  start: string,
+  end: string,
+  homeCurrency: SupportedCurrency,
+): Promise<Record<string, AnalyticsExpenseTransactionLine[]>> {
+  const loaded = await loadConvertedRows(start, end, homeCurrency);
+  return aggregateExpenseDebitsByCategory(loaded);
+}

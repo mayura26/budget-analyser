@@ -76,6 +76,31 @@ test.describe("Budget", () => {
     await expect(page.getByText("Left").first()).toBeVisible();
   });
 
+  test("past month monthly budget tab loads; optional transaction drill-down", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    await page.goto(`/budget?month=${prevMonth}`);
+    await expect(
+      page.getByRole("heading", { name: "Budget Planner" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: "Monthly Budget" }),
+    ).toHaveAttribute("data-state", "active");
+
+    const expandTxn = page
+      .getByRole("button", { name: /Show transactions for/i })
+      .first();
+    if (await expandTxn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await expandTxn.click();
+      await expect(
+        page.getByRole("link", { name: "Transactions" }).first(),
+      ).toBeVisible();
+    }
+  });
+
   test("month picker is visible and functional", async ({ page }) => {
     await page.goto("/budget");
     // Month picker should show the current month
