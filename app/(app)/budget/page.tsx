@@ -149,13 +149,12 @@ export default async function BudgetPage({
 
   const { start: monthRangeStart, end: monthRangeEnd } =
     getMonthRange(selectedMonth);
-  const expenseTransactionsByCategory = isReadOnly
-    ? await getExpenseDebitLinesByCategoryForRange(
-        monthRangeStart,
-        monthRangeEnd,
-        homeCurrency,
-      )
-    : undefined;
+  const expenseTransactionsByCategory =
+    await getExpenseDebitLinesByCategoryForRange(
+      monthRangeStart,
+      monthRangeEnd,
+      homeCurrency,
+    );
 
   return (
     <div className="p-4 sm:p-6 space-y-6">

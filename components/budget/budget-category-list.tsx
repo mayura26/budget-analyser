@@ -14,7 +14,12 @@ import {
 import { transactionsInRangeUrl } from "@/lib/analytics/transaction-links";
 import { saveBudgetTargets } from "@/lib/actions/budget-targets";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { cn, currencySymbol, formatCurrency } from "@/lib/utils";
+import {
+  budgetCategoryShortTitle,
+  cn,
+  currencySymbol,
+  formatCurrency,
+} from "@/lib/utils";
 import type { AnalyticsExpenseTransactionLine, BudgetCategoryRow } from "@/types";
 
 type GroupedRows = { group: string; rows: BudgetCategoryRow[] }[];
@@ -76,8 +81,7 @@ function CategoryRow({
   const catKey = String(row.categoryId);
   const lines = expenseTransactionsByCategory?.[catKey] ?? [];
   const drilldownContext = expenseTransactionsByCategory != null;
-  const canDrillDown =
-    readOnly && row.actualSpent > 0 && lines.length > 0;
+  const canDrillDown = lines.length > 0;
 
   const gridClass = drilldownContext ? gridColsDrilldown : gridColsBase;
 
@@ -115,8 +119,17 @@ function CategoryRow({
           style={{ backgroundColor: row.color }}
         />
 
-        {/* Category name */}
-        <div className="min-w-0 truncate text-sm">{row.categoryName}</div>
+        {/* Category name: short on mobile when name has (…) or […] */}
+        <div
+          className="min-w-0 truncate text-sm"
+          title={row.categoryName}
+          aria-label={row.categoryName}
+        >
+          <span className="sm:hidden">
+            {budgetCategoryShortTitle(row.categoryName)}
+          </span>
+          <span className="hidden sm:inline">{row.categoryName}</span>
+        </div>
 
         {/* Target (editable) */}
         <div className="text-right">
@@ -409,7 +422,12 @@ export function BudgetCategoryList({
                   ) : (
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
-                  <span>{group}</span>
+                  <span title={group} aria-label={group}>
+                    <span className="sm:hidden">
+                      {budgetCategoryShortTitle(group)}
+                    </span>
+                    <span className="hidden sm:inline">{group}</span>
+                  </span>
                   <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
                     {formatCurrency(groupSpent, homeCurrency)} /{" "}
                     {formatCurrency(groupBudgeted, homeCurrency)}

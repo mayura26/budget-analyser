@@ -41,6 +41,17 @@ export function formatMonth(monthStr: string): string {
   return date.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
 }
 
+/** Budget list: main title before the first `(` or `[` (for narrow layouts). */
+export function budgetCategoryShortTitle(name: string): string {
+  let cut = name.length;
+  const iParen = name.indexOf("(");
+  const iBracket = name.indexOf("[");
+  if (iParen >= 0) cut = Math.min(cut, iParen);
+  if (iBracket >= 0) cut = Math.min(cut, iBracket);
+  const shortened = name.slice(0, cut).trimEnd();
+  return shortened.length > 0 ? shortened : name;
+}
+
 export function getCurrentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

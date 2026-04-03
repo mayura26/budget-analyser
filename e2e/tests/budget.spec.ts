@@ -101,6 +101,49 @@ test.describe("Budget", () => {
     }
   });
 
+  test("current month monthly budget tab; optional transaction drill-down", async ({
+    page,
+  }) => {
+    await page.goto("/budget");
+    await expect(
+      page.getByRole("heading", { name: "Budget Planner" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: "Monthly Budget" }),
+    ).toHaveAttribute("data-state", "active");
+
+    const expandTxn = page
+      .getByRole("button", { name: /Show transactions for/i })
+      .first();
+    if (await expandTxn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await expandTxn.click();
+      await expect(
+        page.getByRole("link", { name: "Transactions" }).first(),
+      ).toBeVisible();
+    }
+  });
+
+  test("mobile budget list shows short category title before parenthetical", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/budget");
+    await expect(
+      page
+        .getByText("Set up your budget for")
+        .or(page.getByText("Total Budgeted")),
+    ).toBeVisible({ timeout: 10000 });
+
+    await expect(
+      page
+        .getByText("Housing (rent, strata)", { exact: true })
+        .filter({ visible: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Housing", { exact: true }).filter({ visible: true }).first(),
+    ).toBeVisible();
+  });
+
   test("month picker is visible and functional", async ({ page }) => {
     await page.goto("/budget");
     // Month picker should show the current month
