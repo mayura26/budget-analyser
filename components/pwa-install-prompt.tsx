@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+/** sessionStorage key — once dismissed (or shown) it stays hidden for the rest of this visit. */
 const DISMISS_KEY = "pwa-install-banner-dismissed";
 
 /** Chromium install prompt; not in all TypeScript `lib` targets. */
@@ -45,7 +46,7 @@ export function PwaInstallPrompt() {
 
   const dismiss = useCallback(() => {
     try {
-      localStorage.setItem(DISMISS_KEY, "1");
+      sessionStorage.setItem(DISMISS_KEY, "1");
     } catch {
       /* private mode */
     }
@@ -65,16 +66,21 @@ export function PwaInstallPrompt() {
     if (isStandalone()) return;
     if (!isLikelyMobileDevice()) return;
 
-    try {
-      if (localStorage.getItem(DISMISS_KEY) === "1") return;
-    } catch {
-      /* private mode */
-    }
+    const wasDismissed = () => {
+      try {
+        return sessionStorage.getItem(DISMISS_KEY) === "1";
+      } catch {
+        return false;
+      }
+    };
+
+    if (wasDismissed()) return;
 
     let iosTimer: ReturnType<typeof setTimeout>;
 
     const onBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      if (wasDismissed()) return;
       setDeferredPrompt(e as InstallPromptEvent);
       setMode("android");
       clearTimeout(iosTimer);
@@ -84,6 +90,7 @@ export function PwaInstallPrompt() {
 
     if (isLikelyIOS()) {
       iosTimer = setTimeout(() => {
+        if (wasDismissed()) return;
         setMode((prev) => (prev === null ? "ios" : prev));
       }, 2500);
     }
