@@ -4,6 +4,7 @@ import {
   isOpenAIReasoningChatModel,
   openAIModelOnlySupportsDefaultTemperature,
 } from "@/lib/openai/model-params";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import type { Category } from "@/types";
 
 export type AICategorisationResult = {
@@ -31,6 +32,7 @@ export async function categoriseWithAI(
   categories: Category[],
   apiKey: string,
   model = "gpt-4o-mini",
+  homeCurrency: SupportedCurrency,
 ): Promise<AICategorisationResult[]> {
   const client = new OpenAI({ apiKey });
 
@@ -46,7 +48,7 @@ export async function categoriseWithAI(
   const transactionList = transactions
     .map(
       (t) =>
-        `ID ${t.id}: "${t.normalised}" | AUD ${t.amount.toFixed(2)} | ${t.date}${t.accountName ? ` | ${t.accountName}` : ""}`,
+        `ID ${t.id}: "${t.normalised}" | ${homeCurrency} ${t.amount.toFixed(2)} | ${t.date}${t.accountName ? ` | ${t.accountName}` : ""}`,
     )
     .join("\n");
 

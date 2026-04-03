@@ -28,6 +28,7 @@ import {
 } from "@/lib/actions/categories";
 import type { RuleBuilderTransactionRow } from "@/lib/actions/rule-builder";
 import { getRuleBuilderTransactionSample } from "@/lib/actions/rule-builder";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category, RuleDraftInput } from "@/types";
 
@@ -43,8 +44,10 @@ function ruleKey(r: RuleDraftInput): string {
 
 export function RuleBuilderChatDialog({
   categories,
+  homeCurrency,
 }: {
   categories: Category[];
+  homeCurrency: SupportedCurrency;
 }) {
   const [open, setOpen] = useState(false);
   const [loadingSample, setLoadingSample] = useState(false);
@@ -332,7 +335,7 @@ export function RuleBuilderChatDialog({
                             ) : null}
                           </td>
                           <td className="p-2 text-right tabular-nums whitespace-nowrap">
-                            {formatCurrency(t.amount)}
+                            {formatCurrency(t.amount, homeCurrency)}
                           </td>
                         </tr>
                       );

@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { addAIScheduleSuggestion } from "@/lib/actions/scheduled";
+import type { SupportedCurrency } from "@/lib/currency/supported";
+import { formatCurrency } from "@/lib/utils";
 import type { Category } from "@/types";
 
 interface Suggestion {
@@ -38,6 +40,7 @@ function suggestionKey(s: Suggestion): string {
 
 interface Props {
   categories: Category[];
+  homeCurrency: SupportedCurrency;
 }
 
 type DialogError = {
@@ -45,7 +48,10 @@ type DialogError = {
   showSettingsLink?: boolean;
 };
 
-export function AISchedulerDialog({ categories: _categories }: Props) {
+export function AISchedulerDialog({
+  categories: _categories,
+  homeCurrency,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<DialogError | null>(null);
@@ -174,11 +180,8 @@ export function AISchedulerDialog({ categories: _categories }: Props) {
                           isIncome ? "text-green-600" : "text-red-600"
                         }`}
                       >
-                        {isIncome ? "+" : "-"}$
-                        {Math.abs(s.amount).toLocaleString("en-AU", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {isIncome ? "+" : "-"}
+                        {formatCurrency(s.amount, homeCurrency)}
                       </span>
                     </div>
 

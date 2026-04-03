@@ -6,6 +6,7 @@ import {
   extractProposedRulesFromAssistantContent,
   truncateForPrompt,
 } from "@/lib/categorisation/rule-builder-chat";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { settings } from "@/lib/db/schema";
 import {
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
     .where(eq(settings.key, "openai_model"))
     .get();
   const model = modelSetting?.value ?? "gpt-4o-mini";
+  const homeCurrency = getHomeCurrency();
 
   const byId = new Map(categories.map((c) => [c.id, c]));
   const categoryList = categories
@@ -95,11 +97,13 @@ export async function POST(req: NextRequest) {
         t.categoryName != null && t.categoryName !== ""
           ? `current_cat: ${t.categoryName} (id ${t.categoryId ?? "—"})`
           : "current_cat: none";
-      return `id=${t.id} | ${t.date} | "${norm}" | AUD ${t.amount.toFixed(2)} | ${cat}`;
+      return `id=${t.id} | ${t.date} | "${norm}" | ${homeCurrency} ${t.amount.toFixed(2)} | ${cat}`;
     })
     .join("\n");
 
   const systemPrompt = `You help users build categorisation rules for bank transactions. Rules match the **normalised** description text (uppercase, simplified).
+
+Amounts in the sample are in the user's home currency (${homeCurrency}).
 
 Available sub-categories (use categoryId when proposing rules):
 ${categoryList}

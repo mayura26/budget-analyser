@@ -10,6 +10,8 @@ import {
 } from "@/lib/categories/assignable";
 import { categoriseWithAI } from "@/lib/categorisation/ai-client";
 import { categoriseTransactions } from "@/lib/categorisation/engine";
+import { amountsInHomeCurrency } from "@/lib/currency/convert";
+import { getHomeCurrency } from "@/lib/currency/home";
 import {
   findMatchingRule,
   matchRule,
@@ -501,19 +503,30 @@ export async function getAISuggestions(
         .where(eq(settings.key, "openai_model"))
         .get();
       const model = modelSetting?.value ?? "gpt-4o-mini";
+      const homeCurrency = getHomeCurrency();
+      const amountsHome = await amountsInHomeCurrency(
+        db,
+        needsAI.map((t) => ({
+          amount: t.amount,
+          date: t.date,
+          accountCurrency: t.accountCurrency,
+        })),
+        homeCurrency,
+      );
 
       try {
         const aiResults = await categoriseWithAI(
-          needsAI.map((t) => ({
+          needsAI.map((t, i) => ({
             id: t.id,
             normalised: t.normalised,
-            amount: t.amount,
+            amount: amountsHome[i] ?? t.amount,
             date: t.date,
             accountName: t.accountName,
           })),
           assignableForAi,
           apiKey,
           model,
+          homeCurrency,
         );
 
         const aiMap = new Map(aiResults.map((r) => [r.transactionId, r]));

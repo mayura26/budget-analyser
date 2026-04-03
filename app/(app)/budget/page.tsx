@@ -281,6 +281,7 @@ export default async function BudgetPage({
             categories={allCategories}
             categoryMains={categoryMains}
             aiEnabled={aiEnabled}
+            homeCurrency={homeCurrency}
           />
         </TabsContent>
       </Tabs>

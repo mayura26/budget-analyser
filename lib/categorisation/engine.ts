@@ -1,6 +1,9 @@
 import { desc, eq, inArray } from "drizzle-orm";
+import { amountsInHomeCurrency } from "@/lib/currency/convert";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import {
+  accounts,
   categories,
   categorisationRules,
   settings,
@@ -27,10 +30,16 @@ export async function categoriseTransactions(
   // Load all categories
   const allCategories = db.select().from(categories).all() as Category[];
 
-  // Load transactions
   const txns = db
-    .select()
+    .select({
+      id: transactions.id,
+      normalised: transactions.normalised,
+      amount: transactions.amount,
+      date: transactions.date,
+      accountCurrency: accounts.currency,
+    })
     .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
     .where(inArray(transactions.id, transactionIds))
     .all();
 
@@ -68,21 +77,32 @@ export async function categoriseTransactions(
     .get();
 
   const model = modelSetting?.value ?? "gpt-4o-mini";
+  const homeCurrency = getHomeCurrency();
 
   // Process in batches
   for (let i = 0; i < uncategorised.length; i += AI_BATCH_SIZE) {
     const batch = uncategorised.slice(i, i + AI_BATCH_SIZE);
     try {
-      const results = await categoriseWithAI(
+      const amountsHome = await amountsInHomeCurrency(
+        db,
         batch.map((t) => ({
+          amount: t.amount,
+          date: t.date,
+          accountCurrency: t.accountCurrency,
+        })),
+        homeCurrency,
+      );
+      const results = await categoriseWithAI(
+        batch.map((t, j) => ({
           id: t.id,
           normalised: t.normalised,
-          amount: t.amount,
+          amount: amountsHome[j] ?? t.amount,
           date: t.date,
         })),
         allCategories,
         apiKey,
         model,
+        homeCurrency,
       );
 
       for (const result of results) {

@@ -7,8 +7,15 @@ import {
   isAssignableCategoryId,
 } from "@/lib/categories/assignable";
 import { categoriseWithAI } from "@/lib/categorisation/ai-client";
+import { amountsInHomeCurrency } from "@/lib/currency/convert";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
-import { categories, settings, transactions } from "@/lib/db/schema";
+import {
+  accounts,
+  categories,
+  settings,
+  transactions,
+} from "@/lib/db/schema";
 import type { Category } from "@/types";
 
 const RequestSchema = z.object({
@@ -54,25 +61,45 @@ export async function POST(request: NextRequest) {
 
   const model = modelSetting?.value ?? "gpt-4o-mini";
 
+  const homeCurrency = getHomeCurrency();
+
   const txns = db
-    .select()
+    .select({
+      id: transactions.id,
+      normalised: transactions.normalised,
+      amount: transactions.amount,
+      date: transactions.date,
+      accountCurrency: accounts.currency,
+    })
     .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
     .where(inArray(transactions.id, parsed.data.transactionIds))
     .all();
+
+  const amountsHome = await amountsInHomeCurrency(
+    db,
+    txns.map((t) => ({
+      amount: t.amount,
+      date: t.date,
+      accountCurrency: t.accountCurrency,
+    })),
+    homeCurrency,
+  );
 
   const allCategories = db.select().from(categories).all() as Category[];
   const assignableForAi = filterAssignableCategories(allCategories);
 
   const results = await categoriseWithAI(
-    txns.map((t) => ({
+    txns.map((t, i) => ({
       id: t.id,
       normalised: t.normalised,
-      amount: t.amount,
+      amount: amountsHome[i] ?? t.amount,
       date: t.date,
     })),
     assignableForAi,
     apiKey,
     model,
+    homeCurrency,
   );
 
   // Update transactions

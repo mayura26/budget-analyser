@@ -1,6 +1,8 @@
 "use server";
 
 import { desc, eq, sql } from "drizzle-orm";
+import { amountsInHomeCurrency } from "@/lib/currency/convert";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import type { ActionResult } from "@/types";
@@ -34,12 +36,13 @@ export async function getRuleBuilderTransactionSample(
       categoryId: transactions.categoryId,
       categoryName: categories.name,
       accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+      accountCurrency: sql<string>`COALESCE(${accounts.currency}, 'AUD')`,
     })
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(categories, eq(transactions.categoryId, categories.id));
 
-  const rows = unverifiedOnly
+  const rowsRaw = unverifiedOnly
     ? base
         .where(eq(transactions.categoryConfirmed, false))
         .orderBy(desc(transactions.date), desc(transactions.id))
@@ -49,6 +52,28 @@ export async function getRuleBuilderTransactionSample(
         .orderBy(desc(transactions.date), desc(transactions.id))
         .limit(MAX_SAMPLE)
         .all();
+
+  const homeCurrency = getHomeCurrency();
+  const amountsHome = await amountsInHomeCurrency(
+    db,
+    rowsRaw.map((r) => ({
+      amount: r.amount,
+      date: r.date,
+      accountCurrency: r.accountCurrency,
+    })),
+    homeCurrency,
+  );
+
+  const rows: RuleBuilderTransactionRow[] = rowsRaw.map((r, i) => ({
+    id: r.id,
+    date: r.date,
+    description: r.description,
+    normalised: r.normalised,
+    amount: amountsHome[i] ?? r.amount,
+    categoryId: r.categoryId,
+    categoryName: r.categoryName,
+    accountName: r.accountName,
+  }));
 
   return { success: true, data: rows };
 }

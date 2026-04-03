@@ -8,6 +8,8 @@ import {
   deleteScheduledTransaction,
   toggleScheduledTransaction,
 } from "@/lib/actions/scheduled";
+import type { SupportedCurrency } from "@/lib/currency/supported";
+import { formatCurrency } from "@/lib/utils";
 import type { Account, Category, ScheduledTransaction } from "@/types";
 import { AISchedulerDialog } from "./ai-scheduler-dialog";
 import { ScheduleDialog } from "./schedule-dialog";
@@ -18,6 +20,7 @@ interface Props {
   categories: Category[];
   categoryMains?: Category[];
   aiEnabled?: boolean;
+  homeCurrency: SupportedCurrency;
 }
 
 const FREQ_LABELS: Record<string, string> = {
@@ -67,6 +70,7 @@ export function ScheduleList({
   categories,
   categoryMains,
   aiEnabled = false,
+  homeCurrency,
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ScheduledTransaction | null>(
@@ -103,7 +107,12 @@ export function ScheduleList({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Scheduled transactions</h2>
         <div className="flex items-center gap-2">
-          {aiEnabled && <AISchedulerDialog categories={categories} />}
+          {aiEnabled && (
+            <AISchedulerDialog
+              categories={categories}
+              homeCurrency={homeCurrency}
+            />
+          )}
           <Button size="sm" onClick={handleAdd}>
             <Plus className="h-4 w-4 mr-1" />
             Add schedule
@@ -139,11 +148,8 @@ export function ScheduleList({
                       isIncome ? "text-green-600" : "text-red-600"
                     }`}
                   >
-                    {isIncome ? "+" : "-"}$
-                    {Math.abs(s.amount).toLocaleString("en-AU", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {isIncome ? "+" : "-"}
+                    {formatCurrency(s.amount, homeCurrency)}
                   </span>
                 </div>
 

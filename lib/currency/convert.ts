@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import { fxRates } from "@/lib/db/schema";
+import { parseAccountCurrency } from "./account-currency";
 import { fetchFrankfurterRate } from "./frankfurter";
 import type { SupportedCurrency } from "./supported";
 
@@ -96,4 +97,34 @@ export function convertToHome(
     );
   }
   return Math.round(amount * rate * 100) / 100;
+}
+
+/** Prefetch FX and return each row's amount converted to home currency (same order as `rows`). */
+export async function amountsInHomeCurrency(
+  database: DB,
+  rows: Array<{
+    amount: number;
+    date: string;
+    accountCurrency: string | null | undefined;
+  }>,
+  homeCurrency: SupportedCurrency,
+): Promise<number[]> {
+  if (rows.length === 0) return [];
+  await prefetchRatesToHome(
+    database,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.accountCurrency, homeCurrency),
+    })),
+    homeCurrency,
+  );
+  return rows.map((r) =>
+    convertToHome(
+      database,
+      r.amount,
+      parseAccountCurrency(r.accountCurrency, homeCurrency),
+      homeCurrency,
+      r.date,
+    ),
+  );
 }

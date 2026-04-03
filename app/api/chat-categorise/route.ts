@@ -2,6 +2,8 @@ import { eq, sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { formatCategoryForAI } from "@/lib/categories/display-name";
+import { amountsInHomeCurrency } from "@/lib/currency/convert";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { accounts, settings, transactions } from "@/lib/db/schema";
 import {
@@ -62,6 +64,7 @@ export async function POST(req: NextRequest) {
       amount: transactions.amount,
       date: transactions.date,
       accountName: sql<string>`COALESCE(${accounts.name}, 'Unknown')`,
+      accountCurrency: sql<string>`COALESCE(${accounts.currency}, 'AUD')`,
     })
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -81,6 +84,20 @@ export async function POST(req: NextRequest) {
     .where(eq(settings.key, "openai_model"))
     .get();
   const model = modelSetting?.value ?? "gpt-4o-mini";
+  const homeCurrency = getHomeCurrency();
+
+  const [amountHome] = await amountsInHomeCurrency(
+    db,
+    [
+      {
+        amount: txn.amount,
+        date: txn.date,
+        accountCurrency: txn.accountCurrency,
+      },
+    ],
+    homeCurrency,
+  );
+  const displayAmount = amountHome ?? txn.amount;
 
   const byId = new Map(categories.map((c) => [c.id, c]));
   const categoryList = categories
@@ -99,7 +116,7 @@ ${categoryList}
 Transaction details:
 - Description: "${txn.description}"
 - Normalised: "${txn.normalised}"
-- Amount: AUD ${txn.amount.toFixed(2)} (negative = expense)
+- Amount: ${homeCurrency} ${displayAmount.toFixed(2)} (negative = expense; home currency)
 - Date: ${txn.date}
 - Account: ${txn.accountName}
 
