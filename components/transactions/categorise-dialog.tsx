@@ -68,6 +68,13 @@ function suggestionConfidencePercent(raw: number): number {
   return Math.min(100, Math.max(0, Math.round(pct)));
 }
 
+/** Return Tailwind color classes for a confidence percentage. */
+function confidenceColorClass(pct: number): string {
+  if (pct >= 90) return "text-green-600 dark:text-green-400";
+  if (pct >= 70) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
+
 type DialogState =
   | "idle"
   | "loading"
@@ -299,19 +306,7 @@ export function CategoriseDialog({
         ? unfinalisedCount
         : uncategorisedCount;
 
-  const sourceLabel = (source: SuggestionRow["source"]) => {
-    if (source === "ai")
-      return (
-        <Badge className="text-xs bg-blue-100 text-blue-800 border-0">AI</Badge>
-      );
-    if (source === "rule")
-      return (
-        <Badge className="text-xs bg-purple-100 text-purple-800 border-0">
-          Rule
-        </Badge>
-      );
-    return null;
-  };
+  const isMismatches = activeScope === "mismatches";
 
   return (
     <>
@@ -412,36 +407,36 @@ export function CategoriseDialog({
               <table className="w-full table-fixed text-sm">
                 <thead className="sticky top-0 z-1 border-b bg-muted/80 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    <th className="w-[10%] px-3 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
                       Date
                     </th>
-                    <th className="w-[28%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className={`${isMismatches ? "w-[28%]" : "w-[32%]"} min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground`}>
                       Description
                     </th>
-                    <th className="w-[12%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
+                    <th className="w-[12%] min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
                       Account
                     </th>
-                    <th className="w-[11%] px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    <th className="w-[11%] px-3 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
                       Amount
                     </th>
-                    <th className="w-[18%] min-w-0 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className={`${isMismatches ? "w-[18%]" : "w-[22%]"} min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground`}>
                       Category
                     </th>
                     <th
-                      className="w-[8%] px-2 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap tabular-nums"
+                      className="w-[8%] px-2 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap tabular-nums"
                       title="Suggestion confidence: rule strength, model estimate for AI, or consistency for mismatches."
                     >
                       Confidence
                     </th>
                     <th
-                      className="w-[8%] px-2 py-2 text-center text-xs font-medium text-muted-foreground whitespace-nowrap"
+                      className={`${isMismatches ? "w-[8%]" : "w-[7%]"} px-2 py-2.5 text-center text-xs font-medium text-muted-foreground whitespace-nowrap`}
                       title="Mark as verified when applying (green on the list). Untick to save the category but leave it unconfirmed."
                     >
                       Verify
                     </th>
-                    <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
-                      {activeScope === "mismatches" ? "" : "Source"}
-                    </th>
+                    {isMismatches && (
+                      <th className="w-[8%] px-3 py-2.5 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell" />
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -470,10 +465,10 @@ export function CategoriseDialog({
                             : ""
                         }`}
                       >
-                        <td className="px-3 py-2 text-muted-foreground whitespace-nowrap align-middle">
+                        <td className="px-3 py-3 text-muted-foreground whitespace-nowrap align-middle">
                           {formatDate(row.date)}
                         </td>
-                        <td className="min-w-0 px-3 py-2 align-middle">
+                        <td className="min-w-0 px-3 py-3 align-middle">
                           <div className="flex items-start gap-1">
                             <TooltipProvider>
                               <Tooltip>
@@ -523,13 +518,13 @@ export function CategoriseDialog({
                               )}
                           </div>
                         </td>
-                        <td className="min-w-0 px-3 py-2 align-middle hidden sm:table-cell">
+                        <td className="min-w-0 px-3 py-3 align-middle hidden sm:table-cell">
                           <p className="truncate text-muted-foreground text-xs">
                             {row.accountName}
                           </p>
                         </td>
                         <td
-                          className={`px-3 py-2 text-right font-medium whitespace-nowrap align-middle ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
+                          className={`px-3 py-3 text-right font-medium whitespace-nowrap align-middle ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
                         >
                           {row.amount < 0 ? "-" : "+"}
                           {formatCurrency(
@@ -540,7 +535,7 @@ export function CategoriseDialog({
                             ),
                           )}
                         </td>
-                        <td className="min-w-0 px-3 py-2 align-middle">
+                        <td className="min-w-0 px-3 py-3 align-middle">
                           <Select
                             value={
                               selections[row.transactionId] != null
@@ -578,11 +573,11 @@ export function CategoriseDialog({
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="px-2 py-2 text-right align-middle tabular-nums text-xs text-muted-foreground">
+                        <td className="px-2 py-3 text-right align-middle tabular-nums text-xs">
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="cursor-default">
+                                <span className={`cursor-default font-medium ${confidenceColorClass(suggestionConfidencePercent(row.confidence))}`}>
                                   {suggestionConfidencePercent(row.confidence)}%
                                 </span>
                               </TooltipTrigger>
@@ -598,7 +593,7 @@ export function CategoriseDialog({
                             </Tooltip>
                           </TooltipProvider>
                         </td>
-                        <td className="px-2 py-2 align-middle text-center">
+                        <td className="px-2 py-3 align-middle text-center">
                           <input
                             type="checkbox"
                             checked={
@@ -621,8 +616,8 @@ export function CategoriseDialog({
                             data-testid="bulk-verify-when-apply"
                           />
                         </td>
-                        <td className="px-3 py-2 align-middle hidden sm:table-cell">
-                          {activeScope === "mismatches" ? (
+                        {isMismatches && (
+                          <td className="px-3 py-3 align-middle hidden sm:table-cell">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -646,10 +641,8 @@ export function CategoriseDialog({
                             >
                               <X className="h-3.5 w-3.5" />
                             </Button>
-                          ) : (
-                            sourceLabel(row.source)
-                          )}
-                        </td>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
