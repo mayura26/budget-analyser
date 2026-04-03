@@ -127,28 +127,34 @@ async function DashboardBudgetStatus({
               return (
                 <div
                   key={row.categoryId}
-                  className="flex items-center gap-2 text-xs"
+                  className="flex flex-col gap-1.5 text-xs sm:flex-row sm:items-center sm:gap-2"
                 >
-                  <div
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: row.color }}
-                  />
-                  <span className="truncate flex-1">{row.categoryName}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {formatCurrency(row.actualSpent, homeCurrency)} /{" "}
-                    {formatCurrency(row.targetAmount, homeCurrency)}
-                  </span>
-                  <span
-                    className={`tabular-nums w-8 text-right ${
-                      catPct > 100
-                        ? "text-red-600 dark:text-red-400"
-                        : catPct >= 75
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-green-600 dark:text-green-400"
-                    }`}
-                  >
-                    {catPct}%
-                  </span>
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    <div
+                      className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: row.color }}
+                    />
+                    <span className="wrap-break-word min-w-0 flex-1 leading-snug">
+                      {row.categoryName}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center justify-end gap-3 pl-6 sm:pl-0">
+                    <span className="tabular-nums text-muted-foreground">
+                      {formatCurrency(row.actualSpent, homeCurrency)} /{" "}
+                      {formatCurrency(row.targetAmount, homeCurrency)}
+                    </span>
+                    <span
+                      className={`tabular-nums w-8 text-right ${
+                        catPct > 100
+                          ? "text-red-600 dark:text-red-400"
+                          : catPct >= 75
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-green-600 dark:text-green-400"
+                      }`}
+                    >
+                      {catPct}%
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -228,55 +234,55 @@ export default async function DashboardPage({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
               Income
             </CardTitle>
-            <div className="h-9 w-9 rounded-full bg-kpi-income-bg flex items-center justify-center">
-              <ArrowUpCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-income-bg sm:h-9 sm:w-9">
+              <ArrowUpCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400 sm:h-4 sm:w-4" />
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-xl font-bold text-green-600 dark:text-green-400 sm:text-2xl">
               {formatCurrency(currentMonthData.income, homeCurrency)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
               Expenses
             </CardTitle>
-            <div className="h-9 w-9 rounded-full bg-kpi-expense-bg flex items-center justify-center">
-              <ArrowDownCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-expense-bg sm:h-9 sm:w-9">
+              <ArrowDownCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 sm:h-4 sm:w-4" />
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-xl font-bold text-red-600 dark:text-red-400 sm:text-2xl">
               {formatCurrency(currentMonthData.expenses, homeCurrency)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
               Net
             </CardTitle>
-            <div className="h-9 w-9 rounded-full bg-kpi-net-bg flex items-center justify-center">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-net-bg sm:h-9 sm:w-9">
               {currentMonthData.net >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-primary dark:text-blue-400" />
+                <TrendingUp className="h-3.5 w-3.5 text-primary dark:text-blue-400 sm:h-4 sm:w-4" />
               ) : (
-                <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <TrendingDown className="h-3.5 w-3.5 text-red-600 dark:text-red-400 sm:h-4 sm:w-4" />
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             <p
-              className={`text-2xl font-bold ${currentMonthData.net >= 0 ? "text-primary dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}
+              className={`text-xl font-bold sm:text-2xl ${currentMonthData.net >= 0 ? "text-primary dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}
             >
               {currentMonthData.net >= 0 ? "+" : ""}
               {formatCurrency(Math.abs(currentMonthData.net), homeCurrency)}
@@ -285,17 +291,17 @@ export default async function DashboardPage({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
               Transactions
             </CardTitle>
-            <div className="h-9 w-9 rounded-full bg-kpi-tx-bg flex items-center justify-center">
-              <Wallet className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-tx-bg sm:h-9 sm:w-9">
+              <Wallet className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 sm:h-4 sm:w-4" />
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{totalTransactions}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <p className="text-xl font-bold sm:text-2xl">{totalTransactions}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {accountCount} account{accountCount !== 1 ? "s" : ""}
             </p>
           </CardContent>

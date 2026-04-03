@@ -51,6 +51,22 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
   });
 
+  test("spending chart help popover on narrow viewports", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/dashboard");
+    await expect(page.getByText(/monthly overview/i)).toBeVisible({
+      timeout: 10000,
+    });
+    await page
+      .getByRole("button", { name: /full chart explanation/i })
+      .click();
+    await expect(
+      page.getByRole("dialog").getByText(
+        /Outflows only — same as expense totals elsewhere\. Turn on Include Net/i,
+      ),
+    ).toBeVisible();
+  });
+
   test("include net slider disabled when monthly net is zero", async ({
     page,
   }) => {
@@ -129,7 +145,9 @@ test.describe("Dashboard", () => {
       await expect(
         page.getByText("Income allocation", { exact: true }),
       ).toBeVisible({ timeout: 10000 });
-      await expect(page.getByText("Unspent").first()).toBeVisible();
+      await expect(
+        page.getByText("Unspent", { exact: true }),
+      ).toBeVisible();
     });
   });
 

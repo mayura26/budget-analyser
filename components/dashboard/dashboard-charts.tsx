@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleHelp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -14,8 +15,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
@@ -137,6 +144,13 @@ export function DashboardCharts({
   const hasPieData = pieData.length > 0;
   const sliderDisabled = monthNet <= 0;
 
+  const pieHelpLong = includeNetEffective
+    ? "Top spending categories plus unspent income (same net as the summary card)."
+    : "Outflows only — same as expense totals elsewhere. Turn on Include Net when net is positive to add unspent income to the chart.";
+  const pieHelpShort = includeNetEffective
+    ? "Top categories plus remaining net (same as Net on the summary)."
+    : "Outflows only — matches expense totals elsewhere.";
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {/* Bar Chart */}
@@ -196,7 +210,7 @@ export function DashboardCharts({
 
       {/* Donut Chart */}
       <Card>
-        <CardHeader className="space-y-3">
+        <CardHeader className="space-y-2 sm:space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <CardTitle className="text-base font-semibold">
               {includeNetEffective
@@ -223,10 +237,32 @@ export function DashboardCharts({
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground font-normal leading-snug">
-            {includeNetEffective
-              ? "Top spending categories plus unspent income (same net as the summary card)."
-              : "Outflows only — same as expense totals elsewhere. Turn on Include Net when net is positive to add unspent income to the chart."}
+          <div className="flex items-start gap-2 sm:block">
+            <p className="text-xs text-muted-foreground font-normal leading-snug flex-1 min-w-0 sm:hidden">
+              {pieHelpShort}
+            </p>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground sm:hidden"
+                  aria-label="Full chart explanation"
+                >
+                  <CircleHelp className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-[min(100vw-2rem,18rem)] text-xs leading-snug"
+              >
+                {pieHelpLong}
+              </PopoverContent>
+            </Popover>
+          </div>
+          <p className="hidden sm:block text-xs text-muted-foreground font-normal leading-snug">
+            {pieHelpLong}
           </p>
         </CardHeader>
         <CardContent>
@@ -235,16 +271,16 @@ export function DashboardCharts({
               No expense data for this month
             </div>
           ) : (
-            <div className="flex items-center gap-4">
-              <div className="shrink-0 w-[140px] h-[140px] sm:w-[180px] sm:h-[180px]">
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <div className="shrink-0 w-[160px] h-[160px] sm:w-[180px] sm:h-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={54}
-                      outerRadius={82}
+                      innerRadius="42%"
+                      outerRadius="68%"
                       dataKey="value"
                       strokeWidth={0}
                     >
@@ -262,24 +298,26 @@ export function DashboardCharts({
                 </ResponsiveContainer>
               </div>
 
-              <ul className="flex-1 space-y-1.5 min-w-0">
+              <ul className="w-full sm:flex-1 space-y-2 sm:space-y-1.5 min-w-0">
                 {pieData.map((entry) => (
-                  <li
-                    key={entry.name}
-                    className="flex items-center gap-2 text-sm min-w-0"
-                  >
+                  <li key={entry.name} className="flex gap-2 text-sm min-w-0">
                     <span
-                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                      className="mt-1.5 h-2.5 w-2.5 rounded-full shrink-0"
                       style={{ background: entry.color }}
                     />
-                    <span className="truncate text-muted-foreground flex-1">
-                      {entry.name}
-                    </span>
-                    <span className="font-medium tabular-nums shrink-0">
-                      {entry.signedAmount !== undefined
-                        ? formatSignedCurrency(entry.signedAmount, homeCurrency)
-                        : formatCurrency(entry.value, homeCurrency)}
-                    </span>
+                    <div className="min-w-0 flex-1 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+                      <span className="text-muted-foreground wrap-break-word leading-snug">
+                        {entry.name}
+                      </span>
+                      <span className="font-medium tabular-nums shrink-0 sm:text-right">
+                        {entry.signedAmount !== undefined
+                          ? formatSignedCurrency(
+                              entry.signedAmount,
+                              homeCurrency,
+                            )
+                          : formatCurrency(entry.value, homeCurrency)}
+                      </span>
+                    </div>
                   </li>
                 ))}
               </ul>
