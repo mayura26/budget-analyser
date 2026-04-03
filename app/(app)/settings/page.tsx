@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { BankProfilesSection } from "@/components/settings/bank-profiles-section";
+import { DatabaseExportSection } from "@/components/settings/database-export-section";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { db } from "@/lib/db";
 import { bankProfiles, settings } from "@/lib/db/schema";
@@ -25,6 +26,7 @@ export default function SettingsPage() {
             settingsMap.transaction_amount_display ?? "account",
         }}
       />
+      <DatabaseExportSection />
       <BankProfilesSection profiles={allProfiles} />
     </div>
   );

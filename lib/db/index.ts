@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -39,3 +40,30 @@ sqlite.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqlite, { schema });
 export type DB = typeof db;
+
+/** True when the app uses a file-backed SQLite database (not build-time :memory:). */
+export function isFileBackedDatabase(): boolean {
+  return sqlitePath !== ":memory:";
+}
+
+/**
+ * Writes a consistent snapshot of the open database (including WAL) to a temp
+ * file via SQLite backup, then returns its bytes. Returns null if not file-backed.
+ */
+export async function exportDatabaseFileBuffer(): Promise<Buffer | null> {
+  if (sqlitePath === ":memory:") return null;
+  const tmp = path.join(
+    os.tmpdir(),
+    `budget-export-${process.pid}-${Date.now()}.db`,
+  );
+  try {
+    await sqlite.backup(tmp);
+    return fs.readFileSync(tmp);
+  } finally {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
+  }
+}

@@ -65,4 +65,15 @@ test.describe("Settings", () => {
     }
     await expect(page.getByText("built-in").first()).toBeVisible();
   });
+
+  test("export database downloads budget.db", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(
+      page.getByText("Export database", { exact: true }),
+    ).toBeVisible();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: /download budget\.db/i }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("budget.db");
+  });
 });
