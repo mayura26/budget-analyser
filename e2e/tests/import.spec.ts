@@ -86,6 +86,41 @@ test.describe("Import", () => {
     await expect(page.getByText(/4 transactions imported/i)).toBeVisible();
   });
 
+  test("accounts page shows freshness after import", async ({ page }) => {
+    const accountName = `Import Freshness ${Date.now()}`;
+
+    await page.goto("/accounts");
+    await page.getByRole("button", { name: "Add account" }).click();
+    const accountDialog = page.getByRole("dialog");
+    await expect(accountDialog).toBeVisible();
+    await accountDialog.locator('input[name="name"]').fill(accountName);
+    await accountDialog.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+    await accountDialog.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByText(accountName)).toBeVisible();
+
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: accountName }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+    await page.locator("#csv-file").setInputFiles(commbankCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await page.getByRole("button", { name: /Import 4 transactions/i }).click();
+    await expect(page.getByText("Import complete!")).toBeVisible();
+
+    await page.goto("/accounts");
+    const accountCard = page.locator(".rounded-lg").filter({
+      hasText: accountName,
+    });
+    await expect(accountCard).toContainText(/Last import:\s(?!Never imported).+/);
+    await expect(
+      accountCard,
+    ).toContainText(/Latest transaction:\s\d{4}-\d{2}-\d{2}/);
+  });
+
   test("import success links to review pending categories", async ({
     page,
   }) => {

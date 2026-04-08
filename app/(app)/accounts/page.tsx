@@ -13,6 +13,7 @@ import {
   accountGroups,
   accounts,
   bankProfiles,
+  importBatches,
   transactions,
 } from "@/lib/db/schema";
 import type { AccountGroup } from "@/types";
@@ -32,11 +33,14 @@ export default function AccountsPage() {
       bankProfileId: accounts.bankProfileId,
       groupId: accounts.groupId,
       bankProfileName: sql<string>`${bankProfiles.name}`,
-      transactionCount: sql<number>`COUNT(${transactions.id})`,
+      transactionCount: sql<number>`COUNT(DISTINCT ${transactions.id})`,
+      lastImportedAt: sql<number | null>`MAX(${importBatches.importedAt})`,
+      latestTransactionDate: sql<string | null>`MAX(${transactions.date})`,
     })
     .from(accounts)
     .leftJoin(bankProfiles, eq(accounts.bankProfileId, bankProfiles.id))
     .leftJoin(transactions, eq(accounts.id, transactions.accountId))
+    .leftJoin(importBatches, eq(accounts.id, importBatches.accountId))
     .groupBy(accounts.id)
     .all();
 
@@ -65,6 +69,12 @@ export default function AccountsPage() {
   }
 
   function AccountCard({ account }: { account: (typeof accountRows)[0] }) {
+    const lastImportText = account.lastImportedAt
+      ? new Date(account.lastImportedAt * 1000).toLocaleString()
+      : "Never imported";
+    const latestTransactionText =
+      account.latestTransactionDate ?? "No transactions yet";
+
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -101,6 +111,8 @@ export default function AccountsPage() {
             <p>
               {account.currency} · {account.transactionCount} transactions
             </p>
+            <p>Last import: {lastImportText}</p>
+            <p>Latest transaction: {latestTransactionText}</p>
             {account.bankProfileName && (
               <Badge variant="secondary" className="text-xs">
                 {account.bankProfileName}

@@ -7,12 +7,13 @@ test.describe("Accounts", () => {
   });
 
   test("create account", async ({ page }) => {
+    const accountName = `Test Chequing ${Date.now()}`;
     await page.goto("/accounts");
     await page.getByRole("button", { name: "Add account" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="name"]').fill("Test Chequing");
+    await dialog.locator('input[name="name"]').fill(accountName);
 
     // Select bank profile (second combobox — first is group)
     await dialog.getByRole("combobox").nth(1).click();
@@ -29,8 +30,15 @@ test.describe("Accounts", () => {
 
     await dialog.getByRole("button", { name: "Create account" }).click();
 
-    await expect(page.getByText("Test Chequing")).toBeVisible();
+    await expect(page.getByText(accountName)).toBeVisible();
     await expect(page.getByText("CommBank").first()).toBeVisible();
+    const testChequingCard = page.locator(".rounded-lg").filter({
+      hasText: accountName,
+    });
+    await expect(testChequingCard).toContainText("Last import: Never imported");
+    await expect(testChequingCard).toContainText(
+      "Latest transaction: No transactions yet",
+    );
   });
 
   test("edit account", async ({ page }) => {
