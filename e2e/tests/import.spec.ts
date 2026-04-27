@@ -49,6 +49,46 @@ test.describe("Import", () => {
     await expect(page.locator("tbody tr")).toHaveCount(4);
   });
 
+  test("account default profile is auto-selected and updates on account switch", async ({
+    page,
+  }) => {
+    const commbankAccountName = `Import Auto CommBank ${Date.now()}`;
+    const monzoAccountName = `Import Auto Monzo ${Date.now()}`;
+
+    await page.goto("/accounts");
+
+    // Create account with CommBank profile
+    await page.getByRole("button", { name: "Add account" }).click();
+    let accountDialog = page.getByRole("dialog");
+    await expect(accountDialog).toBeVisible();
+    await accountDialog.locator('input[name="name"]').fill(commbankAccountName);
+    await accountDialog.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+    await accountDialog.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByText(commbankAccountName)).toBeVisible();
+
+    // Create account with Monzo profile
+    await page.getByRole("button", { name: "Add account" }).click();
+    accountDialog = page.getByRole("dialog");
+    await expect(accountDialog).toBeVisible();
+    await accountDialog.locator('input[name="name"]').fill(monzoAccountName);
+    await accountDialog.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Monzo" }).click();
+    await accountDialog.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByText(monzoAccountName)).toBeVisible();
+
+    await page.goto("/import");
+
+    // Choosing each account should auto-select that account's default profile.
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: commbankAccountName }).click();
+    await expect(page.getByRole("combobox").nth(1)).toContainText("CommBank");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: monzoAccountName }).click();
+    await expect(page.getByRole("combobox").nth(1)).toContainText("Monzo");
+  });
+
   test("CSV with more than 100 rows imports all on confirm", async ({
     page,
   }) => {

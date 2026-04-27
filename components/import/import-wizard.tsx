@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, CheckCircle, Loader2, Upload } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,20 @@ export function ImportWizard({
   accounts: Account[];
   bankProfiles: BankProfile[];
 }) {
+  function getDefaultProfileIdForAccount(nextAccountId: string): string | null {
+    const selectedAccount = accounts.find((a) => String(a.id) === nextAccountId);
+    if (!selectedAccount) return null;
+
+    if (selectedAccount.bankProfileId != null) {
+      const matchedProfile = bankProfiles.find(
+        (profile) => profile.id === selectedAccount.bankProfileId,
+      );
+      if (matchedProfile) return String(matchedProfile.id);
+    }
+
+    return null;
+  }
+
   const [step, setStep] = useState<Step>("upload");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +55,43 @@ export function ImportWizard({
     accounts[0] ? String(accounts[0].id) : "",
   );
   const [profileId, setProfileId] = useState<string>(
-    bankProfiles[0] ? String(bankProfiles[0].id) : "",
+    (accounts[0] ? getDefaultProfileIdForAccount(String(accounts[0].id)) : null) ??
+      (bankProfiles[0] ? String(bankProfiles[0].id) : ""),
   );
   const [file, setFile] = useState<File | null>(null);
+  const lastAccountIdRef = useRef<string>(accountId);
+
+  useEffect(() => {
+    const accountChanged = lastAccountIdRef.current !== accountId;
+    const accountDefaultProfileId = getDefaultProfileIdForAccount(accountId);
+
+    if (accountChanged) {
+      if (accountDefaultProfileId) {
+        setProfileId(accountDefaultProfileId);
+      } else if (
+        !bankProfiles.some((profile) => String(profile.id) === profileId) &&
+        bankProfiles[0]
+      ) {
+        setProfileId(String(bankProfiles[0].id));
+      }
+      lastAccountIdRef.current = accountId;
+      return;
+    }
+
+    if (
+      profileId &&
+      bankProfiles.some((profile) => String(profile.id) === profileId)
+    ) {
+      return;
+    }
+
+    if (accountDefaultProfileId) {
+      setProfileId(accountDefaultProfileId);
+      return;
+    }
+
+    setProfileId(bankProfiles[0] ? String(bankProfiles[0].id) : "");
+  }, [accountId, bankProfiles, profileId]);
 
   const previewAccountCurrency = parseAccountCurrency(
     accounts.find((a) => String(a.id) === accountId)?.currency,
