@@ -39,6 +39,39 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     isSystem: true,
   },
   {
+    name: "Wise",
+    dateColumn: "Created on",
+    descriptionColumn: "Target name",
+    amountColumn: "Source amount (after fees)",
+    debitColumn: null,
+    creditColumn: null,
+    dateFormat: "YYYY-MM-DD HH:mm",
+    skipRows: 0,
+    delimiter: ",",
+    negativeIsDebit: true,
+    extraMappings: JSON.stringify({
+      directionColumn: "Direction",
+      outValues: ["OUT"],
+      inValues: ["IN"],
+      descriptionFallbackColumns: ["Reference", "Target name", "Source name"],
+    }),
+    isSystem: true,
+  },
+  {
+    name: "Amex",
+    dateColumn: "Date",
+    descriptionColumn: "Description",
+    amountColumn: "Amount",
+    debitColumn: null,
+    creditColumn: null,
+    dateFormat: "DD/MM/YYYY",
+    skipRows: 0,
+    delimiter: ",",
+    negativeIsDebit: false,
+    extraMappings: null,
+    isSystem: true,
+  },
+  {
     name: "Coles",
     dateColumn: "Date",
     descriptionColumn: "Transaction Details",
@@ -91,6 +124,28 @@ export function detectBankProfile(
 
 export function parseDateToISO(dateStr: string, format: string): string | null {
   try {
+    if (format === "YYYY-MM-DD HH:mm") {
+      const match = dateStr
+        .trim()
+        .match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+\d{1,2}:\d{2})?$/);
+      if (!match) return null;
+      const year = Number.parseInt(match[1], 10);
+      const month = Number.parseInt(match[2], 10);
+      const day = Number.parseInt(match[3], 10);
+      if (
+        Number.isNaN(year) ||
+        Number.isNaN(month) ||
+        Number.isNaN(day) ||
+        month < 1 ||
+        month > 12 ||
+        day < 1 ||
+        day > 31
+      ) {
+        return null;
+      }
+      return `${match[1]}-${match[2]}-${match[3]}`;
+    }
+
     if (format === "DD MMM YY" || format === "DD MMM YYYY") {
       const match = dateStr
         .trim()

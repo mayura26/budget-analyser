@@ -50,6 +50,8 @@ next-env.d.ts
 # local test data and notes
 e2e/fixtures/*
 !e2e/fixtures/commbank-105.csv
+!e2e/fixtures/wise.csv
+!e2e/fixtures/amex.csv
 
 # Playwright
 e2e/.auth/

@@ -11,6 +11,8 @@ const monzoTransfersCsv = path.join(
 const colesCsv = path.join(__dirname, "../fixtures/coles.csv");
 const commbankPdf = path.join(__dirname, "../fixtures/commbank-statement.pdf");
 const commbank105Csv = path.join(__dirname, "../fixtures/commbank-105.csv");
+const wiseCsv = path.join(__dirname, "../fixtures/wise.csv");
+const amexCsv = path.join(__dirname, "../fixtures/amex.csv");
 
 test.describe("Import", () => {
   test.beforeAll(async ({ browser }) => {
@@ -258,6 +260,72 @@ test.describe("Import", () => {
       // All 11 rows already imported as duplicates — preview rendered successfully
       await expect(page.getByText("0 new")).toBeVisible();
     }
+  });
+
+  test("Wise CSV parses with direction-aware signs", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Wise" }).click();
+    await page.locator("#csv-file").setInputFiles(wiseCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("2 new")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(2);
+    await expect(
+      page.locator("tbody tr").filter({ hasText: "MARKET EDGE ANALYTICS LTD." }),
+    ).toContainText("+");
+    await expect(
+      page.locator("tbody tr").filter({ hasText: "TransferWise" }),
+    ).toContainText("-");
+  });
+
+  test("Amex CSV shows preview", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Amex" }).click();
+    await page.locator("#csv-file").setInputFiles(amexCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("2 new")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(2);
+  });
+
+  test("Wise CSV auto-detects when wrong profile selected", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+
+    await page.locator("#csv-file").setInputFiles(wiseCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("2 new")).toBeVisible();
+    await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
+  });
+
+  test("Amex CSV auto-detects when wrong profile selected", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+
+    await page.locator("#csv-file").setInputFiles(amexCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("2 new")).toBeVisible();
+    await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 
   test("Import more resets wizard", async ({ page }) => {

@@ -20,6 +20,10 @@ export type ColumnMapping = {
     debit?: number;
     credit?: number;
   };
+  directionColumn?: string;
+  outValues?: string[];
+  inValues?: string[];
+  descriptionFallbackColumns?: string[];
 };
 
 export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
@@ -31,6 +35,10 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
       const parsed = JSON.parse(profile.extraMappings) as {
         hasHeader?: boolean;
         positionalColumns?: ColumnMapping["positionalColumns"];
+        directionColumn?: string;
+        outValues?: string[];
+        inValues?: string[];
+        descriptionFallbackColumns?: string[];
       };
       if (typeof parsed.hasHeader === "boolean") {
         hasHeader = parsed.hasHeader;
@@ -38,6 +46,23 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
       if (parsed.positionalColumns) {
         positionalColumns = parsed.positionalColumns;
       }
+      return {
+        dateColumn: profile.dateColumn,
+        descriptionColumn: profile.descriptionColumn,
+        amountColumn: profile.amountColumn ?? undefined,
+        debitColumn: profile.debitColumn ?? undefined,
+        creditColumn: profile.creditColumn ?? undefined,
+        dateFormat: profile.dateFormat,
+        negativeIsDebit: profile.negativeIsDebit,
+        skipRows: profile.skipRows,
+        delimiter: profile.delimiter,
+        hasHeader,
+        positionalColumns,
+        directionColumn: parsed.directionColumn,
+        outValues: parsed.outValues,
+        inValues: parsed.inValues,
+        descriptionFallbackColumns: parsed.descriptionFallbackColumns,
+      };
     } catch {
       // Ignore invalid JSON and fall back to header-based parsing.
     }
@@ -131,11 +156,7 @@ export function parseCSV(
         continue;
       }
 
-      // Normalise sign: negative = debit (money out)
-      // If the CSV convention is that positive = debit, flip the sign
-      if (!mapping.negativeIsDebit && amount > 0) {
-        amount = -amount;
-      }
+      amount = normaliseSignedAmount(amount, mapping);
 
       rows.push({
         date,
@@ -171,7 +192,7 @@ export function parseCSV(
     const row = result.data[i];
 
     const dateRaw = row[mapping.dateColumn]?.trim();
-    const desc = row[mapping.descriptionColumn]?.trim();
+    const desc = resolveDescription(row, mapping);
 
     if (!dateRaw || !desc) continue;
 
@@ -202,11 +223,7 @@ export function parseCSV(
       continue;
     }
 
-    // Normalise sign: negative = debit (money out)
-    // If the CSV convention is that positive = debit, flip the sign
-    if (!mapping.negativeIsDebit && amount > 0) {
-      amount = -amount;
-    }
+    amount = normaliseSignedAmount(amount, mapping, row);
 
     rows.push({ date, description: desc, amount, rawRow: row });
   }
@@ -216,6 +233,44 @@ export function parseCSV(
 
 function normaliseAmount(raw: string): string {
   return raw.trim().replace(/[",$]/g, "");
+}
+
+function normaliseSignedAmount(
+  amount: number,
+  mapping: ColumnMapping,
+  row?: Record<string, string>,
+): number {
+  const directionColumn = mapping.directionColumn;
+  if (directionColumn && row) {
+    const direction = (row[directionColumn] ?? "").trim().toUpperCase();
+    const outValues = new Set((mapping.outValues ?? []).map((v) => v.toUpperCase()));
+    const inValues = new Set((mapping.inValues ?? []).map((v) => v.toUpperCase()));
+    const absoluteAmount = Math.abs(amount);
+    if (outValues.has(direction)) return -absoluteAmount;
+    if (inValues.has(direction)) return absoluteAmount;
+  }
+
+  // Normalise sign: negative = debit (money out)
+  // If the CSV convention is that positive = debit, flip the sign
+  if (!mapping.negativeIsDebit && amount > 0) {
+    return -amount;
+  }
+  return amount;
+}
+
+function resolveDescription(
+  row: Record<string, string>,
+  mapping: ColumnMapping,
+): string {
+  const candidates = [
+    mapping.descriptionColumn,
+    ...(mapping.descriptionFallbackColumns ?? []),
+  ];
+  for (const column of candidates) {
+    const value = row[column]?.trim();
+    if (value) return value;
+  }
+  return "";
 }
 
 export function detectDelimiter(csvContent: string): string {
