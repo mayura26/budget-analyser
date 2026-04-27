@@ -109,6 +109,8 @@ export const importBatches = sqliteTable("import_batches", {
 export const scheduledTransactions = sqliteTable("scheduled_transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  internalName: text("internal_name"),
+  displayName: text("display_name"),
   amount: real("amount").notNull(),
   accountId: integer("account_id").references(() => accounts.id, {
     onDelete: "cascade",
@@ -126,6 +128,27 @@ export const scheduledTransactions = sqliteTable("scheduled_transactions", {
   createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
   updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
 });
+
+export const mutedScheduleSuggestions = sqliteTable(
+  "muted_schedule_suggestions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    signature: text("signature").notNull(),
+    internalName: text("internal_name").notNull(),
+    frequency: text("frequency", {
+      enum: ["weekly", "fortnightly", "monthly", "quarterly", "yearly"],
+    }).notNull(),
+    amountRounded: real("amount_rounded").notNull(),
+    reason: text("reason"),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  },
+  (table) => [
+    uniqueIndex("muted_schedule_suggestions_signature_unique").on(
+      table.signature,
+    ),
+    index("muted_schedule_suggestions_internal_name_idx").on(table.internalName),
+  ],
+);
 
 export const transactions = sqliteTable(
   "transactions",

@@ -438,4 +438,64 @@ test.describe("Budget", () => {
     await page.getByRole("button", { name: "Save settings" }).click();
     await expect(page.getByText("Settings saved")).toBeVisible();
   });
+
+  test("AI schedule suggestion supports display/internal names and mute/add actions", async ({
+    page,
+  }) => {
+    await page.route("**/api/ai-scheduler", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          suggestions: [
+            {
+              displayName: "Mayuras Mobile",
+              internalName: "belong",
+              amount: -45,
+              frequency: "monthly",
+              startDate: "2026-05-01",
+              categoryId: null,
+              reasoning: "Recurring mobile plan payment",
+              confidence: 0.93,
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.getByLabel("Enable AI features").click();
+    await page.getByRole("option", { name: "Enabled" }).click();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Settings saved")).toBeVisible();
+
+    await page.goto("/budget");
+    await page.getByRole("tab", { name: "Schedules" }).click();
+    await page.getByRole("button", { name: "AI Suggestions" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Mayuras Mobile")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Mute" })).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Add to schedule" }),
+    ).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Mute" }).click();
+    await expect(dialog.getByRole("button", { name: "Muted" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "AI Suggestions" }).click();
+    await expect(dialog.getByText("Mayuras Mobile")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to schedule" }).click();
+    await expect(dialog.getByRole("button", { name: "Added" })).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await expect(page.getByText("Mayuras Mobile")).toBeVisible();
+
+    await page.goto("/settings");
+    await page.getByLabel("Enable AI features").click();
+    await page.getByRole("option", { name: "Disabled" }).click();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Settings saved")).toBeVisible();
+  });
 });

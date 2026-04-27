@@ -118,7 +118,7 @@ export function ScheduleDialog({
             <Input
               id="sched-name"
               name="name"
-              defaultValue={schedule?.name ?? ""}
+              defaultValue={schedule?.displayName ?? schedule?.name ?? ""}
               placeholder="e.g. Salary, Rent"
               required
             />

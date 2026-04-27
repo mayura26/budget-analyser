@@ -138,7 +138,9 @@ export function ScheduleList({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1 min-w-0">
-                    <p className="font-medium truncate">{s.name}</p>
+                    <p className="font-medium truncate">
+                      {s.displayName ?? s.name}
+                    </p>
                     <Badge variant="outline" className="text-xs">
                       {FREQ_LABELS[s.frequency]}
                     </Badge>

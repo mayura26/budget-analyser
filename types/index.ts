@@ -137,6 +137,8 @@ export type ActionResult<T = void> =
 export type ScheduledTransaction = {
   id: number;
   name: string;
+  internalName: string | null;
+  displayName: string | null;
   amount: number;
   accountId: number | null;
   categoryId: number | null;

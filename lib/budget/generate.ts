@@ -90,7 +90,7 @@ export function generateOccurrences(
       results.push({
         date: current,
         scheduleId: schedule.id,
-        name: schedule.name,
+        name: schedule.displayName ?? schedule.name,
         amount: schedule.amount,
         accountId: schedule.accountId,
         categoryId: schedule.categoryId,

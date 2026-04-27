@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import {
   accounts,
   categories,
+  mutedScheduleSuggestions,
   scheduledTransactions,
   settings,
   transactions,
@@ -16,6 +17,23 @@ import {
   isOpenAIReasoningChatModel,
   openAIModelOnlySupportsDefaultTemperature,
 } from "@/lib/openai/model-params";
+import {
+  canonicalInternalName,
+  scheduleSuggestionSignature,
+  type ScheduleFrequency,
+} from "@/lib/schedules/ai-signature";
+
+type AIScheduleSuggestion = {
+  name: string;
+  displayName?: string;
+  internalName?: string;
+  amount: number;
+  frequency: ScheduleFrequency;
+  startDate: string;
+  categoryId: number | null;
+  reasoning?: string;
+  confidence?: number;
+};
 
 export async function POST() {
   const aiEnabledSetting = db
@@ -143,9 +161,27 @@ export async function POST() {
     return NextResponse.json({ suggestions: [] });
   }
 
-  // Fetch existing scheduled transaction names to avoid duplicates
+  // Fetch existing schedules and muted signatures to avoid repeats
   const existingSchedules = db.select().from(scheduledTransactions).all();
-  const existingNames = existingSchedules.map((s) => s.name.toLowerCase());
+  const existingSignatures = new Set(
+    existingSchedules.map((schedule) =>
+      scheduleSuggestionSignature({
+        internalName: schedule.internalName ?? schedule.name,
+        frequency: schedule.frequency,
+        amount: schedule.amount,
+      }),
+    ),
+  );
+  const existingNames = existingSchedules.map((s) =>
+    (s.displayName ?? s.name).toLowerCase(),
+  );
+  const mutedSignatures = new Set(
+    db
+      .select({ signature: mutedScheduleSuggestions.signature })
+      .from(mutedScheduleSuggestions)
+      .all()
+      .map((row) => row.signature),
+  );
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -170,12 +206,13 @@ Rules:
 - Use negative amounts for expenses, positive for income (amounts must be in ${homeCurrency})
 - frequency: "weekly" (~7 days apart), "fortnightly" (~14 days), "monthly" (~30 days), "quarterly" (~90 days), "yearly" (~365 days)
 - startDate: the next expected occurrence from today in YYYY-MM-DD format
-- name: a clean, human-readable merchant name (not the raw bank description)
+- displayName: a clean, human-readable merchant name (not the raw bank description)
+- internalName: canonical merchant key used for matching (best raw recurring token, short and stable)
 - Skip anything that looks like a one-off, transfer, or random purchase
 - Skip anything already in the "Already scheduled" list
 
 Respond with a JSON object: {"suggestions": [...]}
-Each suggestion: {"name": string, "amount": number, "frequency": string, "startDate": string, "categoryId": number|null, "reasoning": string, "confidence": number}
+Each suggestion: {"displayName": string, "internalName": string, "amount": number, "frequency": string, "startDate": string, "categoryId": number|null, "reasoning": string, "confidence": number}
 Only return the JSON object, no other text.`;
 
   const client = new OpenAI({ apiKey });
@@ -197,9 +234,52 @@ Only return the JSON object, no other text.`;
 
   try {
     const parsed = JSON.parse(content);
-    const suggestions = Array.isArray(parsed)
+    const rawSuggestions: AIScheduleSuggestion[] = Array.isArray(parsed)
       ? parsed
       : (parsed.suggestions ?? []);
+    const seen = new Set<string>();
+    const suggestions = rawSuggestions
+      .filter((suggestion) => {
+        if (
+          !suggestion ||
+          typeof suggestion !== "object" ||
+          typeof suggestion.amount !== "number" ||
+          typeof suggestion.frequency !== "string" ||
+          typeof suggestion.startDate !== "string"
+        ) {
+          return false;
+        }
+        const internalName = canonicalInternalName(
+          suggestion.internalName ?? suggestion.name ?? suggestion.displayName ?? "",
+        );
+        if (!internalName) return false;
+        const signature = scheduleSuggestionSignature({
+          internalName,
+          frequency: suggestion.frequency as ScheduleFrequency,
+          amount: suggestion.amount,
+        });
+        if (seen.has(signature)) return false;
+        if (existingSignatures.has(signature)) return false;
+        if (mutedSignatures.has(signature)) return false;
+        seen.add(signature);
+        return true;
+      })
+      .map((suggestion) => {
+        const displayName =
+          suggestion.displayName?.trim() ||
+          suggestion.name?.trim() ||
+          suggestion.internalName?.trim() ||
+          "Scheduled item";
+        const internalName = canonicalInternalName(
+          suggestion.internalName ?? suggestion.name ?? displayName,
+        );
+        return {
+          ...suggestion,
+          name: displayName,
+          displayName,
+          internalName,
+        };
+      });
     return NextResponse.json({ suggestions });
   } catch {
     return NextResponse.json({ suggestions: [] });
