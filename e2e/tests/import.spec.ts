@@ -219,6 +219,26 @@ test.describe("Import", () => {
     ).toBeDisabled();
   });
 
+  test("re-import can overwrite duplicates", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+    await page.locator("#csv-file").setInputFiles(commbankDupCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("0 new")).toBeVisible();
+    await page.getByLabel(/Overwrite duplicates/i).check();
+    await expect(
+      page.getByRole("button", { name: /Import 4 transactions/i }),
+    ).toBeEnabled();
+    await page.getByRole("button", { name: /Import 4 transactions/i }).click();
+    await expect(page.getByText("Import complete!")).toBeVisible();
+    await expect(page.getByText(/duplicates overwritten/i)).toBeVisible();
+  });
+
   test("Monzo CSV parses even if wrong profile selected", async ({ page }) => {
     // Intentionally select CommBank while uploading Monzo CSV.
     // The server should auto-detect the correct profile from the CSV header.
@@ -320,6 +340,16 @@ test.describe("Import", () => {
     await expect(
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),
     ).toContainText("-");
+    // "Import Test Account" is AUD, so Wise multi-currency rows should use target amount.
+    await expect(
+      page.locator("tbody tr").filter({ hasText: "TransferWise" }),
+    ).toContainText("10.00");
+    await expect(
+      page.locator("tbody tr").filter({ hasText: "MARKET EDGE ANALYTICS LTD." }),
+    ).toContainText("USD");
+    await expect(
+      page.locator("tbody tr").filter({ hasText: "TransferWise" }),
+    ).toContainText("AUD");
   });
 
   test("Amex CSV shows preview", async ({ page }) => {

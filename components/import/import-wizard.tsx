@@ -48,8 +48,10 @@ export function ImportWizard({
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [doneResult, setDoneResult] = useState<{
     imported: number;
+    overwritten: number;
     skipped: number;
   } | null>(null);
+  const [overwriteDuplicates, setOverwriteDuplicates] = useState(false);
 
   const [accountId, setAccountId] = useState<string>(
     accounts[0] ? String(accounts[0].id) : "",
@@ -112,6 +114,7 @@ export function ImportWizard({
       formData.set("accountId", accountId);
       formData.set("bankProfileId", profileId);
       formData.set("filename", file.name);
+      formData.set("overwriteDuplicates", overwriteDuplicates ? "1" : "0");
       if (file.name.toLowerCase().endsWith(".pdf")) {
         formData.set("pdfFile", file);
       } else {
@@ -142,6 +145,7 @@ export function ImportWizard({
       formData.set("accountId", accountId);
       formData.set("bankProfileId", profileId);
       formData.set("filename", file.name);
+      formData.set("overwriteDuplicates", overwriteDuplicates ? "1" : "0");
       if (file.name.toLowerCase().endsWith(".pdf")) {
         formData.set("pdfFile", file);
       } else {
@@ -154,6 +158,7 @@ export function ImportWizard({
       } else {
         setDoneResult({
           imported: result.data.imported,
+          overwritten: result.data.overwritten,
           skipped: result.data.skipped,
         });
         setStep("done");
@@ -190,8 +195,11 @@ export function ImportWizard({
           <div>
             <p className="text-lg font-semibold">Import complete!</p>
             <p className="text-muted-foreground text-sm mt-1">
-              {doneResult.imported} transactions imported, {doneResult.skipped}{" "}
-              skipped (duplicates)
+              {doneResult.imported} transactions imported
+              {doneResult.overwritten > 0
+                ? `, ${doneResult.overwritten} duplicates overwritten`
+                : ""}
+              , {doneResult.skipped} skipped
             </p>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">
               If categories were applied automatically, confirm them on the
@@ -215,6 +223,7 @@ export function ImportWizard({
                 setPreview(null);
                 setDoneResult(null);
                 setFile(null);
+                setOverwriteDuplicates(false);
               }}
             >
               Import more
@@ -231,6 +240,24 @@ export function ImportWizard({
 
     return (
       <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <input
+            id="overwrite-duplicates"
+            type="checkbox"
+            className="h-4 w-4"
+            checked={overwriteDuplicates}
+            onChange={(e) => {
+              setOverwriteDuplicates(e.target.checked);
+              setError(null);
+            }}
+          />
+          <label
+            htmlFor="overwrite-duplicates"
+            className="text-sm text-muted-foreground"
+          >
+            Overwrite duplicates (update existing matching transactions)
+          </label>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Import Preview</CardTitle>
@@ -247,7 +274,9 @@ export function ImportWizard({
                 <Badge variant="secondary">
                   {preview.duplicateCount} duplicate
                 </Badge>
-                <span className="text-muted-foreground">will be skipped</span>
+                <span className="text-muted-foreground">
+                  {overwriteDuplicates ? "will be overwritten" : "will be skipped"}
+                </span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -271,6 +300,9 @@ export function ImportWizard({
                 </th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
                   Amount
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                  Currency
                 </th>
               </tr>
             </thead>
@@ -306,6 +338,9 @@ export function ImportWizard({
                       previewAccountCurrency,
                     )}
                   </td>
+                  <td className="px-3 py-1 text-muted-foreground whitespace-nowrap">
+                    {row.currency ?? previewAccountCurrency}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -320,9 +355,13 @@ export function ImportWizard({
         )}
 
         <div className="flex gap-2">
+          {(() => {
+            const importCount =
+              preview.newCount + (overwriteDuplicates ? preview.duplicateCount : 0);
+            return (
           <Button
             onClick={handleConfirm}
-            disabled={loading || preview.newCount === 0}
+            disabled={loading || importCount === 0}
           >
             {loading ? (
               <>
@@ -330,9 +369,11 @@ export function ImportWizard({
                 Importing…
               </>
             ) : (
-              `Import ${preview.newCount} transactions`
+              `Import ${importCount} transactions`
             )}
           </Button>
+            );
+          })()}
           <Button variant="outline" onClick={() => setStep("upload")}>
             Back
           </Button>

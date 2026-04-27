@@ -1,11 +1,11 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { categoriseTransactions } from "@/lib/categorisation/engine";
 import { db } from "@/lib/db";
-import { bankProfiles, importBatches, transactions } from "@/lib/db/schema";
+import { accounts, bankProfiles, importBatches, transactions } from "@/lib/db/schema";
 import { generateFingerprint } from "@/lib/import/fingerprint";
 import { normaliseDescription } from "@/lib/import/normaliser";
 import {
@@ -61,6 +61,12 @@ async function buildImportPreview(
   }
 
   const { accountId, bankProfileId, csvContent, filename } = parsed.data;
+  const account = db
+    .select({ currency: accounts.currency })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .get();
+  if (!account) return { success: false, error: "Account not found" };
 
   const isPdf = filename.toLowerCase().endsWith(".pdf");
   let rows: Awaited<ReturnType<typeof parseCSV>>["rows"] = [];
@@ -85,6 +91,7 @@ async function buildImportPreview(
     if (!profile) return { success: false, error: "Bank profile not found" };
 
     const mapping = profileToColumnMapping(profile);
+    mapping.accountCurrency = account.currency;
     const csvResult = parseCSV(csvContent, mapping);
     rows = csvResult.rows;
     errors = csvResult.errors;
@@ -109,6 +116,7 @@ async function buildImportPreview(
           .get();
         if (detectedProfile) {
           const retryMapping = profileToColumnMapping(detectedProfile);
+          retryMapping.accountCurrency = account.currency;
           const retry = parseCSV(csvContent, retryMapping);
           if (retry.rows.length > 0) {
             rows = retry.rows;
@@ -207,10 +215,16 @@ export async function previewImport(
 export async function confirmImport(
   formData: FormData,
 ): Promise<
-  ActionResult<{ batchId: number; imported: number; skipped: number }>
+  ActionResult<{
+    batchId: number;
+    imported: number;
+    overwritten: number;
+    skipped: number;
+  }>
 > {
   const built = await buildImportPreview(formData);
   if (!built.success) return built;
+  const overwriteDuplicates = formData.get("overwriteDuplicates") === "1";
 
   const {
     accountId,
@@ -221,9 +235,15 @@ export async function confirmImport(
     dateRangeEnd,
     previewRows,
   } = built.data;
+  const account = db
+    .select({ currency: accounts.currency })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .get();
+  if (!account) return { success: false, error: "Account not found" };
 
-  if (newRows.length === 0) {
-    return { success: false, error: "No new transactions to import" };
+  if (newRows.length === 0 && (!overwriteDuplicates || duplicateRows.length === 0)) {
+    return { success: false, error: "No transactions to import" };
   }
 
   const batch = db
@@ -233,7 +253,7 @@ export async function confirmImport(
       filename,
       rowCount: previewRows.length,
       importedCount: newRows.length,
-      skippedCount: duplicateRows.length,
+      skippedCount: overwriteDuplicates ? 0 : duplicateRows.length,
       dateRangeStart,
       dateRangeEnd,
       status: "completed",
@@ -242,6 +262,7 @@ export async function confirmImport(
     .get();
 
   const insertedIds: number[] = [];
+  let overwritten = 0;
 
   db.transaction((tx) => {
     for (const row of newRows) {
@@ -256,6 +277,8 @@ export async function confirmImport(
             description: row.description,
             normalised: row.normalised,
             amount: row.amount,
+            originalAmount: row.amount,
+            originalCurrency: row.currency ?? account.currency,
             tags: "[]",
             categoryConfirmed: false,
           })
@@ -264,6 +287,32 @@ export async function confirmImport(
         insertedIds.push(result.id);
       } catch {
         // Skip duplicates that slipped through
+      }
+    }
+
+    if (overwriteDuplicates) {
+      const now = Math.floor(Date.now() / 1000);
+      for (const row of duplicateRows) {
+        const result = tx
+          .update(transactions)
+          .set({
+            importBatchId: batch.id,
+            description: row.description,
+            normalised: row.normalised,
+            amount: row.amount,
+            originalAmount: row.amount,
+            originalCurrency: row.currency ?? account.currency,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(transactions.accountId, accountId),
+              eq(transactions.fingerprint, row.fingerprint),
+            ),
+          )
+          .returning({ id: transactions.id })
+          .all();
+        overwritten += result.length;
       }
     }
   });
@@ -281,7 +330,10 @@ export async function confirmImport(
     data: {
       batchId: batch.id,
       imported: insertedIds.length,
-      skipped: duplicateRows.length + (newRows.length - insertedIds.length),
+      overwritten,
+      skipped:
+        (overwriteDuplicates ? 0 : duplicateRows.length) +
+        (newRows.length - insertedIds.length),
     },
   };
 }

@@ -54,6 +54,10 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
       outValues: ["OUT"],
       inValues: ["IN"],
       descriptionFallbackColumns: ["Reference", "Target name", "Source name"],
+      sourceAmountColumn: "Source amount (after fees)",
+      sourceCurrencyColumn: "Source currency",
+      targetAmountColumn: "Target amount (after fees)",
+      targetCurrencyColumn: "Target currency",
     }),
     isSystem: true,
   },
@@ -127,7 +131,7 @@ export function parseDateToISO(dateStr: string, format: string): string | null {
     if (format === "YYYY-MM-DD HH:mm") {
       const match = dateStr
         .trim()
-        .match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+\d{1,2}:\d{2})?$/);
+        .match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
       if (!match) return null;
       const year = Number.parseInt(match[1], 10);
       const month = Number.parseInt(match[2], 10);

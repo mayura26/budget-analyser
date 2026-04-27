@@ -24,6 +24,11 @@ export type ColumnMapping = {
   outValues?: string[];
   inValues?: string[];
   descriptionFallbackColumns?: string[];
+  sourceAmountColumn?: string;
+  sourceCurrencyColumn?: string;
+  targetAmountColumn?: string;
+  targetCurrencyColumn?: string;
+  accountCurrency?: string;
 };
 
 export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
@@ -39,6 +44,10 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         outValues?: string[];
         inValues?: string[];
         descriptionFallbackColumns?: string[];
+        sourceAmountColumn?: string;
+        sourceCurrencyColumn?: string;
+        targetAmountColumn?: string;
+        targetCurrencyColumn?: string;
       };
       if (typeof parsed.hasHeader === "boolean") {
         hasHeader = parsed.hasHeader;
@@ -62,6 +71,10 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         outValues: parsed.outValues,
         inValues: parsed.inValues,
         descriptionFallbackColumns: parsed.descriptionFallbackColumns,
+        sourceAmountColumn: parsed.sourceAmountColumn,
+        sourceCurrencyColumn: parsed.sourceCurrencyColumn,
+        targetAmountColumn: parsed.targetAmountColumn,
+        targetCurrencyColumn: parsed.targetCurrencyColumn,
       };
     } catch {
       // Ignore invalid JSON and fall back to header-based parsing.
@@ -203,14 +216,18 @@ export function parseCSV(
     }
 
     let amount: number;
+    let currency: string | undefined;
 
-    if (mapping.amountColumn && row[mapping.amountColumn] !== undefined) {
-      const raw = normaliseAmount(row[mapping.amountColumn]);
+    const resolved = resolveMappedAmountAndCurrency(row, mapping);
+    const resolvedAmount = resolved?.amount ?? null;
+    if (resolvedAmount !== null) {
+      const raw = normaliseAmount(resolvedAmount);
       amount = parseFloat(raw);
       if (Number.isNaN(amount)) {
         errors.push(`Invalid amount "${raw}" in row ${i + 1}`);
         continue;
       }
+      currency = resolved?.currency;
     } else if (mapping.debitColumn && mapping.creditColumn) {
       const debitRaw = normaliseAmount(row[mapping.debitColumn] ?? "0");
       const creditRaw = normaliseAmount(row[mapping.creditColumn] ?? "0");
@@ -225,7 +242,7 @@ export function parseCSV(
 
     amount = normaliseSignedAmount(amount, mapping, row);
 
-    rows.push({ date, description: desc, amount, rawRow: row });
+    rows.push({ date, description: desc, amount, currency, rawRow: row });
   }
 
   return { rows, headers, errors };
@@ -271,6 +288,71 @@ function resolveDescription(
     if (value) return value;
   }
   return "";
+}
+
+function resolveMappedAmountAndCurrency(
+  row: Record<string, string>,
+  mapping: ColumnMapping,
+): { amount: string; currency?: string } | null {
+  const accountCurrency = mapping.accountCurrency?.trim().toUpperCase();
+
+  if (
+    accountCurrency &&
+    mapping.sourceAmountColumn &&
+    mapping.sourceCurrencyColumn &&
+    mapping.targetAmountColumn &&
+    mapping.targetCurrencyColumn
+  ) {
+    const sourceCurrency = (row[mapping.sourceCurrencyColumn] ?? "")
+      .trim()
+      .toUpperCase();
+    const targetCurrency = (row[mapping.targetCurrencyColumn] ?? "")
+      .trim()
+      .toUpperCase();
+
+    if (targetCurrency === accountCurrency) {
+      const targetAmount = row[mapping.targetAmountColumn];
+      if (targetAmount !== undefined && targetAmount !== "") {
+        return { amount: targetAmount, currency: targetCurrency || undefined };
+      }
+    }
+
+    if (sourceCurrency === accountCurrency) {
+      const sourceAmount = row[mapping.sourceAmountColumn];
+      if (sourceAmount !== undefined && sourceAmount !== "") {
+        return { amount: sourceAmount, currency: sourceCurrency || undefined };
+      }
+    }
+
+    if (targetAmountColumnHasValue(row, mapping.targetAmountColumn)) {
+      const targetAmount = row[mapping.targetAmountColumn];
+      if (targetAmount !== undefined && targetAmount !== "") {
+        return { amount: targetAmount, currency: targetCurrency || undefined };
+      }
+    }
+
+    if (targetAmountColumnHasValue(row, mapping.sourceAmountColumn)) {
+      const sourceAmount = row[mapping.sourceAmountColumn];
+      if (sourceAmount !== undefined && sourceAmount !== "") {
+        return { amount: sourceAmount, currency: sourceCurrency || undefined };
+      }
+    }
+  }
+
+  if (mapping.amountColumn && row[mapping.amountColumn] !== undefined) {
+    return { amount: row[mapping.amountColumn] };
+  }
+
+  return null;
+}
+
+function targetAmountColumnHasValue(
+  row: Record<string, string>,
+  column?: string,
+): boolean {
+  if (!column) return false;
+  const value = row[column];
+  return value !== undefined && value !== "";
 }
 
 export function detectDelimiter(csvContent: string): string {

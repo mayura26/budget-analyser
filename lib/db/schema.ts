@@ -143,6 +143,8 @@ export const transactions = sqliteTable(
     description: text("description").notNull(),
     normalised: text("normalised").notNull(),
     amount: real("amount").notNull(), // negative=debit, positive=credit
+    originalAmount: real("original_amount"),
+    originalCurrency: text("original_currency"),
     categoryId: integer("category_id").references(() => categories.id, {
       onDelete: "set null",
     }),

@@ -1,3 +1,3 @@
 ID,Status,Direction,Created on,Finished on,Source fee amount,Source fee currency,Target fee amount,Target fee currency,Source name,Source amount (after fees),Source currency,Target name,Target amount (after fees),Target currency,Exchange rate,Reference,Batch,Created by,Category,Note
-TRANSFER-2056821763,COMPLETED,IN,2026-04-03 3:16,2026-04-03 3:17,,,,,Kanthavel Mayura Vivekananda,1161.81,USD,MARKET EDGE ANALYTICS LTD.,1161.81,USD,1,Redoing personal account,,Kanthavel Mayura Vivekananda,Money added,
-CARD_ORDER-26516729,COMPLETED,OUT,2026-04-18 4:37,2026-04-18 4:38,,,,,,7.19,USD,TransferWise,10,AUD,1.39509,26516729,,Kanthavel Mayura Vivekananda,General,
+TRANSFER-2056821763,COMPLETED,IN,2026-04-03 03:16:57,2026-04-03 03:17:15,,,,,Kanthavel Mayura Vivekananda,1161.81,USD,MARKET EDGE ANALYTICS LTD.,1161.81,USD,1,Redoing personal account,,Kanthavel Mayura Vivekananda,Money added,
+CARD_ORDER-26516729,COMPLETED,OUT,2026-04-18 04:37:41,2026-04-18 04:38:09,,,,,,7.19,USD,TransferWise,10,AUD,1.39509,26516729,,Kanthavel Mayura Vivekananda,General,

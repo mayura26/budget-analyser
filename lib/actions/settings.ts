@@ -12,7 +12,6 @@ const SettingsSchema = z.object({
   openai_model: z.string().default("gpt-4o-mini"),
   ai_enabled: z.enum(["true", "false"]).default("false"),
   home_currency: z.enum(SUPPORTED_CURRENCIES),
-  transaction_amount_display: z.enum(["account", "home"]).default("account"),
 });
 
 export async function saveSettings(
@@ -23,8 +22,6 @@ export async function saveSettings(
     openai_model: (formData.get("openai_model") as string) || "gpt-4o-mini",
     ai_enabled: (formData.get("ai_enabled") as string) || "false",
     home_currency: (formData.get("home_currency") as string) || "AUD",
-    transaction_amount_display:
-      (formData.get("transaction_amount_display") as string) || "account",
   };
 
   const parsed = SettingsSchema.safeParse(data);
@@ -62,31 +59,6 @@ export async function saveSettings(
 export async function getSettings(): Promise<Record<string, string>> {
   const rows = db.select().from(settings).all();
   return Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
-}
-
-export async function setTransactionAmountDisplay(
-  mode: "account" | "home",
-): Promise<ActionResult> {
-  if (mode !== "account" && mode !== "home") {
-    return { success: false, error: "Invalid display mode" };
-  }
-  db.insert(settings)
-    .values({
-      key: "transaction_amount_display",
-      value: mode,
-      updatedAt: Math.floor(Date.now() / 1000),
-    })
-    .onConflictDoUpdate({
-      target: settings.key,
-      set: {
-        value: mode,
-        updatedAt: Math.floor(Date.now() / 1000),
-      },
-    })
-    .run();
-  revalidatePath("/transactions");
-  revalidatePath("/settings");
-  return { success: true, data: undefined };
 }
 
 const BankProfileSchema = z.object({

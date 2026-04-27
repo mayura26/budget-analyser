@@ -20,7 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
 import { LinkTransferPopover } from "@/components/transactions/link-transfer-popover";
@@ -42,7 +42,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { setTransactionAmountDisplay } from "@/lib/actions/settings";
 import {
   deleteTransaction,
   setTransactionCategoryConfirmed,
@@ -59,6 +58,8 @@ type Row = {
   date: string;
   description: string;
   amount: number;
+  originalAmount: number | null;
+  originalCurrency: string | null;
   categoryId: number | null;
   categoryName: string | null;
   categoryColor: string | null;
@@ -98,7 +99,6 @@ export function TransactionTable({
   categoryMains,
   currentFilters,
   homeCurrency,
-  transactionAmountDisplay,
 }: {
   rows: Row[];
   accounts: Account[];
@@ -107,20 +107,11 @@ export function TransactionTable({
   categoryMains?: Category[];
   currentFilters: Record<string, string | undefined>;
   homeCurrency: SupportedCurrency;
-  transactionAmountDisplay: "account" | "home";
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState(currentFilters.search ?? "");
-  const [amountDisplay, setAmountDisplay] = useState<"account" | "home">(
-    transactionAmountDisplay,
-  );
-  const [amountDisplayPending, setAmountDisplayPending] = useState(false);
-
-  useEffect(() => {
-    setAmountDisplay(transactionAmountDisplay);
-  }, [transactionAmountDisplay]);
 
   const updateFilter = useCallback(
     (key: string, value: string | undefined) => {
@@ -227,14 +218,8 @@ export function TransactionTable({
     }),
     col.accessor("amount", {
       sortingFn: (rowA, rowB) => {
-        const a =
-          amountDisplay === "home"
-            ? rowA.original.amountInHome
-            : rowA.original.amount;
-        const b =
-          amountDisplay === "home"
-            ? rowB.original.amountInHome
-            : rowB.original.amount;
+        const a = rowA.original.amountInHome;
+        const b = rowB.original.amountInHome;
         return a - b;
       },
       header: ({ column }) => (
@@ -255,28 +240,38 @@ export function TransactionTable({
       ),
       cell: (info) => {
         const row = info.row.original;
-        const amount = row.amount;
         const isTransfer = row.categoryType === "transfer";
-        const ccy = parseAccountCurrency(row.accountCurrency, homeCurrency);
-        const useHome = amountDisplay === "home";
-        const signed = useHome ? row.amountInHome : amount;
-        const displayCcy = useHome ? homeCurrency : ccy;
+        const originalCurrency = parseAccountCurrency(
+          row.originalCurrency ?? row.accountCurrency,
+          homeCurrency,
+        );
+        const homeSigned = row.amountInHome;
+        const originalSigned = row.originalAmount ?? row.amount;
+        const showSecondaryAccountLine = originalCurrency !== homeCurrency;
         return (
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex items-start justify-end gap-1">
+            <div className="flex flex-col items-end">
+              <span
+                className={`text-sm font-medium whitespace-nowrap ${
+                  homeSigned < 0 ? "text-red-600" : "text-green-600"
+                }`}
+              >
+                {homeSigned < 0 ? "-" : "+"}
+                {formatCurrency(Math.abs(homeSigned), homeCurrency)}
+              </span>
+              {showSecondaryAccountLine && (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {originalSigned < 0 ? "-" : "+"}
+                  {formatCurrency(Math.abs(originalSigned), originalCurrency)}
+                </span>
+              )}
+            </div>
             {isTransfer && (
               <LinkTransferPopover
                 transactionId={row.id}
                 linkedTransactionId={row.linkedTransactionId}
               />
             )}
-            <span
-              className={`text-sm font-medium whitespace-nowrap ${
-                signed < 0 ? "text-red-600" : "text-green-600"
-              }`}
-            >
-              {signed < 0 ? "-" : "+"}
-              {formatCurrency(Math.abs(signed), displayCcy)}
-            </span>
           </div>
         );
       },
@@ -393,31 +388,6 @@ export function TransactionTable({
           </SelectContent>
         </Select>
 
-        <Select
-          value={amountDisplay}
-          disabled={amountDisplayPending}
-          onValueChange={async (v) => {
-            if (v !== "account" && v !== "home") return;
-            setAmountDisplay(v);
-            setAmountDisplayPending(true);
-            await setTransactionAmountDisplay(v);
-            router.refresh();
-            setAmountDisplayPending(false);
-          }}
-        >
-          <SelectTrigger
-            className="h-8 text-sm w-full sm:w-56"
-            data-testid="transaction-amount-display"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="account">Amounts: account currency</SelectItem>
-            <SelectItem value="home">
-              Amounts: home currency ({homeCurrency})
-            </SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Table */}

@@ -182,26 +182,36 @@ test.describe("Transactions", () => {
     });
   });
 
-  test("amount display mode combobox persists after reload", async ({
+  test("non-home account amounts show home value with account value below", async ({
     page,
   }) => {
-    await page.goto("/transactions");
-    await expect(page.getByTestId("transaction-amount-display")).toBeVisible();
-    await page.getByTestId("transaction-amount-display").click();
-    await page.getByRole("option", { name: /Amounts: home currency/i }).click();
-    await expect(page.getByTestId("transaction-amount-display")).toContainText(
-      /home currency/i,
-    );
-    await page.reload();
-    await expect(page.getByTestId("transaction-amount-display")).toContainText(
-      /home currency/i,
-    );
-    await page.getByTestId("transaction-amount-display").click();
-    await page
-      .getByRole("option", { name: /Amounts: account currency/i })
-      .click();
-    await expect(page.getByTestId("transaction-amount-display")).toContainText(
-      /account currency/i,
+    const usdAccountName = `E2E USD Account ${Date.now()}`;
+    const txnDescription = `E2E USD txn ${Date.now()}`;
+
+    await page.goto("/accounts");
+    await page.getByRole("button", { name: "Add account" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="name"]').fill(usdAccountName);
+    await dialog.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: "USD" }).click();
+    await dialog.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByText(usdAccountName)).toBeVisible();
+
+    await page.goto("/transactions/new");
+    await page.getByLabel("Description").fill(txnDescription);
+    await page.getByLabel("Amount (negative = expense)").fill("-150");
+    await page.locator("select#accountId").selectOption({ label: usdAccountName });
+    await page.getByRole("button", { name: "Save transaction" }).click();
+    await expect(page).toHaveURL("/transactions", { timeout: 15000 });
+
+    const row = page.locator("tbody tr").filter({ hasText: txnDescription });
+    await expect(row).toBeVisible();
+    const amountCell = row.locator("td").nth(5);
+    await expect(amountCell.locator("span.text-sm.font-medium")).toBeVisible();
+    await expect(amountCell.locator("span.text-xs.text-muted-foreground")).toContainText(
+      "USD",
     );
   });
+
 });

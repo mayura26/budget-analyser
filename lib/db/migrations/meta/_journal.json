@@ -71,6 +71,20 @@
       "when": 1775100000000,
       "tag": "0009_budgets",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1775200000000,
+      "tag": "0010_transaction_original_currency",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1775300000000,
+      "tag": "0011_transaction_original_currency_code",
+      "breakpoints": true
     }
   ]
 }

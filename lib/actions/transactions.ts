@@ -110,6 +110,13 @@ export async function createManualTransaction(
     : [];
 
   try {
+    const account = db
+      .select({ currency: accounts.currency })
+      .from(accounts)
+      .where(eq(accounts.id, accountId))
+      .get();
+    if (!account) return { success: false, error: "Account not found" };
+
     const result = db
       .insert(transactions)
       .values({
@@ -119,6 +126,8 @@ export async function createManualTransaction(
         normalised,
         fingerprint,
         amount,
+        originalAmount: amount,
+        originalCurrency: account.currency,
         categoryId: categoryId ?? null,
         categorySource: categoryId ? "manual" : null,
         notes: notes ?? null,

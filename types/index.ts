@@ -54,6 +54,8 @@ export type Transaction = {
   description: string;
   normalised: string;
   amount: number; // negative=debit, positive=credit
+  originalAmount: number | null;
+  originalCurrency: string | null;
   categoryId: number | null;
   categorySource: "rule" | "ai" | "manual" | null;
   confidence: number | null;
@@ -107,6 +109,7 @@ export type ParsedRow = {
   date: string;
   description: string;
   amount: number;
+  currency?: string;
   rawRow: Record<string, string>;
 };
 

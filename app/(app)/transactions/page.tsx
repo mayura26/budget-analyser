@@ -6,7 +6,6 @@ import Link from "next/link";
 import { TransactionActions } from "@/components/transactions/transaction-actions";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
-import { getSettings } from "@/lib/actions/settings";
 import { isValidISODate } from "@/lib/analytics/date-range";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
@@ -32,9 +31,6 @@ export default async function TransactionsPage({
 }) {
   const params = await searchParams;
   const homeCurrency = getHomeCurrency();
-  const settingsMap = await getSettings();
-  const transactionAmountDisplay =
-    settingsMap.transaction_amount_display === "home" ? "home" : "account";
 
   const allAccounts = db.select().from(accounts).all();
   const allCatsRaw = db.select().from(categories).all() as Category[];
@@ -89,6 +85,8 @@ export default async function TransactionsPage({
       date: transactions.date,
       description: transactions.description,
       amount: transactions.amount,
+      originalAmount: transactions.originalAmount,
+      originalCurrency: transactions.originalCurrency,
       categoryId: transactions.categoryId,
       categoryName: sql<string>`${categories.name}`,
       categoryColor: sql<string>`${categories.color}`,
@@ -114,14 +112,27 @@ export default async function TransactionsPage({
     db,
     rows.map((r) => ({
       date: r.date,
-      from: parseAccountCurrency(r.accountCurrency, homeCurrency),
+      from: parseAccountCurrency(
+        r.originalCurrency ?? r.accountCurrency,
+        homeCurrency,
+      ),
     })),
     homeCurrency,
   );
 
   const rowsWithHome = rows.map((r) => {
-    const ccy = parseAccountCurrency(r.accountCurrency, homeCurrency);
-    const amountInHome = convertToHome(db, r.amount, ccy, homeCurrency, r.date);
+    const sourceCurrency = parseAccountCurrency(
+      r.originalCurrency ?? r.accountCurrency,
+      homeCurrency,
+    );
+    const sourceAmount = r.originalAmount ?? r.amount;
+    const amountInHome = convertToHome(
+      db,
+      sourceAmount,
+      sourceCurrency,
+      homeCurrency,
+      r.date,
+    );
     return { ...r, amountInHome };
   });
 
@@ -207,7 +218,6 @@ export default async function TransactionsPage({
         categoryMains={categoryMains}
         currentFilters={params}
         homeCurrency={homeCurrency}
-        transactionAmountDisplay={transactionAmountDisplay}
       />
     </div>
   );

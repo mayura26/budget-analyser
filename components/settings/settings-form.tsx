@@ -53,7 +53,6 @@ export function SettingsForm({
     openai_model: string;
     ai_enabled: string;
     home_currency: string;
-    transaction_amount_display: string;
   };
 }) {
   const [state, formAction, pending] = useActionState(saveSettings, null);
@@ -89,30 +88,6 @@ export function SettingsForm({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="transaction_amount_display">
-              Transaction list amounts
-            </Label>
-            <Select
-              name="transaction_amount_display"
-              defaultValue={defaultValues.transaction_amount_display}
-            >
-              <SelectTrigger id="transaction_amount_display">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="account">
-                  Account (transaction) currency
-                </SelectItem>
-                <SelectItem value="home">Home currency</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Choose whether the Transactions page shows each row in the
-              account&apos;s currency or converted to your home currency using
-              rates for that day.
-            </p>
-          </div>
         </CardContent>
       </Card>
 
