@@ -120,6 +120,88 @@ test.describe("Budget", () => {
     }
   });
 
+  test("closed month unlocks review page with quick and deep formats", async ({
+    page,
+  }) => {
+    await page.route("**/api/ai-budget-review", async (route) => {
+      const body = route.request().postDataJSON() as {
+        month?: string;
+        format?: "digest" | "deep";
+      };
+      const format = body.format === "deep" ? "deep" : "digest";
+      const payload =
+        format === "digest"
+          ? {
+              format: "digest",
+              metrics: {
+                month: body.month ?? "2026-01",
+                monthLabel: "January 2026",
+                totalBudgeted: 2000,
+                totalSpent: 1900,
+                projectedSpend: 1900,
+                netVariance: -100,
+                onTrack: true,
+                topOverspend: [],
+                topUnderspend: [],
+              },
+              review: {
+                headline: "Strong finish for the month.",
+                risks: ["Dining out is still near your limit."],
+                wins: ["Groceries closed under target."],
+                actions: ["Carry $50 into your utilities buffer next month."],
+              },
+            }
+          : {
+              format: "deep",
+              metrics: {
+                month: body.month ?? "2026-01",
+                monthLabel: "January 2026",
+                totalBudgeted: 2000,
+                totalSpent: 2100,
+                projectedSpend: 2100,
+                netVariance: 100,
+                onTrack: false,
+                topOverspend: [],
+                topUnderspend: [],
+              },
+              review: {
+                executiveSummary: "You closed slightly over budget.",
+                keyFindings: ["Transport and dining drove most variance."],
+                varianceDrivers: ["Dining out exceeded target by $80."],
+                recommendations: ["Reduce dining cap by one meal per week."],
+              },
+            };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(payload),
+      });
+    });
+
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    await page.goto(`/budget?month=${prevMonth}`);
+
+    const closeButton = page.getByRole("button", { name: "Close Month" });
+    if (await closeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await closeButton.click();
+      await expect(page.getByRole("button", { name: "Month Closed" })).toBeVisible();
+    }
+
+    const reviewButton = page.getByRole("button", { name: "Review Month" });
+    await expect(reviewButton).toBeEnabled();
+    await reviewButton.click();
+
+    await expect(page.getByText(/End-of-month review for/i)).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Quick Digest" })).toBeVisible();
+    await expect(page.getByText("Strong finish for the month.")).toBeVisible();
+
+    await page.getByRole("tab", { name: "Deep Review" }).click();
+    await expect(page.getByText("You closed slightly over budget.")).toBeVisible();
+    await expect(page.getByText("Variance Drivers")).toBeVisible();
+  });
+
   test("current month monthly budget tab; optional transaction drill-down", async ({
     page,
   }) => {

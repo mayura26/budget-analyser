@@ -5,6 +5,7 @@ import type { SupportedCurrency } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
 import {
   accounts,
+  budgetMonthStatus,
   budgets,
   categories,
   scheduledTransactions,
@@ -19,6 +20,7 @@ import type {
   Budget,
   BudgetCategoryRow,
   BudgetGenerateAnalyticsRow,
+  BudgetMonthStatus,
   BudgetSummary,
   Category,
 } from "@/types";
@@ -39,6 +41,29 @@ export function hasBudgetTargets(month: string): boolean {
     .where(eq(budgets.month, month))
     .get();
   return (row?.count ?? 0) > 0;
+}
+
+export function getMonthStatus(month: string): BudgetMonthStatus | null {
+  const row = db
+    .select()
+    .from(budgetMonthStatus)
+    .where(eq(budgetMonthStatus.month, month))
+    .get();
+  return (row as BudgetMonthStatus | undefined) ?? null;
+}
+
+export function isMonthClosed(month: string): boolean {
+  const status = getMonthStatus(month);
+  return status?.isClosed ?? false;
+}
+
+export function closeMonth(month: string): void {
+  db.run(sql`
+    INSERT INTO budget_month_status (month, is_closed, closed_at, created_at, updated_at)
+    VALUES (${month}, 1, unixepoch(), unixepoch(), unixepoch())
+    ON CONFLICT (month)
+    DO UPDATE SET is_closed = 1, closed_at = COALESCE(budget_month_status.closed_at, unixepoch()), updated_at = unixepoch()
+  `);
 }
 
 export async function getActualSpendingByCategory(

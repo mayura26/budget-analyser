@@ -217,6 +217,19 @@ export const budgets = sqliteTable(
   ],
 );
 
+export const budgetMonthStatus = sqliteTable(
+  "budget_month_status",
+  {
+    month: text("month").primaryKey(), // YYYY-MM
+    isClosed: integer("is_closed", { mode: "boolean" }).notNull().default(false),
+    closedAt: integer("closed_at"),
+    reviewGeneratedAt: integer("review_generated_at"),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+  },
+  (table) => [index("budget_month_status_closed_idx").on(table.isClosed)],
+);
+
 export const dismissedMismatches = sqliteTable(
   "dismissed_mismatches",
   {

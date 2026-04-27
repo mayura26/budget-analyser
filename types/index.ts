@@ -178,6 +178,15 @@ export type Budget = {
   updatedAt: number;
 };
 
+export type BudgetMonthStatus = {
+  month: string;
+  isClosed: boolean;
+  closedAt: number | null;
+  reviewGeneratedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type BudgetCategoryRow = {
   categoryId: number;
   categoryName: string;

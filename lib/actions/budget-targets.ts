@@ -4,12 +4,15 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
   buildBudgetGenerateAnalyticsRows,
+  closeMonth,
   getHistoricalAverages,
+  isMonthClosed,
 } from "@/lib/budget/queries";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { budgets, categories, settings } from "@/lib/db/schema";
+import { getCurrentMonth } from "@/lib/utils";
 import type {
   ActionResult,
   BudgetGenerateAnalyticsRow,
@@ -287,5 +290,31 @@ export async function applyGeneratedBudgetTargets(
 
   revalidatePath("/budget");
   revalidatePath("/dashboard");
+  return { success: true, data: undefined };
+}
+
+export async function closeBudgetMonthAction(month: string): Promise<ActionResult> {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return { success: false, error: "Invalid month" };
+  }
+
+  const currentMonth = getCurrentMonth();
+  if (month >= currentMonth) {
+    return {
+      success: false,
+      error: "You can only close completed months",
+    };
+  }
+
+  if (isMonthClosed(month)) {
+    return {
+      success: false,
+      error: "Month is already closed",
+    };
+  }
+
+  closeMonth(month);
+  revalidatePath("/budget");
+  revalidatePath(`/budget/review?month=${month}`);
   return { success: true, data: undefined };
 }

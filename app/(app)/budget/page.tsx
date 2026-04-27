@@ -20,6 +20,7 @@ import {
   buildBudgetSummary,
   getScheduledAmountsByCategory,
   hasBudgetTargets,
+  isMonthClosed,
 } from "@/lib/budget/queries";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { getHomeCurrency } from "@/lib/currency/home";
@@ -146,6 +147,8 @@ export default async function BudgetPage({
   const previousMonth = addCalendarMonths(selectedMonth, -1);
   const hasPrevBudget = hasBudgetTargets(previousMonth);
   const isReadOnly = selectedMonth < currentMonth;
+  const monthClosed = isMonthClosed(selectedMonth);
+  const canCloseMonth = selectedMonth < currentMonth && !monthClosed;
 
   const { start: monthRangeStart, end: monthRangeEnd } =
     getMonthRange(selectedMonth);
@@ -191,6 +194,8 @@ export default async function BudgetPage({
             previousMonth={previousMonth}
             aiEnabled={aiEnabled}
             readOnly={isReadOnly}
+            monthClosed={monthClosed}
+            canCloseMonth={canCloseMonth}
             homeCurrency={homeCurrency}
             expenseTransactionsByCategory={expenseTransactionsByCategory}
             monthRangeStart={monthRangeStart}

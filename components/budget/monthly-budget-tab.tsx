@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Copy, Sparkles, TrendingUp } from "lucide-react";
+import { CalendarClock, CheckCircle2, Copy, Sparkles, TrendingUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AiBudgetSuggestionsDialog } from "@/components/budget/ai-budget-suggestions-dialog";
@@ -11,6 +11,7 @@ import { BudgetSummaryStrip } from "@/components/budget/budget-summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  closeBudgetMonthAction,
   copyBudgetForward,
   initFromAverages,
 } from "@/lib/actions/budget-targets";
@@ -30,6 +31,8 @@ export function MonthlyBudgetTab({
   previousMonth,
   aiEnabled,
   readOnly,
+  monthClosed,
+  canCloseMonth,
   homeCurrency,
   expenseTransactionsByCategory,
   monthRangeStart,
@@ -42,6 +45,8 @@ export function MonthlyBudgetTab({
   previousMonth: string;
   aiEnabled: boolean;
   readOnly: boolean;
+  monthClosed: boolean;
+  canCloseMonth: boolean;
   homeCurrency: SupportedCurrency;
   expenseTransactionsByCategory?:
     | Record<string, AnalyticsExpenseTransactionLine[]>
@@ -70,11 +75,50 @@ export function MonthlyBudgetTab({
     });
   };
 
+  const handleCloseMonth = () => {
+    startTransition(async () => {
+      await closeBudgetMonthAction(month);
+      router.refresh();
+    });
+  };
+
+  const handleReviewMonth = () => {
+    router.push(`/budget/review?month=${month}`);
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {hasBudget ? (
         <>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleReviewMonth}
+              disabled={!monthClosed}
+              title={
+                monthClosed
+                  ? "Open end-of-month AI review"
+                  : "Close this month to unlock review"
+              }
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Review Month
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCloseMonth}
+              disabled={pending || !canCloseMonth}
+              title={
+                canCloseMonth
+                  ? "Close this month for final review"
+                  : monthClosed
+                    ? "Month already closed"
+                    : "Only completed months can be closed"
+              }
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              {monthClosed ? "Month Closed" : "Close Month"}
+            </Button>
             <Button
               variant="outline"
               onClick={() => setShowGenerateDialog(true)}
@@ -116,6 +160,34 @@ export function MonthlyBudgetTab({
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleReviewMonth}
+                  disabled={!monthClosed}
+                  title={
+                    monthClosed
+                      ? "Open end-of-month AI review"
+                      : "Close this month to unlock review"
+                  }
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Review Month
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCloseMonth}
+                  disabled={pending || !canCloseMonth}
+                  title={
+                    canCloseMonth
+                      ? "Close this month for final review"
+                      : monthClosed
+                        ? "Month already closed"
+                        : "Only completed months can be closed"
+                  }
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  {monthClosed ? "Month Closed" : "Close Month"}
+                </Button>
                 <Button
                   variant="default"
                   onClick={() => setShowGenerateDialog(true)}
