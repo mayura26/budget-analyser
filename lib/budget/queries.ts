@@ -18,6 +18,7 @@ import {
 import type {
   Budget,
   BudgetCategoryRow,
+  BudgetGenerateAnalyticsRow,
   BudgetSummary,
   Category,
 } from "@/types";
@@ -315,6 +316,60 @@ export async function buildBudgetCategoryRows(
       actualSpent: actual.get(cat.id) ?? 0,
       scheduledAmount: scheduled.get(cat.id) ?? 0,
       avg3Month: averages.get(cat.id) ?? 0,
+    }))
+    .sort((a, b) => {
+      const groupCmp = a.parentName.localeCompare(b.parentName);
+      if (groupCmp !== 0) return groupCmp;
+      return a.categoryName.localeCompare(b.categoryName);
+    });
+}
+
+export async function buildBudgetGenerateAnalyticsRows(
+  month: string,
+  allCategories: Category[],
+  homeCurrency: SupportedCurrency,
+): Promise<BudgetGenerateAnalyticsRow[]> {
+  const currentTargets = getBudgetTargetsForMonth(month);
+  const currentTargetMap = new Map(
+    currentTargets.map((target) => [target.categoryId, target.targetAmount]),
+  );
+  const previousMonth = addCalendarMonths(month, -1);
+  const lastTargets = getBudgetTargetsForMonth(previousMonth);
+  const lastTargetMap = new Map(
+    lastTargets.map((target) => [target.categoryId, target.targetAmount]),
+  );
+  const lastMonthSpent = await getActualSpendingByCategory(
+    previousMonth,
+    homeCurrency,
+  );
+  const averages = await getHistoricalAverages(month, homeCurrency);
+  const { expenses: scheduled } = await getScheduledAmountsByCategory(
+    month,
+    homeCurrency,
+  );
+
+  const mainGroups = new Map(
+    allCategories.filter((c) => c.parentId === null).map((c) => [c.id, c.name]),
+  );
+
+  const expenseSubs = allCategories.filter(
+    (c) => c.parentId !== null && c.type === "expense",
+  );
+
+  return expenseSubs
+    .map((cat) => ({
+      categoryId: cat.id,
+      categoryName: cat.name,
+      parentName:
+        cat.parentId != null
+          ? (mainGroups.get(cat.parentId) ?? "Other")
+          : "Other",
+      color: cat.color,
+      currentMonthTarget: currentTargetMap.get(cat.id) ?? 0,
+      lastMonthTarget: lastTargetMap.get(cat.id) ?? 0,
+      lastMonthSpent: lastMonthSpent.get(cat.id) ?? 0,
+      avg3Month: averages.get(cat.id) ?? 0,
+      expectedSpend: scheduled.get(cat.id) ?? 0,
     }))
     .sort((a, b) => {
       const groupCmp = a.parentName.localeCompare(b.parentName);

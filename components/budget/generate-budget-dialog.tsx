@@ -1,0 +1,272 @@
+"use client";
+
+import { Check, Loader2, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  applyGeneratedBudgetTargets,
+  generateBudgetRecommendations,
+} from "@/lib/actions/budget-targets";
+import type { SupportedCurrency } from "@/lib/currency/supported";
+import { formatCurrency } from "@/lib/utils";
+import type { BudgetGenerateRecommendationRow } from "@/types";
+
+export function GenerateBudgetDialog({
+  month,
+  open,
+  onClose,
+  homeCurrency,
+}: {
+  month: string;
+  open: boolean;
+  onClose: () => void;
+  homeCurrency: SupportedCurrency;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<BudgetGenerateRecommendationRow[]>([]);
+  const [overallNotes, setOverallNotes] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [amounts, setAmounts] = useState<Map<number, number>>(new Map());
+  const [applying, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      const result = await generateBudgetRecommendations(month);
+      if (cancelled) return;
+      if (!result.success) {
+        setError(result.error);
+        setRows([]);
+        setOverallNotes("");
+        setSelectedIds(new Set());
+        setAmounts(new Map());
+        setLoading(false);
+        return;
+      }
+
+      const recommendations = result.data.recommendations;
+      setRows(recommendations);
+      setOverallNotes(result.data.overallNotes);
+      setSelectedIds(new Set(recommendations.map((row) => row.categoryId)));
+      setAmounts(
+        new Map(
+          recommendations.map((row) => [row.categoryId, row.recommendedTarget]),
+        ),
+      );
+      setLoading(false);
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [month, open]);
+
+  const selectedTotal = useMemo(
+    () =>
+      rows.reduce((sum, row) => {
+        if (!selectedIds.has(row.categoryId)) return sum;
+        return sum + (amounts.get(row.categoryId) ?? row.recommendedTarget);
+      }, 0),
+    [rows, selectedIds, amounts],
+  );
+
+  function toggleSelected(categoryId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  }
+
+  function setAmount(categoryId: number, value: string) {
+    const amount = Number(value);
+    if (Number.isNaN(amount) || amount < 0) return;
+    setAmounts((prev) => new Map(prev).set(categoryId, amount));
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(rows.map((row) => row.categoryId)));
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  function handleApplySelected() {
+    const entries = rows
+      .filter((row) => selectedIds.has(row.categoryId))
+      .map((row) => ({
+        categoryId: row.categoryId,
+        amount: amounts.get(row.categoryId) ?? row.recommendedTarget,
+      }));
+
+    startTransition(async () => {
+      const result = await applyGeneratedBudgetTargets(month, entries);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent
+        className="max-w-6xl max-h-[85vh] overflow-y-auto"
+        aria-describedby={undefined}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-indigo-500" />
+            Generate Budget
+          </DialogTitle>
+        </DialogHeader>
+
+        {loading && (
+          <div className="py-12 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3" />
+            Building recommendations by category...
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">{overallNotes}</p>
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">
+                {selectedIds.size} of {rows.length} categories selected
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={selectAll}>
+                  Select all
+                </Button>
+                <Button variant="outline" size="sm" onClick={clearSelection}>
+                  Clear
+                </Button>
+              </div>
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-20">Apply</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Last Target</TableHead>
+                  <TableHead className="text-right">Last Spent</TableHead>
+                  <TableHead className="text-right">3M Avg</TableHead>
+                  <TableHead className="text-right">Expected</TableHead>
+                  <TableHead className="text-right">Recommend</TableHead>
+                  <TableHead>AI Insight</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => {
+                  const selected = selectedIds.has(row.categoryId);
+                  return (
+                    <TableRow key={row.categoryId}>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant={selected ? "default" : "outline"}
+                          size="sm"
+                          className="h-8 px-2"
+                          onClick={() => toggleSelected(row.categoryId)}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-36">
+                          <p className="font-medium">{row.categoryName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {row.parentName}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(row.lastMonthTarget, homeCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(row.lastMonthSpent, homeCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(row.avg3Month, homeCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(row.expectedSpend, homeCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={10}
+                          value={
+                            amounts.get(row.categoryId) ?? row.recommendedTarget
+                          }
+                          onChange={(event) =>
+                            setAmount(row.categoryId, event.target.value)
+                          }
+                          className="h-8 w-28 ml-auto text-right"
+                        />
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {row.aiInsight}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            <div className="flex items-center justify-between border-t pt-3">
+              <p className="text-sm">
+                Selected total:{" "}
+                <span className="font-semibold">
+                  {formatCurrency(selectedTotal, homeCurrency)}
+                </span>
+              </p>
+              <Button
+                onClick={handleApplySelected}
+                disabled={selectedIds.size === 0 || applying}
+              >
+                {applying ? "Applying..." : "Apply Selected"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

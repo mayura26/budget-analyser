@@ -60,6 +60,25 @@ test.describe("Budget", () => {
     await expect(page.getByText("Set up your budget for")).toBeVisible();
   });
 
+  test("generate budget dialog opens with analytics columns and selection controls", async ({
+    page,
+  }) => {
+    await page.goto("/budget");
+    await page.getByRole("button", { name: "Generate Budget" }).first().click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Generate Budget")).toBeVisible();
+    await expect(dialog.getByText("Last Target")).toBeVisible();
+    await expect(dialog.getByText("Last Spent")).toBeVisible();
+    await expect(dialog.getByText("3M Avg")).toBeVisible();
+    await expect(dialog.getByText("Expected")).toBeVisible();
+    await expect(
+      dialog.getByRole("columnheader", { name: "Recommend" }),
+    ).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Select all" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Clear" })).toBeVisible();
+  });
+
   test("monthly budget tab shows category list with headers", async ({
     page,
   }) => {

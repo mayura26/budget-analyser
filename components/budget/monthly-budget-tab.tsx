@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AiBudgetSuggestionsDialog } from "@/components/budget/ai-budget-suggestions-dialog";
 import { BudgetCategoryList } from "@/components/budget/budget-category-list";
+import { GenerateBudgetDialog } from "@/components/budget/generate-budget-dialog";
 import { BudgetInsightsPanel } from "@/components/budget/budget-insights-panel";
 import { BudgetSummaryStrip } from "@/components/budget/budget-summary-strip";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export function MonthlyBudgetTab({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showAiDialog, setShowAiDialog] = useState(false);
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
 
   const handleCopyForward = () => {
     startTransition(async () => {
@@ -72,6 +74,17 @@ export function MonthlyBudgetTab({
     <div className="space-y-4 sm:space-y-6">
       {hasBudget ? (
         <>
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowGenerateDialog(true)}
+              disabled={pending}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate Budget
+            </Button>
+          </div>
+
           <BudgetSummaryStrip summary={summary} homeCurrency={homeCurrency} />
 
           <BudgetCategoryList
@@ -103,6 +116,14 @@ export function MonthlyBudgetTab({
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button
+                  variant="default"
+                  onClick={() => setShowGenerateDialog(true)}
+                  disabled={pending}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Budget
+                </Button>
                 {hasPreviousMonth && (
                   <Button
                     variant="outline"
@@ -156,6 +177,12 @@ export function MonthlyBudgetTab({
           />
         </>
       )}
+      <GenerateBudgetDialog
+        month={month}
+        open={showGenerateDialog}
+        onClose={() => setShowGenerateDialog(false)}
+        homeCurrency={homeCurrency}
+      />
     </div>
   );
 }

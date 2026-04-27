@@ -222,6 +222,24 @@ export type AiBudgetSuggestionsResponse = {
   overallNotes: string;
 };
 
+export type BudgetGenerateAnalyticsRow = {
+  categoryId: number;
+  categoryName: string;
+  parentName: string;
+  color: string;
+  currentMonthTarget: number;
+  lastMonthTarget: number;
+  lastMonthSpent: number;
+  avg3Month: number;
+  expectedSpend: number;
+};
+
+export type BudgetGenerateRecommendationRow = BudgetGenerateAnalyticsRow & {
+  recommendedTarget: number;
+  trend: "up" | "down" | "stable" | "new";
+  aiInsight: string;
+};
+
 export type MonthlyTotal = {
   month: string; // YYYY-MM
   income: number;
