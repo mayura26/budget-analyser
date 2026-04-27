@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Loader2, Sparkles } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ import {
   generateBudgetRecommendations,
 } from "@/lib/actions/budget-targets";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { cn, formatCurrency } from "@/lib/utils";
+import { budgetCategoryShortTitle, cn, formatCurrency } from "@/lib/utils";
 import type { BudgetGenerateRecommendationRow } from "@/types";
 
 type Direction = "increase" | "decrease" | "keep" | "new";
@@ -75,6 +75,7 @@ export function GenerateBudgetDialog({
   const [overallNotes, setOverallNotes] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [amounts, setAmounts] = useState<Map<number, number>>(new Map());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [applying, startTransition] = useTransition();
 
   useEffect(() => {
@@ -102,6 +103,11 @@ export function GenerateBudgetDialog({
       setAmounts(
         new Map(
           recommendations.map((row) => [row.categoryId, row.recommendedTarget]),
+        ),
+      );
+      setExpandedGroups(
+        new Set(
+          [...new Set(recommendations.map((row) => row.parentName || "Other"))].sort(),
         ),
       );
       setLoading(false);
@@ -199,6 +205,15 @@ export function GenerateBudgetDialog({
     });
   }
 
+  function toggleGroup(group: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  }
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
@@ -232,19 +247,19 @@ export function GenerateBudgetDialog({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div className="rounded-lg border p-3">
+              <div className="rounded-lg border bg-card/80 p-3">
                 <p className="text-xs text-muted-foreground">Selected categories</p>
                 <p className="text-lg font-semibold">
                   {selectedCount} / {rows.length}
                 </p>
               </div>
-              <div className="rounded-lg border p-3">
+              <div className="rounded-lg border bg-amber-500/5 p-3">
                 <p className="text-xs text-muted-foreground">Budget increases</p>
                 <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">
                   {increaseCount}
                 </p>
               </div>
-              <div className="rounded-lg border p-3">
+              <div className="rounded-lg border bg-emerald-500/5 p-3">
                 <p className="text-xs text-muted-foreground">Budget decreases</p>
                 <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
                   {decreaseCount}
@@ -266,7 +281,7 @@ export function GenerateBudgetDialog({
               </div>
             </div>
 
-            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+            <div className="max-h-[50vh] overflow-y-auto pr-1 border rounded-md">
               {groupedRows.map((group) => {
                 const groupSelected = group.rows.filter((row) =>
                   selectedIds.has(row.categoryId),
@@ -274,100 +289,127 @@ export function GenerateBudgetDialog({
                 const groupTotal = groupSelected.reduce((sum, row) => {
                   return sum + (amounts.get(row.categoryId) ?? row.recommendedTarget);
                 }, 0);
+                const isExpanded = expandedGroups.has(group.group);
 
                 return (
-                  <div key={group.group} className="rounded-xl border">
-                    <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                  <div key={group.group} className="mt-2 first:mt-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.group)}
+                      className="w-full flex items-center justify-between px-2 sm:px-3 py-2 text-sm font-semibold hover:bg-muted/50 rounded-md transition-colors bg-muted/20"
+                    >
                       <div className="flex items-center gap-2">
-                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
                         <p className="font-semibold">{group.group}</p>
                       </div>
                       <p className="text-sm text-muted-foreground tabular-nums">
                         {groupSelected.length}/{group.rows.length} selected ·{" "}
                         {formatCurrency(groupTotal, homeCurrency)}
                       </p>
-                    </div>
+                    </button>
 
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-20">Apply</TableHead>
-                          <TableHead>Subcategory</TableHead>
-                          <TableHead className="text-right">Last target</TableHead>
-                          <TableHead className="text-right">Last spent</TableHead>
-                          <TableHead className="text-right">3M avg</TableHead>
-                          <TableHead className="text-right">Expected</TableHead>
-                          <TableHead className="text-right">New target</TableHead>
-                          <TableHead className="text-right">Direction</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {group.rows.map((row) => {
-                          const selected = selectedIds.has(row.categoryId);
-                          const currentAmount =
-                            amounts.get(row.categoryId) ?? row.recommendedTarget;
-                          const direction = getDirection(row, currentAmount);
-                          return (
-                            <TableRow key={row.categoryId}>
-                              <TableCell>
-                                <Button
-                                  type="button"
-                                  variant={selected ? "default" : "outline"}
-                                  size="sm"
-                                  className="h-8 px-2"
-                                  onClick={() => toggleSelected(row.categoryId)}
-                                >
-                                  <Check className="h-3.5 w-3.5" />
-                                </Button>
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium">{row.categoryName}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {row.aiInsight}
-                                  </p>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatCurrency(row.lastMonthTarget, homeCurrency)}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatCurrency(row.lastMonthSpent, homeCurrency)}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatCurrency(row.avg3Month, homeCurrency)}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatCurrency(row.expectedSpend, homeCurrency)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={10}
-                                  value={currentAmount}
-                                  onChange={(event) =>
-                                    setAmount(row.categoryId, event.target.value)
-                                  }
-                                  className="h-8 w-28 ml-auto text-right"
-                                />
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "justify-center min-w-20",
-                                    directionClasses(direction),
-                                  )}
-                                >
-                                  {directionLabel(direction)}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                    {isExpanded && (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-16">Apply</TableHead>
+                            <TableHead>Subcategory</TableHead>
+                            <TableHead className="min-w-[260px]">Signals</TableHead>
+                            <TableHead className="text-right">New target</TableHead>
+                            <TableHead className="text-right">Direction</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {group.rows.map((row) => {
+                            const selected = selectedIds.has(row.categoryId);
+                            const currentAmount =
+                              amounts.get(row.categoryId) ?? row.recommendedTarget;
+                            const direction = getDirection(row, currentAmount);
+                            return (
+                              <TableRow key={row.categoryId}>
+                                <TableCell>
+                                  <Button
+                                    type="button"
+                                    variant={selected ? "default" : "outline"}
+                                    size="sm"
+                                    className="h-8 px-2"
+                                    onClick={() => toggleSelected(row.categoryId)}
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="min-w-[220px]">
+                                    <p className="font-medium text-sm flex items-center gap-2">
+                                      <span
+                                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                                        style={{ backgroundColor: row.color }}
+                                      />
+                                      <span className="sm:hidden">
+                                        {budgetCategoryShortTitle(row.categoryName)}
+                                      </span>
+                                      <span className="hidden sm:inline">
+                                        {row.categoryName}
+                                      </span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                      {row.aiInsight}
+                                    </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:text-sm">
+                                    <span className="text-muted-foreground">Last target</span>
+                                    <span className="text-right tabular-nums">
+                                      {formatCurrency(row.lastMonthTarget, homeCurrency)}
+                                    </span>
+                                    <span className="text-muted-foreground">Last spent</span>
+                                    <span className="text-right tabular-nums text-red-600 dark:text-red-400">
+                                      {formatCurrency(row.lastMonthSpent, homeCurrency)}
+                                    </span>
+                                    <span className="text-muted-foreground">3M avg</span>
+                                    <span className="text-right tabular-nums">
+                                      {formatCurrency(row.avg3Month, homeCurrency)}
+                                    </span>
+                                    <span className="text-muted-foreground">Expected</span>
+                                    <span className="text-right tabular-nums text-amber-600 dark:text-amber-400">
+                                      {formatCurrency(row.expectedSpend, homeCurrency)}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    step={10}
+                                    value={currentAmount}
+                                    onChange={(event) =>
+                                      setAmount(row.categoryId, event.target.value)
+                                    }
+                                    className="h-8 w-24 sm:w-28 ml-auto text-right"
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "justify-center min-w-16 sm:min-w-20",
+                                      directionClasses(direction),
+                                    )}
+                                  >
+                                    {directionLabel(direction)}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
                   </div>
                 );
               })}

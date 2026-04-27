@@ -8,7 +8,6 @@ import {
   getHistoricalAverages,
   isMonthClosed,
 } from "@/lib/budget/queries";
-import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { budgets, categories, settings } from "@/lib/db/schema";
@@ -213,11 +212,10 @@ export async function generateBudgetRecommendations(
   }
 
   const allCatsRaw = db.select().from(categories).all() as Category[];
-  const assignable = filterAssignableCategories(allCatsRaw);
   const homeCurrency = getHomeCurrency();
   const analyticsRows = await buildBudgetGenerateAnalyticsRows(
     month,
-    assignable,
+    allCatsRaw,
     homeCurrency,
   );
 
