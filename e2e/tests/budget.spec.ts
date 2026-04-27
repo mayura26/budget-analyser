@@ -73,7 +73,10 @@ test.describe("Budget", () => {
     await expect(dialog.getByText("3M Avg")).toBeVisible();
     await expect(dialog.getByText("Expected")).toBeVisible();
     await expect(
-      dialog.getByRole("columnheader", { name: "Recommend" }),
+      dialog.getByRole("columnheader", { name: "New target" }).first(),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("columnheader", { name: "Direction" }).first(),
     ).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Select all" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Clear" })).toBeVisible();

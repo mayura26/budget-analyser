@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Loader2, Sparkles } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,8 +25,37 @@ import {
   generateBudgetRecommendations,
 } from "@/lib/actions/budget-targets";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { BudgetGenerateRecommendationRow } from "@/types";
+
+type Direction = "increase" | "decrease" | "keep" | "new";
+
+function getDirection(row: BudgetGenerateRecommendationRow, amount: number): Direction {
+  if (row.currentMonthTarget <= 0) return "new";
+  if (amount > row.currentMonthTarget) return "increase";
+  if (amount < row.currentMonthTarget) return "decrease";
+  return "keep";
+}
+
+function directionLabel(direction: Direction): string {
+  if (direction === "increase") return "Increase";
+  if (direction === "decrease") return "Decrease";
+  if (direction === "keep") return "Keep";
+  return "New";
+}
+
+function directionClasses(direction: Direction): string {
+  if (direction === "increase") {
+    return "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300";
+  }
+  if (direction === "decrease") {
+    return "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300";
+  }
+  if (direction === "keep") {
+    return "bg-sky-500/10 border-sky-500/30 text-sky-700 dark:text-sky-300";
+  }
+  return "bg-violet-500/10 border-violet-500/30 text-violet-700 dark:text-violet-300";
+}
 
 export function GenerateBudgetDialog({
   month,
@@ -90,6 +120,41 @@ export function GenerateBudgetDialog({
         return sum + (amounts.get(row.categoryId) ?? row.recommendedTarget);
       }, 0),
     [rows, selectedIds, amounts],
+  );
+
+  const groupedRows = useMemo(() => {
+    const groups = new Map<string, BudgetGenerateRecommendationRow[]>();
+    for (const row of rows) {
+      const key = row.parentName || "Other";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)?.push(row);
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([group, entries]) => ({
+        group,
+        rows: [...entries].sort((a, b) =>
+          a.categoryName.localeCompare(b.categoryName),
+        ),
+      }));
+  }, [rows]);
+
+  const selectedCount = selectedIds.size;
+  const increaseCount = useMemo(
+    () =>
+      rows.filter((row) => {
+        const amount = amounts.get(row.categoryId) ?? row.recommendedTarget;
+        return getDirection(row, amount) === "increase";
+      }).length,
+    [rows, amounts],
+  );
+  const decreaseCount = useMemo(
+    () =>
+      rows.filter((row) => {
+        const amount = amounts.get(row.categoryId) ?? row.recommendedTarget;
+        return getDirection(row, amount) === "decrease";
+      }).length,
+    [rows, amounts],
   );
 
   function toggleSelected(categoryId: number) {
@@ -161,12 +226,35 @@ export function GenerateBudgetDialog({
         )}
 
         {!loading && !error && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{overallNotes}</p>
+          <div className="space-y-5">
+            <div className="rounded-lg border bg-muted/40 p-3">
+              <p className="text-sm text-muted-foreground">{overallNotes}</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Selected categories</p>
+                <p className="text-lg font-semibold">
+                  {selectedCount} / {rows.length}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Budget increases</p>
+                <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">
+                  {increaseCount}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Budget decreases</p>
+                <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                  {decreaseCount}
+                </p>
+              </div>
+            </div>
 
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-muted-foreground">
-                {selectedIds.size} of {rows.length} categories selected
+                Grouped by main category
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={selectAll}>
@@ -178,77 +266,112 @@ export function GenerateBudgetDialog({
               </div>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">Apply</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Last Target</TableHead>
-                  <TableHead className="text-right">Last Spent</TableHead>
-                  <TableHead className="text-right">3M Avg</TableHead>
-                  <TableHead className="text-right">Expected</TableHead>
-                  <TableHead className="text-right">Recommend</TableHead>
-                  <TableHead>AI Insight</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => {
-                  const selected = selectedIds.has(row.categoryId);
-                  return (
-                    <TableRow key={row.categoryId}>
-                      <TableCell>
-                        <Button
-                          type="button"
-                          variant={selected ? "default" : "outline"}
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => toggleSelected(row.categoryId)}
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="min-w-36">
-                          <p className="font-medium">{row.categoryName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {row.parentName}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(row.lastMonthTarget, homeCurrency)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(row.lastMonthSpent, homeCurrency)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(row.avg3Month, homeCurrency)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatCurrency(row.expectedSpend, homeCurrency)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Input
-                          type="number"
-                          min={0}
-                          step={10}
-                          value={
-                            amounts.get(row.categoryId) ?? row.recommendedTarget
-                          }
-                          onChange={(event) =>
-                            setAmount(row.categoryId, event.target.value)
-                          }
-                          className="h-8 w-28 ml-auto text-right"
-                        />
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {row.aiInsight}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+              {groupedRows.map((group) => {
+                const groupSelected = group.rows.filter((row) =>
+                  selectedIds.has(row.categoryId),
+                );
+                const groupTotal = groupSelected.reduce((sum, row) => {
+                  return sum + (amounts.get(row.categoryId) ?? row.recommendedTarget);
+                }, 0);
+
+                return (
+                  <div key={group.group} className="rounded-xl border">
+                    <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        <p className="font-semibold">{group.group}</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground tabular-nums">
+                        {groupSelected.length}/{group.rows.length} selected ·{" "}
+                        {formatCurrency(groupTotal, homeCurrency)}
+                      </p>
+                    </div>
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-20">Apply</TableHead>
+                          <TableHead>Subcategory</TableHead>
+                          <TableHead className="text-right">Last target</TableHead>
+                          <TableHead className="text-right">Last spent</TableHead>
+                          <TableHead className="text-right">3M avg</TableHead>
+                          <TableHead className="text-right">Expected</TableHead>
+                          <TableHead className="text-right">New target</TableHead>
+                          <TableHead className="text-right">Direction</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.rows.map((row) => {
+                          const selected = selectedIds.has(row.categoryId);
+                          const currentAmount =
+                            amounts.get(row.categoryId) ?? row.recommendedTarget;
+                          const direction = getDirection(row, currentAmount);
+                          return (
+                            <TableRow key={row.categoryId}>
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  variant={selected ? "default" : "outline"}
+                                  size="sm"
+                                  className="h-8 px-2"
+                                  onClick={() => toggleSelected(row.categoryId)}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{row.categoryName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {row.aiInsight}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {formatCurrency(row.lastMonthTarget, homeCurrency)}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {formatCurrency(row.lastMonthSpent, homeCurrency)}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {formatCurrency(row.avg3Month, homeCurrency)}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {formatCurrency(row.expectedSpend, homeCurrency)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={10}
+                                  value={currentAmount}
+                                  onChange={(event) =>
+                                    setAmount(row.categoryId, event.target.value)
+                                  }
+                                  className="h-8 w-28 ml-auto text-right"
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "justify-center min-w-20",
+                                    directionClasses(direction),
+                                  )}
+                                >
+                                  {directionLabel(direction)}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })}
+            </div>
 
             <div className="flex items-center justify-between border-t pt-3">
               <p className="text-sm">
