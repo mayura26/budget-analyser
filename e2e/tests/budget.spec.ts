@@ -332,6 +332,10 @@ test.describe("Budget", () => {
       timeout: 10000,
     });
     await expect(page.getByText("Wed", { exact: true })).toBeVisible();
+    // Redesigned header shows month + year as the calendar's heading.
+    const monthLabel = page.getByTestId("calendar-month-label");
+    await expect(monthLabel).toBeVisible();
+    await expect(monthLabel).toHaveText(/^[A-Z][a-z]+ \d{4}$/);
   });
 
   test("calendar tab shows event pills", async ({ page }) => {
