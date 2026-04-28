@@ -1,7 +1,15 @@
 "use client";
 
-import { AlertCircle, CheckCircle, Loader2, Upload } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  Upload,
+  Wallet,
+} from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +37,9 @@ export function ImportWizard({
   bankProfiles: BankProfile[];
 }) {
   function getDefaultProfileIdForAccount(nextAccountId: string): string | null {
-    const selectedAccount = accounts.find((a) => String(a.id) === nextAccountId);
+    const selectedAccount = accounts.find(
+      (a) => String(a.id) === nextAccountId,
+    );
     if (!selectedAccount) return null;
 
     if (selectedAccount.bankProfileId != null) {
@@ -57,8 +67,9 @@ export function ImportWizard({
     accounts[0] ? String(accounts[0].id) : "",
   );
   const [profileId, setProfileId] = useState<string>(
-    (accounts[0] ? getDefaultProfileIdForAccount(String(accounts[0].id)) : null) ??
-      (bankProfiles[0] ? String(bankProfiles[0].id) : ""),
+    (accounts[0]
+      ? getDefaultProfileIdForAccount(String(accounts[0].id))
+      : null) ?? (bankProfiles[0] ? String(bankProfiles[0].id) : ""),
   );
   const [file, setFile] = useState<File | null>(null);
   const lastAccountIdRef = useRef<string>(accountId);
@@ -172,18 +183,16 @@ export function ImportWizard({
 
   if (accounts.length === 0) {
     return (
-      <Card>
-        <CardContent className="pt-6 text-center text-muted-foreground">
-          <p>No accounts found.</p>
-          <p className="text-sm mt-1">
-            Please{" "}
-            <a href="/accounts" className="underline text-primary">
-              create an account
-            </a>{" "}
-            first.
-          </p>
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={Wallet}
+        title="No accounts yet"
+        description="You need at least one account before importing transactions."
+        action={
+          <Button asChild size="sm">
+            <Link href="/accounts">Create an account</Link>
+          </Button>
+        }
+      />
     );
   }
 
@@ -275,7 +284,9 @@ export function ImportWizard({
                   {preview.duplicateCount} duplicate
                 </Badge>
                 <span className="text-muted-foreground">
-                  {overwriteDuplicates ? "will be overwritten" : "will be skipped"}
+                  {overwriteDuplicates
+                    ? "will be overwritten"
+                    : "will be skipped"}
                 </span>
               </div>
             </div>
@@ -286,22 +297,22 @@ export function ImportWizard({
         </Card>
 
         <div className="rounded-md border overflow-auto max-h-96">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-muted/50">
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead>
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                <th className="sticky left-0 top-0 z-20 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/70 px-3 py-2 text-left text-xs font-medium text-muted-foreground border-b">
                   Status
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                <th className="sticky top-0 z-10 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/70 px-3 py-2 text-left text-xs font-medium text-muted-foreground border-b">
                   Date
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                <th className="sticky top-0 z-10 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/70 px-3 py-2 text-left text-xs font-medium text-muted-foreground border-b">
                   Description
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
+                <th className="sticky top-0 z-10 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/70 px-3 py-2 text-right text-xs font-medium text-muted-foreground border-b">
                   Amount
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                <th className="sticky top-0 z-10 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/70 px-3 py-2 text-left text-xs font-medium text-muted-foreground border-b">
                   Currency
                 </th>
               </tr>
@@ -312,7 +323,7 @@ export function ImportWizard({
                   key={row.fingerprint}
                   className={row.isDuplicate ? "opacity-40" : ""}
                 >
-                  <td className="px-3 py-1">
+                  <td className="sticky left-0 z-10 bg-background px-3 py-1 border-b">
                     {row.isDuplicate ? (
                       <Badge variant="secondary" className="text-xs">
                         dup
@@ -323,14 +334,14 @@ export function ImportWizard({
                       </Badge>
                     )}
                   </td>
-                  <td className="px-3 py-1 text-muted-foreground whitespace-nowrap">
+                  <td className="px-3 py-1 text-muted-foreground whitespace-nowrap border-b">
                     {formatDate(row.date)}
                   </td>
-                  <td className="px-3 py-1 max-w-xs">
+                  <td className="px-3 py-1 max-w-[14rem] sm:max-w-xs border-b">
                     <p className="truncate">{row.description}</p>
                   </td>
                   <td
-                    className={`px-3 py-1 text-right font-medium whitespace-nowrap ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
+                    className={`px-3 py-1 text-right font-medium whitespace-nowrap border-b ${row.amount < 0 ? "text-red-600" : "text-green-600"}`}
                   >
                     {row.amount < 0 ? "-" : "+"}
                     {formatCurrency(
@@ -338,7 +349,7 @@ export function ImportWizard({
                       previewAccountCurrency,
                     )}
                   </td>
-                  <td className="px-3 py-1 text-muted-foreground whitespace-nowrap">
+                  <td className="px-3 py-1 text-muted-foreground whitespace-nowrap border-b">
                     {row.currency ?? previewAccountCurrency}
                   </td>
                 </tr>
@@ -357,21 +368,22 @@ export function ImportWizard({
         <div className="flex gap-2">
           {(() => {
             const importCount =
-              preview.newCount + (overwriteDuplicates ? preview.duplicateCount : 0);
+              preview.newCount +
+              (overwriteDuplicates ? preview.duplicateCount : 0);
             return (
-          <Button
-            onClick={handleConfirm}
-            disabled={loading || importCount === 0}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Importing…
-              </>
-            ) : (
-              `Import ${importCount} transactions`
-            )}
-          </Button>
+              <Button
+                onClick={handleConfirm}
+                disabled={loading || importCount === 0}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Importing…
+                  </>
+                ) : (
+                  `Import ${importCount} transactions`
+                )}
+              </Button>
             );
           })()}
           <Button variant="outline" onClick={() => setStep("upload")}>

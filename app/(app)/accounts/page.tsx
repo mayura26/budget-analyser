@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import { eq, sql } from "drizzle-orm";
+import { Wallet } from "lucide-react";
 import { AccountDialog } from "@/components/accounts/account-dialog";
 import { AccountGroupHeader } from "@/components/accounts/account-group-header";
 import { CreateGroupDialog } from "@/components/accounts/create-group-dialog";
 import { DeleteAccountButton } from "@/components/accounts/delete-account-button";
+import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -146,14 +148,19 @@ export default function AccountsPage() {
       />
 
       {!hasAnyAccounts && !hasAnyGroups ? (
-        <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            <p>No accounts yet.</p>
-            <p className="text-sm mt-1">
-              Add your first account to start importing transactions.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Wallet}
+          title="No accounts yet"
+          description="Add your first account to start importing transactions and tracking balances."
+          action={
+            <AccountDialog
+              bankProfiles={allProfiles}
+              groups={allGroups}
+              groupAccountIdsByGroup={groupAccountIdsByGroup}
+              defaultHomeCurrency={defaultHomeCurrency}
+            />
+          }
+        />
       ) : (
         <div className="space-y-6">
           {allGroups.map((group) => {

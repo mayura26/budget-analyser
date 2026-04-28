@@ -1,14 +1,15 @@
 "use client";
 
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { transactionsInRangeUrl } from "@/lib/analytics/transaction-links";
 import { buildTreemapDatumForNodes } from "@/lib/analytics/treemap-helpers";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type {
   AnalyticsExpenseTransactionLine,
   CategoryHierarchyNode,
@@ -118,11 +119,12 @@ function CategoryRow({
                   aria-label={`${isExpanded ? "Collapse" : "Expand"} ${node.name}`}
                   onClick={() => toggleExpanded(key)}
                 >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
+                  <ChevronRight
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-150",
+                      isExpanded && "rotate-90",
+                    )}
+                  />
                 </button>
               ) : null}
             </div>
@@ -154,9 +156,11 @@ function CategoryRow({
               to: rangeEnd,
               categoryId: node.id === null ? "none" : node.id,
             })}
-            className="text-xs text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            aria-label={`Transactions for ${node.name}`}
           >
-            Transactions
+            <span className="hidden sm:inline">Transactions</span>
+            <ExternalLink className="h-3.5 w-3.5 sm:hidden" />
           </Link>
         </td>
       </tr>
@@ -234,6 +238,22 @@ export function AnalyticsCategoryExplorer({
     });
   }, []);
 
+  const allKeys = useMemo(() => {
+    const keys = new Set<string>();
+    function visit(nodes: CategoryHierarchyNode[]) {
+      for (const n of nodes) {
+        if (n.total > 0) {
+          keys.add(categoryKey(n.id));
+          visit(n.children);
+        }
+      }
+    }
+    visit(categoryRoots);
+    return keys;
+  }, [categoryRoots]);
+
+  const allExpanded = expanded.size > 0 && expanded.size >= allKeys.size;
+
   const treemapData = useMemo(
     () => buildTreemapDatumForNodes(categoryRoots),
     [categoryRoots],
@@ -248,14 +268,29 @@ export function AnalyticsCategoryExplorer({
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">
-          Spending by category
-        </CardTitle>
-        <p className="text-xs text-muted-foreground font-normal">
-          Expense debits in home currency; transfers excluded. Expand a category
-          to see subcategories and transactions.
-        </p>
+      <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3 space-y-0">
+        <div className="space-y-1 min-w-0">
+          <CardTitle className="text-base font-semibold">
+            Spending by category
+          </CardTitle>
+          <p className="text-xs text-muted-foreground font-normal">
+            Expense debits in home currency; transfers excluded. Expand a
+            category to see subcategories and transactions.
+          </p>
+        </div>
+        {hasAnySpending && allKeys.size > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs shrink-0"
+            onClick={() =>
+              setExpanded(allExpanded ? new Set() : new Set(allKeys))
+            }
+          >
+            {allExpanded ? "Collapse all" : "Expand all"}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {treemapData && hasAnySpending ? (

@@ -387,15 +387,14 @@ export function TransactionTable({
             <SelectItem value="needsReview">Needs confirmation</SelectItem>
           </SelectContent>
         </Select>
-
       </div>
 
       {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
+      <div className="rounded-md border">
+        <Table wrapperClassName="max-h-[calc(100vh-16rem)]">
+          <TableHeader className="sticky top-0 z-10 bg-background shadow-[inset_0_-1px_0_var(--border)]">
             {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
+              <TableRow key={hg.id} className="hover:bg-transparent">
                 {hg.headers.map((header) => (
                   <TableHead
                     key={header.id}

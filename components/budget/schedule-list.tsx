@@ -1,7 +1,8 @@
 "use client";
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -121,9 +122,17 @@ export function ScheduleList({
       </div>
 
       {schedules.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          No scheduled transactions yet.
-        </div>
+        <EmptyState
+          icon={CalendarClock}
+          title="No scheduled transactions yet"
+          description="Add recurring income and expenses to plan ahead and see them on the budget calendar."
+          action={
+            <Button size="sm" onClick={handleAdd}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add schedule
+            </Button>
+          }
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {schedules.map((s) => {
