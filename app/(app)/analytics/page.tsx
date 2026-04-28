@@ -11,6 +11,7 @@ import { AnalyticsAccountsSection } from "@/components/analytics/analytics-accou
 import { AnalyticsCategoryExplorer } from "@/components/analytics/analytics-category-explorer";
 import { AnalyticsMonthlyChart } from "@/components/analytics/analytics-monthly-chart";
 import { AnalyticsPeriodSelector } from "@/components/analytics/analytics-period-selector";
+import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   formatAnalyticsRangeLabel,
@@ -43,21 +44,25 @@ export default async function AnalyticsPage({
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{rangeLabel}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Amounts in {homeCurrency}. Transfers are excluded from income,
-            expense, and category totals.
-          </p>
-        </div>
-        <AnalyticsPeriodSelector
-          preset={parsed.preset}
-          rangeStart={start}
-          rangeEnd={end}
-        />
-      </div>
+      <PageHeader
+        title="Analytics"
+        subtitle={
+          <>
+            <span>{rangeLabel}</span>
+            <span className="block text-xs mt-1">
+              Amounts in {homeCurrency}. Transfers are excluded from income,
+              expense, and category totals.
+            </span>
+          </>
+        }
+        actions={
+          <AnalyticsPeriodSelector
+            preset={parsed.preset}
+            rangeStart={start}
+            rangeEnd={end}
+          />
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>

@@ -68,7 +68,7 @@ export function SettingsForm({
             amounts are converted using ECB rates (via Frankfurter).
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="space-y-2">
             <Label htmlFor="home_currency">Currency</Label>
             <Select
@@ -87,7 +87,6 @@ export function SettingsForm({
               </SelectContent>
             </Select>
           </div>
-
         </CardContent>
       </Card>
 
@@ -103,12 +102,12 @@ export function SettingsForm({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Model</Label>
+            <Label htmlFor="openai_model">Model</Label>
             <Select
               name="openai_model"
               defaultValue={defaultValues.openai_model}
             >
-              <SelectTrigger>
+              <SelectTrigger id="openai_model">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -121,7 +120,7 @@ export function SettingsForm({
             </Select>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <Label htmlFor="ai_enabled">Enable AI features</Label>
             <Select name="ai_enabled" defaultValue={defaultValues.ai_enabled}>
               <SelectTrigger id="ai_enabled" className="w-full sm:w-44">
@@ -133,22 +132,25 @@ export function SettingsForm({
               </SelectContent>
             </Select>
           </div>
-
-          {state?.success && (
-            <div className="flex items-center gap-2 text-green-600 text-sm">
-              <CheckCircle className="h-4 w-4" />
-              Settings saved
-            </div>
-          )}
-          {state && !state.success && (
-            <p className="text-sm text-destructive">{state.error}</p>
-          )}
-
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save settings"}
-          </Button>
         </CardContent>
       </Card>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-h-5 text-sm">
+          {state?.success && (
+            <span className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <CheckCircle className="h-4 w-4" />
+              Settings saved
+            </span>
+          )}
+          {state && !state.success && (
+            <span className="text-destructive">{state.error}</span>
+          )}
+        </div>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save settings"}
+        </Button>
+      </div>
     </form>
   );
 }

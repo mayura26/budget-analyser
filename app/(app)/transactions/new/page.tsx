@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { ManualTransactionForm } from "@/components/transactions/manual-entry-form";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { db } from "@/lib/db";
@@ -15,8 +16,8 @@ export default function NewTransactionPage() {
   const assignable = filterAssignableCategories(allCatsRaw);
 
   return (
-    <div className="p-6 max-w-lg">
-      <h1 className="text-2xl font-semibold mb-6">Add Transaction</h1>
+    <div className="p-4 sm:p-6 max-w-lg space-y-6">
+      <PageHeader title="Add Transaction" />
       <ManualTransactionForm
         accounts={allAccounts}
         categories={assignable}

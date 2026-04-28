@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { BankProfilesSection } from "@/components/settings/bank-profiles-section";
 import { DatabaseExportSection } from "@/components/settings/database-export-section";
 import { SettingsForm } from "@/components/settings/settings-form";
@@ -16,7 +17,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-8 max-w-2xl">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <PageHeader title="Settings" />
       <SettingsForm
         defaultValues={{
           openai_model: settingsMap.openai_model ?? "gpt-4o-mini",

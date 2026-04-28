@@ -5,6 +5,7 @@ import { AccountDialog } from "@/components/accounts/account-dialog";
 import { AccountGroupHeader } from "@/components/accounts/account-group-header";
 import { CreateGroupDialog } from "@/components/accounts/create-group-dialog";
 import { DeleteAccountButton } from "@/components/accounts/delete-account-button";
+import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getHomeCurrency } from "@/lib/currency/home";
@@ -129,18 +130,20 @@ export default function AccountsPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Accounts</h1>
-        <div className="flex gap-2">
-          <CreateGroupDialog />
-          <AccountDialog
-            bankProfiles={allProfiles}
-            groups={allGroups}
-            groupAccountIdsByGroup={groupAccountIdsByGroup}
-            defaultHomeCurrency={defaultHomeCurrency}
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Accounts"
+        actions={
+          <>
+            <CreateGroupDialog />
+            <AccountDialog
+              bankProfiles={allProfiles}
+              groups={allGroups}
+              groupAccountIdsByGroup={groupAccountIdsByGroup}
+              defaultHomeCurrency={defaultHomeCurrency}
+            />
+          </>
+        }
+      />
 
       {!hasAnyAccounts && !hasAnyGroups ? (
         <Card>

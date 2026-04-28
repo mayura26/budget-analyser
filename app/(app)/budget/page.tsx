@@ -7,14 +7,15 @@ import { BudgetMonthPicker } from "@/components/budget/budget-month-picker";
 import { CashFlowChart } from "@/components/budget/cash-flow-chart";
 import { MonthlyBudgetTab } from "@/components/budget/monthly-budget-tab";
 import { ScheduleList } from "@/components/budget/schedule-list";
+import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getExpenseDebitLinesByCategoryForRange } from "@/lib/analytics/queries";
 import { buildBalancePoints, generateOccurrences } from "@/lib/budget/generate";
 import {
   convertOccurrencesToHomeCurrency,
   getTotalBalanceInHomeCurrency,
 } from "@/lib/budget/home-currency-cashflow";
-import { getExpenseDebitLinesByCategoryForRange } from "@/lib/analytics/queries";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -161,29 +162,37 @@ export default async function BudgetPage({
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Budget Planner</h1>
-          <p className="text-muted-foreground text-sm">
-            Plan, track, and optimise your spending
-          </p>
-        </div>
-        <BudgetMonthPicker
-          selectedMonth={selectedMonth}
-          minMonth={minMonth}
-          maxMonth={maxMonth}
-          monthOptions={monthOptions}
-        />
-      </div>
+      <PageHeader
+        title="Budget Planner"
+        subtitle="Plan, track, and optimise your spending"
+        actions={
+          <BudgetMonthPicker
+            selectedMonth={selectedMonth}
+            minMonth={minMonth}
+            maxMonth={maxMonth}
+            monthOptions={monthOptions}
+          />
+        }
+      />
 
       {/* Tabs */}
       <Tabs defaultValue="monthly-budget">
-        <TabsList>
-          <TabsTrigger value="monthly-budget">Monthly Budget</TabsTrigger>
-          <TabsTrigger value="overview">Cash Flow</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
-          <TabsTrigger value="schedules">Schedules</TabsTrigger>
-        </TabsList>
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+          <TabsList className="w-max">
+            <TabsTrigger value="monthly-budget" className="px-2.5 sm:px-3">
+              Monthly Budget
+            </TabsTrigger>
+            <TabsTrigger value="overview" className="px-2.5 sm:px-3">
+              Cash Flow
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="px-2.5 sm:px-3">
+              Calendar
+            </TabsTrigger>
+            <TabsTrigger value="schedules" className="px-2.5 sm:px-3">
+              Schedules
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="monthly-budget" className="mt-4">
           <MonthlyBudgetTab

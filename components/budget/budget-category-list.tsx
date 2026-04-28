@@ -11,8 +11,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { transactionsInRangeUrl } from "@/lib/analytics/transaction-links";
 import { saveBudgetTargets } from "@/lib/actions/budget-targets";
+import { transactionsInRangeUrl } from "@/lib/analytics/transaction-links";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import {
   budgetCategoryShortTitle,
@@ -20,7 +20,10 @@ import {
   currencySymbol,
   formatCurrency,
 } from "@/lib/utils";
-import type { AnalyticsExpenseTransactionLine, BudgetCategoryRow } from "@/types";
+import type {
+  AnalyticsExpenseTransactionLine,
+  BudgetCategoryRow,
+} from "@/types";
 
 type GroupedRows = { group: string; rows: BudgetCategoryRow[] }[];
 
@@ -37,9 +40,9 @@ function groupRows(rows: BudgetCategoryRow[]): GroupedRows {
 }
 
 const gridColsBase =
-  "grid-cols-[auto_1fr_auto_auto_1fr_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
+  "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
 const gridColsDrilldown =
-  "grid-cols-[auto_auto_1fr_auto_auto_1fr_auto] sm:grid-cols-[auto_auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
+  "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[auto_auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
 
 function CategoryRow({
   row,
@@ -280,17 +283,23 @@ function CategoryRow({
             return (
               <div
                 key={t.id}
-                className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-0.5 py-1.5 px-2 rounded bg-muted/25 text-muted-foreground text-sm"
+                className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 py-1.5 px-2 rounded bg-muted/25 text-muted-foreground text-sm"
               >
                 <div className="min-w-0">
-                  <div className="text-xs tabular-nums">{t.date}</div>
-                  <div className="text-foreground/90 truncate">{t.description}</div>
-                  <div className="text-xs truncate">{t.accountName}</div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="shrink-0 text-xs tabular-nums">
+                      {t.date}
+                    </span>
+                    <span className="truncate text-foreground/90">
+                      {t.description}
+                    </span>
+                  </div>
+                  <div className="truncate text-xs">{t.accountName}</div>
                 </div>
-                <div className="text-right tabular-nums text-foreground sm:col-start-2 sm:row-span-2 sm:self-center">
+                <div className="shrink-0 text-right tabular-nums text-foreground">
                   {formatCurrency(t.converted, homeCurrency)}
                 </div>
-                <div className="text-right text-xs tabular-nums hidden sm:block sm:col-start-3 sm:row-span-2 sm:self-center">
+                <div className="hidden sm:block shrink-0 w-10 text-right text-xs tabular-nums">
                   {txnPct}%
                 </div>
               </div>
