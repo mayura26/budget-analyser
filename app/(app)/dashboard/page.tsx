@@ -13,6 +13,7 @@ import Link from "next/link";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-picker";
+import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildBudgetCategoryRows,
@@ -218,20 +219,18 @@ export default async function DashboardPage({
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Summary and category breakdown for {formatMonth(selectedMonth)}
-          </p>
-        </div>
-        <DashboardMonthPicker
-          selectedMonth={selectedMonth}
-          minMonth={minMonth}
-          maxMonth={maxMonth}
-          monthOptions={monthOptions}
-        />
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`Summary and category breakdown for ${formatMonth(selectedMonth)}`}
+        actions={
+          <DashboardMonthPicker
+            selectedMonth={selectedMonth}
+            minMonth={minMonth}
+            maxMonth={maxMonth}
+            monthOptions={monthOptions}
+          />
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">

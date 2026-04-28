@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { and, eq, gte, isNotNull, isNull, like, lte, sql } from "drizzle-orm";
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { PageHeader } from "@/components/layout/page-header";
 import { TransactionActions } from "@/components/transactions/transaction-actions";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Button } from "@/components/ui/button";
@@ -176,40 +177,44 @@ export default async function TransactionsPage({
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Transactions</h1>
-          <p className="text-sm text-muted-foreground">
-            {rows.length} transactions
-            {dateRangeActive && (
-              <>
-                {" "}
-                · {params.from} to {params.to}
-              </>
+      <PageHeader
+        title="Transactions"
+        subtitle={
+          <>
+            <span>
+              {rows.length} transactions
+              {dateRangeActive && (
+                <>
+                  {" "}
+                  · {params.from} to {params.to}
+                </>
+              )}
+            </span>
+            {needsReviewCount > 0 && (
+              <span className="block text-amber-600 dark:text-amber-500 mt-0.5">
+                {needsReviewCount} need category confirmation
+              </span>
             )}
-          </p>
-          {needsReviewCount > 0 && (
-            <p className="text-sm text-amber-600 dark:text-amber-500 mt-0.5">
-              {needsReviewCount} need category confirmation
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2 justify-end">
-          <TransactionActions
-            uncategorisedCount={uncategorisedCount}
-            unfinalisedCount={unfinalisedCount}
-            confirmedCount={confirmedCount}
-            categories={allCategories}
-            categoryMains={categoryMains}
-          />
-          <Button asChild size="sm">
-            <Link href="/transactions/new">
-              <Plus className="h-4 w-4 mr-2" />
-              Add manual
-            </Link>
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <div className="flex flex-wrap gap-2 justify-end">
+            <TransactionActions
+              uncategorisedCount={uncategorisedCount}
+              unfinalisedCount={unfinalisedCount}
+              confirmedCount={confirmedCount}
+              categories={allCategories}
+              categoryMains={categoryMains}
+            />
+            <Button asChild size="sm">
+              <Link href="/transactions/new">
+                <Plus className="h-4 w-4 mr-2" />
+                Add manual
+              </Link>
+            </Button>
+          </div>
+        }
+      />
 
       <TransactionTable
         rows={rowsWithHome}
