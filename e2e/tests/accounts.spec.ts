@@ -1,19 +1,21 @@
 import { expect, test } from "@playwright/test";
 
+const TEST_ACCOUNT_NAME = "Test Chequing";
+const UPDATED_ACCOUNT_NAME = "Updated Account";
+
 test.describe("Accounts", () => {
   test("empty state shows no accounts message", async ({ page }) => {
     await page.goto("/accounts");
-    await expect(page.getByText("No accounts yet.")).toBeVisible();
+    await expect(page.getByText("No accounts yet")).toBeVisible();
   });
 
   test("create account", async ({ page }) => {
-    const accountName = `Test Chequing ${Date.now()}`;
     await page.goto("/accounts");
-    await page.getByRole("button", { name: "Add account" }).click();
+    await page.getByRole("button", { name: "Add account" }).first().click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="name"]').fill(accountName);
+    await dialog.locator('input[name="name"]').fill(TEST_ACCOUNT_NAME);
 
     // Select bank profile (second combobox — first is group)
     await dialog.getByRole("combobox").nth(1).click();
@@ -30,10 +32,10 @@ test.describe("Accounts", () => {
 
     await dialog.getByRole("button", { name: "Create account" }).click();
 
-    await expect(page.getByText(accountName)).toBeVisible();
+    await expect(page.getByText(TEST_ACCOUNT_NAME)).toBeVisible();
     await expect(page.getByText("CommBank").first()).toBeVisible();
     const testChequingCard = page.locator(".rounded-lg").filter({
-      hasText: accountName,
+      hasText: TEST_ACCOUNT_NAME,
     });
     await expect(testChequingCard).toContainText("Last import: Never imported");
     await expect(testChequingCard).toContainText(
@@ -44,35 +46,35 @@ test.describe("Accounts", () => {
   test("edit account", async ({ page }) => {
     await page.goto("/accounts");
     // Wait for an account card to appear
-    await page.waitForSelector("text=Test Chequing");
+    await page.waitForSelector(`text=${TEST_ACCOUNT_NAME}`);
     await page.locator("button:has(.lucide-pencil)").first().click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     const nameInput = dialog.locator('input[name="name"]');
     await nameInput.clear();
-    await nameInput.fill("Updated Account");
+    await nameInput.fill(UPDATED_ACCOUNT_NAME);
     await dialog.getByRole("button", { name: "Save changes" }).click();
 
-    await expect(page.getByText("Updated Account")).toBeVisible();
+    await expect(page.getByText(UPDATED_ACCOUNT_NAME)).toBeVisible();
   });
 
   test("cancel delete keeps card", async ({ page }) => {
     await page.goto("/accounts");
-    await page.waitForSelector("text=Updated Account");
+    await page.waitForSelector(`text=${UPDATED_ACCOUNT_NAME}`);
     await page.locator("button:has(.lucide-trash-2)").first().click();
     await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByText("Updated Account")).toBeVisible();
+    await expect(page.getByText(UPDATED_ACCOUNT_NAME)).toBeVisible();
   });
 
   test("delete account with confirmation", async ({ page }) => {
     await page.goto("/accounts");
-    await page.waitForSelector("text=Updated Account");
+    await page.waitForSelector(`text=${UPDATED_ACCOUNT_NAME}`);
     await page.locator("button:has(.lucide-trash-2)").first().click();
     await page.getByRole("button", { name: "Delete" }).click();
     // Wait for the confirmation dialog to close, then check the card is gone
     await page.waitForSelector('[role="dialog"]', { state: "hidden" });
-    await expect(page.getByText("Updated Account")).not.toBeVisible();
+    await expect(page.getByText(UPDATED_ACCOUNT_NAME)).not.toBeVisible();
   });
 
   test("create group", async ({ page }) => {
@@ -89,7 +91,7 @@ test.describe("Accounts", () => {
 
   test("create account in group", async ({ page }) => {
     await page.goto("/accounts");
-    await page.getByRole("button", { name: "Add account" }).click();
+    await page.getByRole("button", { name: "Add account" }).first().click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -109,7 +111,7 @@ test.describe("Accounts", () => {
 
   test("grouped accounts show distinct derived colours", async ({ page }) => {
     await page.goto("/accounts");
-    await page.getByRole("button", { name: "Add account" }).click();
+    await page.getByRole("button", { name: "Add account" }).first().click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -142,7 +144,7 @@ test.describe("Accounts", () => {
 
   test("grouped account can pick own colour", async ({ page }) => {
     await page.goto("/accounts");
-    await page.getByRole("button", { name: "Add account" }).click();
+    await page.getByRole("button", { name: "Add account" }).first().click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
