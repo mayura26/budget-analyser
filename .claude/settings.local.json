@@ -37,7 +37,8 @@
       "Bash(sqlite3 data/test.db \"SELECT * FROM __drizzle_migrations ORDER BY created_at;\")",
       "Bash(wait)",
       "Bash(cat app/\\\\\\(app\\\\\\)/transactions/new/page.tsx)",
-      "Bash(kill %1)"
+      "Bash(kill %1)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }
