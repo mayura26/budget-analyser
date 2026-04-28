@@ -13,6 +13,7 @@ import Link from "next/link";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-picker";
+import { KPICard } from "@/components/layout/kpi-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -234,77 +235,35 @@ export default async function DashboardPage({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
-              Income
-            </CardTitle>
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-income-bg sm:h-9 sm:w-9">
-              <ArrowUpCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400 sm:h-4 sm:w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <p className="text-xl font-bold text-green-600 dark:text-green-400 sm:text-2xl">
-              {formatCurrency(currentMonthData.income, homeCurrency)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
-              Expenses
-            </CardTitle>
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-expense-bg sm:h-9 sm:w-9">
-              <ArrowDownCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 sm:h-4 sm:w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <p className="text-xl font-bold text-red-600 dark:text-red-400 sm:text-2xl">
-              {formatCurrency(currentMonthData.expenses, homeCurrency)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
-              Net
-            </CardTitle>
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-net-bg sm:h-9 sm:w-9">
-              {currentMonthData.net >= 0 ? (
-                <TrendingUp className="h-3.5 w-3.5 text-primary dark:text-blue-400 sm:h-4 sm:w-4" />
-              ) : (
-                <TrendingDown className="h-3.5 w-3.5 text-red-600 dark:text-red-400 sm:h-4 sm:w-4" />
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <p
-              className={`text-xl font-bold sm:text-2xl ${currentMonthData.net >= 0 ? "text-primary dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}
-            >
-              {currentMonthData.net >= 0 ? "+" : ""}
-              {formatCurrency(Math.abs(currentMonthData.net), homeCurrency)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1.5 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
-              Transactions
-            </CardTitle>
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-kpi-tx-bg sm:h-9 sm:w-9">
-              <Wallet className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 sm:h-4 sm:w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <p className="text-xl font-bold sm:text-2xl">{totalTransactions}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {accountCount} account{accountCount !== 1 ? "s" : ""}
-            </p>
-          </CardContent>
-        </Card>
+        <KPICard
+          compact
+          label="Income"
+          icon={ArrowUpCircle}
+          tone="income"
+          value={formatCurrency(currentMonthData.income, homeCurrency)}
+        />
+        <KPICard
+          compact
+          label="Expenses"
+          icon={ArrowDownCircle}
+          tone="expense"
+          value={formatCurrency(currentMonthData.expenses, homeCurrency)}
+        />
+        <KPICard
+          compact
+          label="Net"
+          icon={currentMonthData.net >= 0 ? TrendingUp : TrendingDown}
+          tone={currentMonthData.net >= 0 ? "net-positive" : "net-negative"}
+          value={`${currentMonthData.net >= 0 ? "+" : ""}${formatCurrency(Math.abs(currentMonthData.net), homeCurrency)}`}
+        />
+        <KPICard
+          compact
+          label="Transactions"
+          icon={Wallet}
+          tone="neutral"
+          value={totalTransactions}
+          subtitle={`${accountCount} account${accountCount !== 1 ? "s" : ""}`}
+        />
       </div>
 
       {/* Budget Status */}
