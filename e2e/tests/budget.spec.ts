@@ -78,7 +78,9 @@ test.describe("Budget", () => {
     await expect(
       dialog.getByRole("columnheader", { name: "Direction" }).first(),
     ).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Select all" })).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Select all" }),
+    ).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Clear" })).toBeVisible();
   });
 
@@ -189,7 +191,9 @@ test.describe("Budget", () => {
     const closeButton = page.getByRole("button", { name: "Close Month" });
     if (await closeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
       await closeButton.click();
-      await expect(page.getByRole("button", { name: "Month Closed" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Month Closed" }),
+      ).toBeVisible();
     }
 
     const reviewButton = page.getByRole("button", { name: "Review Month" });
@@ -201,7 +205,9 @@ test.describe("Budget", () => {
     await expect(page.getByText("Strong finish for the month.")).toBeVisible();
 
     await page.getByRole("tab", { name: "Deep Review" }).click();
-    await expect(page.getByText("You closed slightly over budget.")).toBeVisible();
+    await expect(
+      page.getByText("You closed slightly over budget."),
+    ).toBeVisible();
     await expect(page.getByText("Variance Drivers")).toBeVisible();
   });
 
@@ -244,7 +250,10 @@ test.describe("Budget", () => {
         .filter({ visible: true }),
     ).toHaveCount(0);
     await expect(
-      page.getByText("Housing", { exact: true }).filter({ visible: true }).first(),
+      page
+        .getByText("Housing", { exact: true })
+        .filter({ visible: true })
+        .first(),
     ).toBeVisible();
   });
 
@@ -357,6 +366,31 @@ test.describe("Budget", () => {
       return;
     }
     expect(hasSalary || hasRent).toBe(true);
+  });
+
+  test("calendar shows month summary chip and category stripe when schedules exist", async ({
+    page,
+  }) => {
+    await page.goto("/budget");
+    await page.getByRole("tab", { name: "Calendar" }).click();
+    const hasSchedule = await page
+      .getByText("Salary")
+      .or(page.getByText("Rent"))
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    if (!hasSchedule) {
+      // No schedules in the visible month — chip renders nothing, test passes trivially.
+      await expect(page.getByText("Mon", { exact: true })).toBeVisible();
+      return;
+    }
+    // Month summary chip shows totals when occurrences exist in the month.
+    const chip = page.getByTestId("calendar-month-summary");
+    await expect(chip).toBeVisible();
+    await expect(chip).toContainText(/\$[\d,.]+/);
+    // Category-coloured stripe: desktop chips use border-l-2 with inline color.
+    const stripe = page.locator(".border-l-2").first();
+    await expect(stripe).toBeVisible();
   });
 
   test("cash flow chart renders on overview tab", async ({ page }) => {

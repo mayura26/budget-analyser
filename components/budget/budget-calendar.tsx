@@ -102,7 +102,10 @@ function MonthSummaryChip({
 }) {
   if (income === 0 && expense === 0) return null;
   return (
-    <div className="hidden sm:flex items-center gap-2 text-xs font-mono tabular-nums">
+    <div
+      className="hidden sm:flex items-center gap-2 text-xs font-mono tabular-nums"
+      data-testid="calendar-month-summary"
+    >
       <span className="text-green-600 dark:text-green-400">
         +{formatCurrency(income, homeCurrency)}
       </span>
@@ -271,13 +274,13 @@ export function BudgetCalendar({ occurrences, accounts, homeCurrency }: Props) {
           const cellInner = (
             <div
               className={cn(
-                "relative flex flex-col h-full min-h-16 sm:min-h-24 lg:min-h-28 p-1 sm:p-1.5 transition-colors",
+                "relative flex flex-col h-full min-h-20 sm:min-h-24 lg:min-h-28 p-1 sm:p-1.5 transition-all duration-150",
                 "bg-card",
-                isWeekend && inMonth && "bg-muted/40",
+                isWeekend && inMonth && "bg-muted/20",
                 !inMonth && "opacity-40",
                 inMonth && isPast && !isToday && "opacity-70",
-                isToday && "ring-1 ring-inset ring-primary/50 z-10",
-                hasEvents && "hover:bg-accent/50",
+                isToday && "ring-1 ring-inset ring-primary/40 z-10",
+                hasEvents && "hover:bg-accent/40 hover:-translate-y-px",
               )}
             >
               {/* Date number */}
@@ -372,7 +375,7 @@ export function BudgetCalendar({ occurrences, accounts, homeCurrency }: Props) {
                   {cellInner}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 sm:w-72 p-0 overflow-hidden">
+              <PopoverContent className="w-56 sm:w-64 p-0 overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
                   <p className="text-sm font-semibold tracking-tight">
                     {new Date(`${dateStr}T00:00:00`).toLocaleDateString(
