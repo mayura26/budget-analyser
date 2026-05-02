@@ -184,6 +184,9 @@ export const transactions = sqliteTable(
       .notNull()
       .default(true),
     linkedTransactionId: integer("linked_transaction_id"),
+    pending: integer("pending", { mode: "boolean" }).notNull().default(false),
+    merchant: text("merchant"),
+    accountReference: text("account_reference"),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
   },
@@ -196,6 +199,10 @@ export const transactions = sqliteTable(
     index("transactions_account_idx").on(table.accountId),
     index("transactions_category_idx").on(table.categoryId),
     index("transactions_linked_idx").on(table.linkedTransactionId),
+    index("transactions_account_pending_idx").on(
+      table.accountId,
+      table.pending,
+    ),
   ],
 );
 

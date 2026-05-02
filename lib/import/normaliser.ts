@@ -27,3 +27,18 @@ export function normaliseDescription(description: string): string {
 
   return s;
 }
+
+/**
+ * Normalise a merchant name for matching pending -> settled rows.
+ * Lowercases, strips legal suffixes and Australian state abbreviations,
+ * removes punctuation, and collapses whitespace.
+ */
+export function normaliseMerchant(merchant: string | null | undefined): string {
+  if (!merchant) return "";
+  let s = merchant.toLowerCase();
+  s = s.replace(/[.,/#!?$%^&*;:{}=_`~()'"\\[\]]/g, " ");
+  s = s.replace(/\b(pty\s*ltd|pty|ltd|limited|inc|llc|co|corp|the)\b/g, " ");
+  s = s.replace(/\b(nsw|vic|qld|wa|sa|tas|act|nt|aus|australia)\b/g, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}

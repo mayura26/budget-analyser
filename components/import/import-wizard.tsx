@@ -59,6 +59,7 @@ export function ImportWizard({
   const [doneResult, setDoneResult] = useState<{
     imported: number;
     overwritten: number;
+    merged: number;
     skipped: number;
   } | null>(null);
   const [overwriteDuplicates, setOverwriteDuplicates] = useState(false);
@@ -170,6 +171,7 @@ export function ImportWizard({
         setDoneResult({
           imported: result.data.imported,
           overwritten: result.data.overwritten,
+          merged: result.data.merged,
           skipped: result.data.skipped,
         });
         setStep("done");
@@ -205,6 +207,9 @@ export function ImportWizard({
             <p className="text-lg font-semibold">Import complete!</p>
             <p className="text-muted-foreground text-sm mt-1">
               {doneResult.imported} transactions imported
+              {doneResult.merged > 0
+                ? `, ${doneResult.merged} pending settled`
+                : ""}
               {doneResult.overwritten > 0
                 ? `, ${doneResult.overwritten} duplicates overwritten`
                 : ""}
@@ -244,9 +249,6 @@ export function ImportWizard({
   }
 
   if (step === "preview" && preview) {
-    const _newRows = preview.rows.filter((r) => !r.isDuplicate);
-    const _dupRows = preview.rows.filter((r) => r.isDuplicate);
-
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
@@ -272,13 +274,23 @@ export function ImportWizard({
             <CardTitle className="text-base">Import Preview</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex gap-4 text-sm">
+            <div className="flex flex-wrap gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <Badge className="bg-green-100 text-green-800 border-green-200">
                   {preview.newCount} new
                 </Badge>
                 <span className="text-muted-foreground">will be imported</span>
               </div>
+              {preview.mergeCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                    {preview.mergeCount} merge
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    will replace pending
+                  </span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">
                   {preview.duplicateCount} duplicate
@@ -321,12 +333,20 @@ export function ImportWizard({
               {preview.rows.map((row) => (
                 <tr
                   key={row.fingerprint}
-                  className={row.isDuplicate ? "opacity-40" : ""}
+                  className={row.status === "duplicate" ? "opacity-40" : ""}
                 >
                   <td className="sticky left-0 z-10 bg-background px-3 py-1 border-b">
-                    {row.isDuplicate ? (
+                    {row.status === "duplicate" ? (
                       <Badge variant="secondary" className="text-xs">
                         dup
+                      </Badge>
+                    ) : row.status === "merge" ? (
+                      <Badge className="bg-amber-100 text-amber-800 text-xs border-0">
+                        merge
+                      </Badge>
+                    ) : row.pending ? (
+                      <Badge className="bg-blue-100 text-blue-800 text-xs border-0">
+                        pending
                       </Badge>
                     ) : (
                       <Badge className="bg-green-100 text-green-800 text-xs border-0">
@@ -369,6 +389,7 @@ export function ImportWizard({
           {(() => {
             const importCount =
               preview.newCount +
+              preview.mergeCount +
               (overwriteDuplicates ? preview.duplicateCount : 0);
             return (
               <Button

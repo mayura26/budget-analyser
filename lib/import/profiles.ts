@@ -86,7 +86,12 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     skipRows: 0,
     delimiter: ",",
     negativeIsDebit: true,
-    extraMappings: null,
+    extraMappings: JSON.stringify({
+      merchantColumn: "Merchant Name",
+      accountReferenceColumn: "Account Number",
+      pendingFlagColumn: "Processed On",
+      pendingWhenEmpty: true,
+    }),
     isSystem: true,
   },
 ];

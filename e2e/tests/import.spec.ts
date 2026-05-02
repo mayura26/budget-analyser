@@ -9,6 +9,8 @@ const monzoTransfersCsv = path.join(
   "../fixtures/monzo-transfers.csv",
 );
 const colesCsv = path.join(__dirname, "../fixtures/coles.csv");
+const colesPendingCsv = path.join(__dirname, "../fixtures/coles-pending.csv");
+const colesSettledCsv = path.join(__dirname, "../fixtures/coles-settled.csv");
 const commbankPdf = path.join(__dirname, "../fixtures/commbank-statement.pdf");
 const commbank105Csv = path.join(__dirname, "../fixtures/commbank-105.csv");
 const wiseCsv = path.join(__dirname, "../fixtures/wise.csv");
@@ -280,6 +282,49 @@ test.describe("Import", () => {
     await expect(page.getByText("4 new")).toBeVisible();
     await expect(page.locator("tbody tr")).toHaveCount(4);
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
+  });
+
+  test("Coles pending row merges with later settled row", async ({ page }) => {
+    // First import: bring in the pending Coles row (-126.61, no Processed On).
+    await page.goto("/import");
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Coles" }).click();
+    await page.locator("#csv-file").setInputFiles(colesPendingCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("1 new")).toBeVisible();
+    await page.getByRole("button", { name: /Import 1 transactions/i }).click();
+    await expect(page.getByText("Import complete!")).toBeVisible();
+
+    // Second import: same merchant + card, settled with a slightly different
+    // amount (-127.38, within 10%) and slightly different description.
+    // Should be detected as a merge (replace pending) rather than a new row.
+    await page.goto("/import");
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Coles" }).click();
+    await page.locator("#csv-file").setInputFiles(colesSettledCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("0 new")).toBeVisible();
+    await expect(page.getByText("1 merge")).toBeVisible();
+    await expect(page.getByText("0 duplicate")).toBeVisible();
+
+    await page.getByRole("button", { name: /Import 1 transactions/i }).click();
+    await expect(page.getByText("Import complete!")).toBeVisible();
+    await expect(page.getByText(/1 pending settled/i)).toBeVisible();
+
+    // Verify only the settled row remains (no duplicate).
+    await page.goto("/transactions");
+    const merchantRows = page
+      .locator("tbody tr")
+      .filter({ hasText: "Coles Online Hawthorn East" });
+    await expect(merchantRows).toHaveCount(1);
+    await expect(merchantRows.first()).toContainText("Hawthorn East NSW");
+    await expect(merchantRows.first()).toContainText("127.38");
   });
 
   test("CommBank PDF shows preview", async ({ page }) => {

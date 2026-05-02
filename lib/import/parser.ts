@@ -29,6 +29,10 @@ export type ColumnMapping = {
   targetAmountColumn?: string;
   targetCurrencyColumn?: string;
   accountCurrency?: string;
+  merchantColumn?: string;
+  accountReferenceColumn?: string;
+  pendingFlagColumn?: string;
+  pendingWhenEmpty?: boolean;
 };
 
 export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
@@ -48,6 +52,10 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         sourceCurrencyColumn?: string;
         targetAmountColumn?: string;
         targetCurrencyColumn?: string;
+        merchantColumn?: string;
+        accountReferenceColumn?: string;
+        pendingFlagColumn?: string;
+        pendingWhenEmpty?: boolean;
       };
       if (typeof parsed.hasHeader === "boolean") {
         hasHeader = parsed.hasHeader;
@@ -75,6 +83,10 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         sourceCurrencyColumn: parsed.sourceCurrencyColumn,
         targetAmountColumn: parsed.targetAmountColumn,
         targetCurrencyColumn: parsed.targetCurrencyColumn,
+        merchantColumn: parsed.merchantColumn,
+        accountReferenceColumn: parsed.accountReferenceColumn,
+        pendingFlagColumn: parsed.pendingFlagColumn,
+        pendingWhenEmpty: parsed.pendingWhenEmpty,
       };
     } catch {
       // Ignore invalid JSON and fall back to header-based parsing.
@@ -242,7 +254,33 @@ export function parseCSV(
 
     amount = normaliseSignedAmount(amount, mapping, row);
 
-    rows.push({ date, description: desc, amount, currency, rawRow: row });
+    const merchant = mapping.merchantColumn
+      ? row[mapping.merchantColumn]?.trim() || undefined
+      : undefined;
+    const accountReference = mapping.accountReferenceColumn
+      ? row[mapping.accountReferenceColumn]?.trim() || undefined
+      : undefined;
+    let pending: boolean | undefined;
+    if (mapping.pendingFlagColumn) {
+      const flagRaw = row[mapping.pendingFlagColumn];
+      const flag = (flagRaw ?? "").trim();
+      if (mapping.pendingWhenEmpty) {
+        pending = flag === "";
+      } else {
+        pending = flag !== "";
+      }
+    }
+
+    rows.push({
+      date,
+      description: desc,
+      amount,
+      currency,
+      rawRow: row,
+      merchant,
+      accountReference,
+      pending,
+    });
   }
 
   return { rows, headers, errors };
@@ -260,8 +298,12 @@ function normaliseSignedAmount(
   const directionColumn = mapping.directionColumn;
   if (directionColumn && row) {
     const direction = (row[directionColumn] ?? "").trim().toUpperCase();
-    const outValues = new Set((mapping.outValues ?? []).map((v) => v.toUpperCase()));
-    const inValues = new Set((mapping.inValues ?? []).map((v) => v.toUpperCase()));
+    const outValues = new Set(
+      (mapping.outValues ?? []).map((v) => v.toUpperCase()),
+    );
+    const inValues = new Set(
+      (mapping.inValues ?? []).map((v) => v.toUpperCase()),
+    );
     const absoluteAmount = Math.abs(amount);
     if (outValues.has(direction)) return -absoluteAmount;
     if (inValues.has(direction)) return absoluteAmount;

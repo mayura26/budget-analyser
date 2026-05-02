@@ -99,6 +99,13 @@
       "when": 1777249800000,
       "tag": "0013_budget_month_status",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1777349800000,
+      "tag": "0014_transaction_pending",
+      "breakpoints": true
     }
   ]
 }

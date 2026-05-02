@@ -111,6 +111,9 @@ export type ParsedRow = {
   amount: number;
   currency?: string;
   rawRow: Record<string, string>;
+  merchant?: string;
+  accountReference?: string;
+  pending?: boolean;
 };
 
 export type ImportPreview = {
@@ -120,14 +123,19 @@ export type ImportPreview = {
   totalRows: number;
   newCount: number;
   duplicateCount: number;
+  mergeCount: number;
   dateRangeStart: string;
   dateRangeEnd: string;
 };
 
+export type PreviewRowStatus = "new" | "duplicate" | "merge";
+
 export type PreviewRow = ParsedRow & {
   normalised: string;
   fingerprint: string;
+  status: PreviewRowStatus;
   isDuplicate: boolean;
+  mergeTargetId?: number;
 };
 
 export type ActionResult<T = void> =
