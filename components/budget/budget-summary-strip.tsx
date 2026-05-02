@@ -24,10 +24,13 @@ export function BudgetSummaryStrip({
       ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100)
       : 0;
 
+  const savingsIncludingSurplus =
+    summary.totalSavingsAllocated + summary.implicitSurplusAsSavings;
+
   const pctSavings =
     summary.totalSavingsBudgeted > 0
       ? Math.round(
-          (summary.totalSavingsAllocated / summary.totalSavingsBudgeted) * 100,
+          (savingsIncludingSurplus / summary.totalSavingsBudgeted) * 100,
         )
       : 0;
 
@@ -80,13 +83,19 @@ export function BudgetSummaryStrip({
         </CardHeader>
         <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
           <p className="text-xl sm:text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
-            {formatCurrency(summary.totalSavingsAllocated, homeCurrency)}
+            {formatCurrency(savingsIncludingSurplus, homeCurrency)}
             <span className="text-sm font-normal text-muted-foreground">
               {" "}
               / {formatCurrency(summary.totalSavingsBudgeted, homeCurrency)}
             </span>
           </p>
           <p className="text-xs text-muted-foreground">
+            {summary.implicitSurplusAsSavings > 0 ? (
+              <>
+                Includes {formatCurrency(summary.implicitSurplusAsSavings, homeCurrency)}{" "}
+                unspent surplus (closed month).{" "}
+              </>
+            ) : null}
             {summary.totalSavingsBudgeted > 0
               ? `${pctSavings}% of savings targets`
               : "No savings targets set"}

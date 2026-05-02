@@ -23,6 +23,7 @@ import {
   getActualIncomeForMonth,
   getScheduledAmountsByCategory,
   hasBudgetTargets,
+  isMonthClosed,
 } from "@/lib/budget/queries";
 import { getHomeCurrency } from "@/lib/currency/home";
 import {
@@ -70,7 +71,13 @@ async function DashboardBudgetStatus({
     homeCurrency,
   );
   const actualIncome = await getActualIncomeForMonth(selectedMonth, homeCurrency);
-  const summary = buildBudgetSummary(rows, selectedMonth, income, actualIncome);
+  const summary = buildBudgetSummary(
+    rows,
+    selectedMonth,
+    income,
+    actualIncome,
+    isMonthClosed(selectedMonth),
+  );
 
   const budgetedRows = rows.filter(
     (r) => r.targetAmount > 0 && r.categoryKind === "expense",

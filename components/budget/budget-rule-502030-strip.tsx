@@ -74,6 +74,14 @@ export function BudgetRule502030Strip({
           Income basis {formatCurrency(incomeBasis, homeCurrency)} &mdash;{" "}
           {basisNote}
         </p>
+        {summary.implicitSurplusAsSavings > 0 ? (
+          <p className="text-xs text-muted-foreground font-normal pt-1">
+            Savings &ldquo;actual&rdquo; includes{" "}
+            {formatCurrency(summary.implicitSurplusAsSavings, homeCurrency)} unspent
+            surplus for this closed month (money left after expenses and tracked
+            savings moves).
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent className="grid gap-6 sm:grid-cols-3">
         <BandBar

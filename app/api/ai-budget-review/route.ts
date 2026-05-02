@@ -76,7 +76,13 @@ export async function POST(request: Request) {
   const rows = await buildBudgetCategoryRows(month, allCats, homeCurrency);
   const { income } = await getScheduledAmountsByCategory(month, homeCurrency);
   const actualIncome = await getActualIncomeForMonth(month, homeCurrency);
-  const summary = buildBudgetSummary(rows, month, income, actualIncome);
+  const summary = buildBudgetSummary(
+    rows,
+    month,
+    income,
+    actualIncome,
+    isMonthClosed(month),
+  );
   const budgetedRows = rows.filter((row) => row.targetAmount > 0);
 
   const rowStats = budgetedRows

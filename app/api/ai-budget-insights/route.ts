@@ -6,6 +6,7 @@ import {
   buildBudgetSummary,
   getActualIncomeForMonth,
   getScheduledAmountsByCategory,
+  isMonthClosed,
 } from "@/lib/budget/queries";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
@@ -66,7 +67,13 @@ export async function POST(request: Request) {
   const rows = await buildBudgetCategoryRows(month, allCats, homeCurrency);
   const { income } = await getScheduledAmountsByCategory(month, homeCurrency);
   const actualIncome = await getActualIncomeForMonth(month, homeCurrency);
-  const summary = buildBudgetSummary(rows, month, income, actualIncome);
+  const summary = buildBudgetSummary(
+    rows,
+    month,
+    income,
+    actualIncome,
+    isMonthClosed(month),
+  );
 
   const budgetedRows = rows.filter((r) => r.targetAmount > 0);
 

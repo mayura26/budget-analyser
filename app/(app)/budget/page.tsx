@@ -142,16 +142,17 @@ export default async function BudgetPage({
     homeCurrency,
   );
   const actualIncome = await getActualIncomeForMonth(selectedMonth, homeCurrency);
+  const monthClosed = isMonthClosed(selectedMonth);
   const budgetSummary = buildBudgetSummary(
     budgetRows,
     selectedMonth,
     expectedIncome,
     actualIncome,
+    monthClosed,
   );
   const previousMonth = addCalendarMonths(selectedMonth, -1);
   const hasPrevBudget = hasBudgetTargets(previousMonth);
   const isReadOnly = selectedMonth < currentMonth;
-  const monthClosed = isMonthClosed(selectedMonth);
   const canCloseMonth = selectedMonth < currentMonth && !monthClosed;
 
   const { start: monthRangeStart, end: monthRangeEnd } =
