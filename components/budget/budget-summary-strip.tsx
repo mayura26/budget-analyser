@@ -34,22 +34,56 @@ export function BudgetSummaryStrip({
         )
       : 0;
 
+  const incomeVariance = summary.actualIncome - summary.expectedIncome;
+  const incomeMatchesExpected = Math.abs(incomeVariance) < 0.01;
+
   return (
     <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-5">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Expected Income
+            {summary.monthClosed ? "Income" : "Expected Income"}
           </CardTitle>
           <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center">
             <ArrowUpCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
           </div>
         </CardHeader>
-        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
-          <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
-            {formatCurrency(summary.expectedIncome, homeCurrency)}
-          </p>
-          <p className="text-xs text-muted-foreground">From scheduled income</p>
+        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6 space-y-1">
+          {summary.monthClosed ? (
+            <>
+              <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
+                {formatCurrency(summary.actualIncome, homeCurrency)}
+              </p>
+              <p className="text-xs text-muted-foreground">Realised this month</p>
+              <p className="text-xs text-muted-foreground">
+                Expected {formatCurrency(summary.expectedIncome, homeCurrency)} (scheduled)
+              </p>
+              {incomeMatchesExpected ? (
+                <p className="text-xs text-muted-foreground">
+                  Matches scheduled income
+                </p>
+              ) : (
+                <p
+                  className={`text-xs font-medium ${
+                    incomeVariance > 0
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-amber-600 dark:text-amber-400"
+                  }`}
+                >
+                  {incomeVariance > 0
+                    ? `+${formatCurrency(incomeVariance, homeCurrency)} over expected`
+                    : `${formatCurrency(Math.abs(incomeVariance), homeCurrency)} under expected`}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
+                {formatCurrency(summary.expectedIncome, homeCurrency)}
+              </p>
+              <p className="text-xs text-muted-foreground">From scheduled income</p>
+            </>
+          )}
         </CardContent>
       </Card>
 

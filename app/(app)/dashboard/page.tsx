@@ -131,6 +131,13 @@ async function DashboardBudgetStatus({
           />
         </div>
 
+        {summary.monthClosed && (
+          <p className="text-xs text-muted-foreground">
+            Income: {formatCurrency(summary.actualIncome, homeCurrency)} realised ·{" "}
+            {formatCurrency(summary.expectedIncome, homeCurrency)} expected (scheduled)
+          </p>
+        )}
+
         {topCategories.length > 0 && (
           <div className="space-y-1.5">
             {topCategories.map((row) => {

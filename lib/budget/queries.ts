@@ -17,6 +17,7 @@ import type { SupportedCurrency } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
 import {
   accounts,
+  budgetMonthReviews,
   budgetMonthStatus,
   budgets,
   categories,
@@ -79,6 +80,79 @@ export function closeMonth(month: string): void {
     ON CONFLICT (month)
     DO UPDATE SET is_closed = 1, closed_at = COALESCE(budget_month_status.closed_at, unixepoch()), updated_at = unixepoch()
   `);
+}
+
+export type SavedMonthReview<TReview, TMetrics> = {
+  review: TReview;
+  metrics: TMetrics;
+  model: string;
+  generatedAt: number;
+};
+
+export function getMonthReview<TReview, TMetrics>(
+  month: string,
+  format: "digest" | "deep",
+): SavedMonthReview<TReview, TMetrics> | null {
+  const row = db
+    .select()
+    .from(budgetMonthReviews)
+    .where(
+      and(
+        eq(budgetMonthReviews.month, month),
+        eq(budgetMonthReviews.format, format),
+      ),
+    )
+    .get() as
+    | {
+        reviewJson: string;
+        metricsJson: string;
+        model: string;
+        generatedAt: number;
+      }
+    | undefined;
+  if (!row) return null;
+  try {
+    return {
+      review: JSON.parse(row.reviewJson) as TReview,
+      metrics: JSON.parse(row.metricsJson) as TMetrics,
+      model: row.model,
+      generatedAt: row.generatedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveMonthReview(args: {
+  month: string;
+  format: "digest" | "deep";
+  review: unknown;
+  metrics: unknown;
+  model: string;
+}): number {
+  const reviewJson = JSON.stringify(args.review);
+  const metricsJson = JSON.stringify(args.metrics);
+  db.run(sql`
+    INSERT INTO budget_month_reviews (month, format, review_json, metrics_json, model, generated_at)
+    VALUES (${args.month}, ${args.format}, ${reviewJson}, ${metricsJson}, ${args.model}, unixepoch())
+    ON CONFLICT (month, format)
+    DO UPDATE SET
+      review_json = excluded.review_json,
+      metrics_json = excluded.metrics_json,
+      model = excluded.model,
+      generated_at = unixepoch()
+  `);
+  const ts = db
+    .select({ generatedAt: budgetMonthReviews.generatedAt })
+    .from(budgetMonthReviews)
+    .where(
+      and(
+        eq(budgetMonthReviews.month, args.month),
+        eq(budgetMonthReviews.format, args.format),
+      ),
+    )
+    .get();
+  return ts?.generatedAt ?? Math.floor(Date.now() / 1000);
 }
 
 function roundMoney(n: number): number {
@@ -618,6 +692,8 @@ export function buildBudgetSummary(
     totalSpent: roundMoney(totalSpent),
     totalRemaining: roundMoney(totalRemaining),
     expectedIncome: roundMoney(expectedIncome),
+    actualIncome: roundMoney(incomeBasisFromActual),
+    monthClosed,
     totalSavingsBudgeted: roundMoney(totalSavingsBudgeted),
     totalSavingsAllocated: roundMoney(totalSavingsAllocated),
     implicitSurplusAsSavings,

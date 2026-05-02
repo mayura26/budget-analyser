@@ -125,6 +125,33 @@ test.describe("Budget", () => {
     }
   });
 
+  test("closed past month shows realised vs scheduled income when budget exists", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    await page.goto(`/budget?month=${prevMonth}`);
+
+    const hasExpenseBudget = await page
+      .getByText("Expense budget")
+      .isVisible({ timeout: 8000 })
+      .catch(() => false);
+    test.skip(!hasExpenseBudget, "Needs budget targets for the previous month");
+
+    const closeMonthBtn = page.getByRole("button", { name: "Close Month" });
+    if (await closeMonthBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await closeMonthBtn.click();
+    }
+
+    await expect(page.getByRole("button", { name: "Month Closed" })).toBeVisible({
+      timeout: 8000,
+    });
+
+    await expect(page.getByText("Realised this month")).toBeVisible();
+    await expect(page.getByText("(scheduled)").first()).toBeVisible();
+  });
+
   test("closed month unlocks review page with quick and deep formats", async ({
     page,
   }) => {

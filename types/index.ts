@@ -230,6 +230,10 @@ export type BudgetSummary = {
   totalSpent: number;
   totalRemaining: number;
   expectedIncome: number;
+  /** Realised income from transactions (home currency) for the month. */
+  actualIncome: number;
+  /** Whether this month is marked closed in settings (final numbers / surplus rules). */
+  monthClosed: boolean;
   /** Savings goal targets and net allocations (same sign convention as spending). */
   totalSavingsBudgeted: number;
   totalSavingsAllocated: number;

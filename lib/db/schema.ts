@@ -243,6 +243,25 @@ export const budgetMonthStatus = sqliteTable(
   (table) => [index("budget_month_status_closed_idx").on(table.isClosed)],
 );
 
+export const budgetMonthReviews = sqliteTable(
+  "budget_month_reviews",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    month: text("month").notNull(), // YYYY-MM
+    format: text("format").notNull(), // 'digest' | 'deep'
+    reviewJson: text("review_json").notNull(),
+    metricsJson: text("metrics_json").notNull(),
+    model: text("model").notNull(),
+    generatedAt: integer("generated_at").notNull().default(sql`(unixepoch())`),
+  },
+  (table) => [
+    uniqueIndex("budget_month_reviews_month_format").on(
+      table.month,
+      table.format,
+    ),
+  ],
+);
+
 export const dismissedMismatches = sqliteTable(
   "dismissed_mismatches",
   {

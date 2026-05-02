@@ -1,6 +1,13 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, Copy, Sparkles, TrendingUp } from "lucide-react";
+import {
+  BookOpen,
+  CalendarClock,
+  CheckCircle2,
+  Copy,
+  Sparkles,
+  TrendingUp,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AiBudgetSuggestionsDialog } from "@/components/budget/ai-budget-suggestions-dialog";
@@ -93,19 +100,16 @@ export function MonthlyBudgetTab({
       {hasBudget ? (
         <>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleReviewMonth}
-              disabled={!monthClosed}
-              title={
-                monthClosed
-                  ? "Open end-of-month AI review"
-                  : "Close this month to unlock review"
-              }
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              Review Month
-            </Button>
+            {monthClosed && (
+              <Button
+                variant="outline"
+                onClick={handleReviewMonth}
+                title="Open end-of-month AI review"
+              >
+                <BookOpen className="h-4 w-4 mr-2" />
+                Review Month
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleCloseMonth}
@@ -164,19 +168,16 @@ export function MonthlyBudgetTab({
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleReviewMonth}
-                  disabled={!monthClosed}
-                  title={
-                    monthClosed
-                      ? "Open end-of-month AI review"
-                      : "Close this month to unlock review"
-                  }
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Review Month
-                </Button>
+                {monthClosed && (
+                  <Button
+                    variant="outline"
+                    onClick={handleReviewMonth}
+                    title="Open end-of-month AI review"
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Review Month
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={handleCloseMonth}
