@@ -24,7 +24,7 @@ test.describe("Import", () => {
     await page.goto("/accounts");
     const exists = await page.getByText("Import Test Account").isVisible();
     if (!exists) {
-      await page.getByRole("button", { name: "Add account" }).click();
+      await page.getByRole("button", { name: "Add account" }).first().click();
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
       await dialog.locator('input[name="name"]').fill("Import Test Account");
@@ -60,7 +60,7 @@ test.describe("Import", () => {
     await page.goto("/accounts");
 
     // Create account with CommBank profile
-    await page.getByRole("button", { name: "Add account" }).click();
+    await page.getByRole("button", { name: "Add account" }).first().click();
     let accountDialog = page.getByRole("dialog");
     await expect(accountDialog).toBeVisible();
     await accountDialog.locator('input[name="name"]').fill(commbankAccountName);
@@ -70,7 +70,7 @@ test.describe("Import", () => {
     await expect(page.getByText(commbankAccountName)).toBeVisible();
 
     // Create account with Monzo profile
-    await page.getByRole("button", { name: "Add account" }).click();
+    await page.getByRole("button", { name: "Add account" }).first().click();
     accountDialog = page.getByRole("dialog");
     await expect(accountDialog).toBeVisible();
     await accountDialog.locator('input[name="name"]').fill(monzoAccountName);
@@ -134,7 +134,7 @@ test.describe("Import", () => {
     const accountName = `Import Freshness ${Date.now()}`;
 
     await page.goto("/accounts");
-    await page.getByRole("button", { name: "Add account" }).click();
+    await page.getByRole("button", { name: "Add account" }).first().click();
     const accountDialog = page.getByRole("dialog");
     await expect(accountDialog).toBeVisible();
     await accountDialog.locator('input[name="name"]').fill(accountName);
@@ -379,8 +379,10 @@ test.describe("Import", () => {
 
     await expect(page.getByText("2 new")).toBeVisible();
     await expect(page.locator("tbody tr")).toHaveCount(2);
+    await expect(page.getByText("BALANCE_TRANSACTION")).toHaveCount(0);
+    // Money in: description uses Source name (not Target / recipient label).
     await expect(
-      page.locator("tbody tr").filter({ hasText: "MARKET EDGE ANALYTICS LTD." }),
+      page.locator("tbody tr").filter({ hasText: "Kanthavel Mayura Vivekananda" }),
     ).toContainText("+");
     await expect(
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),
@@ -390,7 +392,7 @@ test.describe("Import", () => {
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),
     ).toContainText("10.00");
     await expect(
-      page.locator("tbody tr").filter({ hasText: "MARKET EDGE ANALYTICS LTD." }),
+      page.locator("tbody tr").filter({ hasText: "Kanthavel Mayura Vivekananda" }),
     ).toContainText("USD");
     await expect(
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),

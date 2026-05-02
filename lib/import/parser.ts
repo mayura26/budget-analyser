@@ -33,6 +33,15 @@ export type ColumnMapping = {
   accountReferenceColumn?: string;
   pendingFlagColumn?: string;
   pendingWhenEmpty?: boolean;
+  /** Omit rows whose Direction matches any value (case-insensitive). */
+  skipDirections?: string[];
+  skipTransactionIdColumn?: string;
+  /** Omit rows whose transaction id starts with any prefix (case-insensitive). */
+  skipTransactionIdPrefixes?: string[];
+  /** When Direction matches inValues, prefer this column for description. */
+  descriptionInColumn?: string;
+  /** When Direction matches outValues, prefer this column for description. */
+  descriptionOutColumn?: string;
 };
 
 export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
@@ -56,6 +65,11 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         accountReferenceColumn?: string;
         pendingFlagColumn?: string;
         pendingWhenEmpty?: boolean;
+        skipDirections?: string[];
+        skipTransactionIdColumn?: string;
+        skipTransactionIdPrefixes?: string[];
+        descriptionInColumn?: string;
+        descriptionOutColumn?: string;
       };
       if (typeof parsed.hasHeader === "boolean") {
         hasHeader = parsed.hasHeader;
@@ -87,6 +101,11 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         accountReferenceColumn: parsed.accountReferenceColumn,
         pendingFlagColumn: parsed.pendingFlagColumn,
         pendingWhenEmpty: parsed.pendingWhenEmpty,
+        skipDirections: parsed.skipDirections,
+        skipTransactionIdColumn: parsed.skipTransactionIdColumn,
+        skipTransactionIdPrefixes: parsed.skipTransactionIdPrefixes,
+        descriptionInColumn: parsed.descriptionInColumn,
+        descriptionOutColumn: parsed.descriptionOutColumn,
       };
     } catch {
       // Ignore invalid JSON and fall back to header-based parsing.
@@ -216,6 +235,8 @@ export function parseCSV(
   for (let i = mapping.skipRows; i < result.data.length; i++) {
     const row = result.data[i];
 
+    if (shouldSkipMappedRow(row, mapping)) continue;
+
     const dateRaw = row[mapping.dateColumn]?.trim();
     const desc = resolveDescription(row, mapping);
 
@@ -317,15 +338,71 @@ function normaliseSignedAmount(
   return amount;
 }
 
+function shouldSkipMappedRow(
+  row: Record<string, string>,
+  mapping: ColumnMapping,
+): boolean {
+  const idColumn = mapping.skipTransactionIdColumn;
+  const idPrefixes = mapping.skipTransactionIdPrefixes;
+  if (idColumn && idPrefixes && idPrefixes.length > 0) {
+    const rawId = (row[idColumn] ?? "").trim();
+    if (rawId) {
+      const upperId = rawId.toUpperCase();
+      for (const prefix of idPrefixes) {
+        if (upperId.startsWith(prefix.trim().toUpperCase())) return true;
+      }
+    }
+  }
+
+  const dirColumn = mapping.directionColumn;
+  const skipDirs = mapping.skipDirections;
+  if (dirColumn && skipDirs && skipDirs.length > 0) {
+    const direction = (row[dirColumn] ?? "").trim().toUpperCase();
+    const skipSet = new Set(skipDirs.map((d) => d.trim().toUpperCase()));
+    if (direction && skipSet.has(direction)) return true;
+  }
+
+  return false;
+}
+
 function resolveDescription(
   row: Record<string, string>,
   mapping: ColumnMapping,
 ): string {
-  const candidates = [
+  const directionColumn = mapping.directionColumn;
+  const inCol = mapping.descriptionInColumn;
+  const outCol = mapping.descriptionOutColumn;
+  if (
+    directionColumn &&
+    inCol &&
+    outCol &&
+    mapping.inValues?.length &&
+    mapping.outValues?.length
+  ) {
+    const direction = (row[directionColumn] ?? "").trim().toUpperCase();
+    const inValues = new Set(
+      mapping.inValues.map((v) => v.trim().toUpperCase()),
+    );
+    const outValues = new Set(
+      mapping.outValues.map((v) => v.trim().toUpperCase()),
+    );
+    if (inValues.has(direction)) {
+      const primary = row[inCol]?.trim();
+      if (primary) return primary;
+    } else if (outValues.has(direction)) {
+      const primary = row[outCol]?.trim();
+      if (primary) return primary;
+    }
+  }
+
+  const seen = new Set<string>();
+  const chain = [
     mapping.descriptionColumn,
     ...(mapping.descriptionFallbackColumns ?? []),
   ];
-  for (const column of candidates) {
+  for (const column of chain) {
+    if (!column || seen.has(column)) continue;
+    seen.add(column);
     const value = row[column]?.trim();
     if (value) return value;
   }
