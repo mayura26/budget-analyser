@@ -198,15 +198,15 @@ test.describe("Budget", () => {
       },
       topOverspend: [
         {
-          category: "Dining out",
+          category: "Takeout (Fast food, food delivery)",
           bucket: "wants",
-          amount: 80,
-          message: "Dining out is over.",
+          amount: 380,
+          message: "Takeout is over.",
         },
       ],
       topUnderspend: [
         {
-          category: "Groceries",
+          category: "Groceries (supermarket, household food)",
           bucket: "needs",
           amount: 50,
           message: "Groceries finished under.",
@@ -332,6 +332,13 @@ test.describe("Budget", () => {
     await expect(page.getByText("Monthly review")).toBeVisible();
     await expect(page.getByRole("tab", { name: "Quick Digest" })).toBeVisible();
     await expect(page.getByText("Strong finish for the month.")).toBeVisible();
+
+    // Category variance chart shows full long category labels (Y-axis space)
+    await expect(page.getByText("Category variance")).toBeVisible();
+    // Category variance chart shows lean names (before parenthetical)
+    await expect(
+      page.locator(".recharts-wrapper").getByText("Takeout", { exact: true }),
+    ).toBeVisible();
 
     // 50/30/20 verdict band shows three buckets and the actual-income note
     await expect(page.getByText("50 / 30 / 20 verdict")).toBeVisible();

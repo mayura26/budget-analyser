@@ -369,7 +369,19 @@ function MetricTile({
   );
 }
 
-type ChartRow = { name: string; variance: number; bucket: Bucket };
+/** Y-axis label: leading segment before optional " (detail)" parenthetical. */
+function leanCategoryLabel(fullName: string): string {
+  const idx = fullName.indexOf("(");
+  const lean = idx === -1 ? fullName : fullName.slice(0, idx).trim();
+  return lean.length > 0 ? lean : fullName.trim();
+}
+
+type ChartRow = {
+  name: string;
+  fullName: string;
+  variance: number;
+  bucket: Bucket;
+};
 
 function VarianceChart({
   metrics,
@@ -380,12 +392,14 @@ function VarianceChart({
 }) {
   const rows: ChartRow[] = [
     ...metrics.topOverspend.map((r) => ({
-      name: r.category,
+      name: leanCategoryLabel(r.category),
+      fullName: r.category,
       variance: r.amount,
       bucket: r.bucket,
     })),
     ...metrics.topUnderspend.map((r) => ({
-      name: r.category,
+      name: leanCategoryLabel(r.category),
+      fullName: r.category,
       variance: -r.amount,
       bucket: r.bucket,
     })),
@@ -417,12 +431,12 @@ function VarianceChart({
         </p>
       </CardHeader>
       <CardContent>
-        <div className="h-[240px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[240px] w-full min-w-0">
+          <ResponsiveContainer width="100%" height={240} minWidth={280}>
             <BarChart
               data={rows}
               layout="vertical"
-              margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+              margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -437,7 +451,7 @@ function VarianceChart({
               <YAxis
                 type="category"
                 dataKey="name"
-                width={120}
+                width={128}
                 className="text-xs"
               />
               <Tooltip
@@ -447,6 +461,10 @@ function VarianceChart({
                     formatCurrency(Math.abs(v), homeCurrency),
                     v > 0 ? "Over" : "Under",
                   ];
+                }}
+                labelFormatter={(_label, payload) => {
+                  const row = payload?.[0]?.payload as ChartRow | undefined;
+                  return row?.fullName ?? String(_label);
                 }}
                 contentStyle={{
                   borderRadius: 8,
@@ -460,7 +478,7 @@ function VarianceChart({
                   const baseColor = BUCKET_THEME[row.bucket].bar;
                   return (
                     <Cell
-                      key={`${row.name}-${row.variance}`}
+                      key={`${row.fullName}-${row.variance}`}
                       fill={row.variance > 0 ? baseColor : `${baseColor}99`}
                     />
                   );
