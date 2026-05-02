@@ -21,7 +21,7 @@ import {
   formatCurrency,
 } from "@/lib/utils";
 import type {
-  AnalyticsExpenseTransactionLine,
+  AnalyticsBudgetTransactionLine,
   BudgetCategoryRow,
 } from "@/types";
 
@@ -64,7 +64,7 @@ function CategoryRow({
   readOnly: boolean;
   homeCurrency: SupportedCurrency;
   expenseTransactionsByCategory?:
-    | Record<string, AnalyticsExpenseTransactionLine[]>
+    | Record<string, AnalyticsBudgetTransactionLine[]>
     | undefined;
   monthRangeStart: string;
   monthRangeEnd: string;
@@ -211,10 +211,16 @@ function CategoryRow({
           )}
         </div>
 
-        {/* Actual spent */}
+        {/* Actual spent / allocated */}
         <div className="text-right text-sm tabular-nums">
           {row.actualSpent > 0 ? (
-            <span className="text-red-600 dark:text-red-400">
+            <span
+              className={
+                row.categoryKind === "savings"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-red-600 dark:text-red-400"
+              }
+            >
               {formatCurrency(row.actualSpent, homeCurrency)}
             </span>
           ) : (
@@ -276,10 +282,12 @@ function CategoryRow({
             </Link>
           </div>
           {lines.map((t) => {
+            const amt = Math.abs(t.signedConverted);
             const txnPct =
               row.actualSpent > 0
-                ? Math.round((t.converted / row.actualSpent) * 100)
+                ? Math.round((amt / row.actualSpent) * 100)
                 : 0;
+            const isInflow = t.signedConverted > 0;
             return (
               <div
                 key={t.id}
@@ -296,8 +304,15 @@ function CategoryRow({
                   </div>
                   <div className="truncate text-xs">{t.accountName}</div>
                 </div>
-                <div className="shrink-0 text-right tabular-nums text-foreground">
-                  {formatCurrency(t.converted, homeCurrency)}
+                <div
+                  className={`shrink-0 text-right tabular-nums ${
+                    isInflow
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-foreground"
+                  }`}
+                >
+                  {isInflow ? "+" : "−"}
+                  {formatCurrency(amt, homeCurrency)}
                 </div>
                 <div className="hidden sm:block shrink-0 w-10 text-right text-xs tabular-nums">
                   {txnPct}%
@@ -325,7 +340,7 @@ export function BudgetCategoryList({
   readOnly: boolean;
   homeCurrency: SupportedCurrency;
   expenseTransactionsByCategory?:
-    | Record<string, AnalyticsExpenseTransactionLine[]>
+    | Record<string, AnalyticsBudgetTransactionLine[]>
     | undefined;
   monthRangeStart: string;
   monthRangeEnd: string;

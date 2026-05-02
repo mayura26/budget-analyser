@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
+  getActualIncomeForMonth,
   getScheduledAmountsByCategory,
   hasBudgetTargets,
 } from "@/lib/budget/queries";
@@ -67,9 +68,12 @@ async function DashboardBudgetStatus({
     selectedMonth,
     homeCurrency,
   );
-  const summary = buildBudgetSummary(rows, selectedMonth, income);
+  const actualIncome = await getActualIncomeForMonth(selectedMonth, homeCurrency);
+  const summary = buildBudgetSummary(rows, selectedMonth, income, actualIncome);
 
-  const budgetedRows = rows.filter((r) => r.targetAmount > 0);
+  const budgetedRows = rows.filter(
+    (r) => r.targetAmount > 0 && r.categoryKind === "expense",
+  );
   // Top categories closest to / over budget
   const topCategories = [...budgetedRows]
     .sort(

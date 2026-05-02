@@ -111,6 +111,7 @@ export function DashboardCharts({
     month: formatMonthShort(m.month),
     Income: m.income,
     Expenses: m.expenses,
+    Savings: m.savings,
   }));
 
   const includeNetEffective = includeNet && monthNet > 0;
@@ -140,7 +141,9 @@ export function DashboardCharts({
     return [...expenseSlices, unspent];
   }, [includeNetEffective, categoryExpenseTotals, monthNet]);
 
-  const hasBarData = barData.some((d) => d.Income > 0 || d.Expenses > 0);
+  const hasBarData = barData.some(
+    (d) => d.Income > 0 || d.Expenses > 0 || d.Savings > 0,
+  );
   const hasPieData = pieData.length > 0;
   const sliderDisabled = monthNet <= 0;
 
@@ -202,6 +205,7 @@ export function DashboardCharts({
                 />
                 <Bar dataKey="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Savings" fill="#059669" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

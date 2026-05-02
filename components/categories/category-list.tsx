@@ -39,7 +39,7 @@ import type { CategorisationRule, Category } from "@/types";
 
 type CategoryWithCount = Category & { ruleCount: number };
 
-const TYPE_OPTIONS = ["expense", "income", "transfer"] as const;
+const TYPE_OPTIONS = ["expense", "income", "transfer", "savings"] as const;
 
 function DeleteCategoryButton({
   categoryId,
@@ -346,6 +346,7 @@ function AddMainGroupDialog() {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [type, setType] = useState<string>("expense");
+  const [bucket, setBucket] = useState<string>("wants");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -388,6 +389,17 @@ function AddMainGroupDialog() {
             />
           </div>
           <input type="hidden" name="type" value={type} />
+          <input
+            type="hidden"
+            name="budgetRuleBucket"
+            value={
+              type === "income" || type === "transfer"
+                ? "none"
+                : type === "savings"
+                  ? "savings"
+                  : bucket
+            }
+          />
           <div className="space-y-2">
             <Label>Type</Label>
             <Select value={type} onValueChange={setType}>
@@ -403,6 +415,21 @@ function AddMainGroupDialog() {
               </SelectContent>
             </Select>
           </div>
+          {type === "expense" ? (
+            <div className="space-y-2">
+              <Label>50/30/20 bucket</Label>
+              <Select value={bucket} onValueChange={setBucket}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="needs">Needs (~50%)</SelectItem>
+                  <SelectItem value="wants">Wants (~30%)</SelectItem>
+                  <SelectItem value="none">Excluded from rule</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label>Colour</Label>
             <Input
@@ -542,6 +569,9 @@ function EditCategoryDialog({
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [type, setType] = useState<string>(category.type);
+  const [bucket, setBucket] = useState<string>(
+    category.budgetRuleBucket ?? "wants",
+  );
   const [parentId, setParentId] = useState(() =>
     isMain
       ? String(category.parentId ?? "")
@@ -557,6 +587,7 @@ function EditCategoryDialog({
   useEffect(() => {
     if (!open) return;
     setType(category.type);
+    setBucket(category.budgetRuleBucket ?? "wants");
     if (!isMain) {
       setParentId(defaultParentIdStringForSubEdit(category, mains));
     }
@@ -639,7 +670,23 @@ function EditCategoryDialog({
                 </SelectContent>
               </Select>
             </div>
-          ) : (
+          ) : null}
+          {isMain && type === "expense" ? (
+            <div className="space-y-2">
+              <Label>50/30/20 bucket</Label>
+              <Select value={bucket} onValueChange={setBucket}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="needs">Needs (~50%)</SelectItem>
+                  <SelectItem value="wants">Wants (~30%)</SelectItem>
+                  <SelectItem value="none">Excluded from rule</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+          {!isMain ? (
             <div className="space-y-2">
               <Label>Main group</Label>
               <Select value={parentId} onValueChange={setParentId}>
@@ -659,7 +706,20 @@ function EditCategoryDialog({
                 <strong>{selectedMain?.type ?? category.type}</strong>
               </p>
             </div>
-          )}
+          ) : null}
+          {isMain ? (
+            <input
+              type="hidden"
+              name="budgetRuleBucket"
+              value={
+                type === "income" || type === "transfer"
+                  ? "none"
+                  : type === "savings"
+                    ? "savings"
+                    : bucket
+              }
+            />
+          ) : null}
           <CategoryColorField key={category.id} defaultValue={category.color} />
           <Button type="submit" className="w-full" disabled={pending}>
             Save

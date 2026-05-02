@@ -63,9 +63,12 @@ export function AnalyticsMonthlyChart({
     month: formatMonthShort(m.month),
     Income: m.income,
     Expenses: m.expenses,
+    Savings: m.savings,
   }));
 
-  const hasBarData = barData.some((d) => d.Income > 0 || d.Expenses > 0);
+  const hasBarData = barData.some(
+    (d) => d.Income > 0 || d.Expenses > 0 || d.Savings > 0,
+  );
 
   return (
     <Card>
@@ -74,8 +77,8 @@ export function AnalyticsMonthlyChart({
           Cashflow by month
         </CardTitle>
         <p className="text-xs text-muted-foreground font-normal">
-          Income and expenses in home currency for each calendar month in the
-          selected range.
+          Income, expenses (needs &amp; wants net), and savings allocations per
+          calendar month.
         </p>
       </CardHeader>
       <CardContent>
@@ -120,6 +123,7 @@ export function AnalyticsMonthlyChart({
               />
               <Bar dataKey="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
               <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Savings" fill="#059669" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

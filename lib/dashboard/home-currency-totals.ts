@@ -20,6 +20,7 @@ export async function getMonthlyTotalsInHomeCurrency(
         amount: transactions.amount,
         date: transactions.date,
         currency: accounts.currency,
+        categoryType: categories.type,
       })
       .from(transactions)
       .innerJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -44,18 +45,34 @@ export async function getMonthlyTotalsInHomeCurrency(
 
     let income = 0;
     let expenses = 0;
+    let savings = 0;
     for (const row of rows) {
       const cur = parseAccountCurrency(row.currency, homeCurrency);
       const v = convertToHome(db, row.amount, cur, homeCurrency, row.date);
+      const t = row.categoryType;
+      if (t === "transfer") continue;
+      if (t === "income") {
+        income += v;
+        continue;
+      }
+      if (t === "savings") {
+        savings += -v;
+        continue;
+      }
+      if (t === "expense") {
+        expenses += -v;
+        continue;
+      }
       if (v > 0) income += v;
-      else expenses += Math.abs(v);
+      else expenses += -v;
     }
 
     results.push({
       month,
       income: Math.round(income * 100) / 100,
       expenses: Math.round(expenses * 100) / 100,
-      net: Math.round((income - expenses) * 100) / 100,
+      savings: Math.round(savings * 100) / 100,
+      net: Math.round((income - expenses - savings) * 100) / 100,
     });
   }
 
@@ -75,6 +92,7 @@ export async function getCategoryBreakdownInHomeCurrency(
       categoryId: transactions.categoryId,
       categoryName: sql<string>`COALESCE(${categories.name}, 'Not processed')`,
       color: sql<string>`COALESCE(${categories.color}, '#9ca3af')`,
+      categoryType: categories.type,
       amount: transactions.amount,
       date: transactions.date,
       currency: accounts.currency,
@@ -120,8 +138,11 @@ export async function getCategoryBreakdownInHomeCurrency(
       expenseTotal: 0,
       expenseCount: 0,
     };
-    if (conv < 0) {
-      existing.expenseTotal += Math.abs(conv);
+    if (row.categoryType === "expense") {
+      existing.expenseTotal += -conv;
+      existing.expenseCount += 1;
+    } else if (row.categoryType == null && conv < 0) {
+      existing.expenseTotal += -conv;
       existing.expenseCount += 1;
     }
     byCat.set(key, existing);

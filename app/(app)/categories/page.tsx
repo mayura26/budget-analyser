@@ -22,6 +22,7 @@ export default function CategoriesPage() {
       icon: categories.icon,
       parentId: categories.parentId,
       type: categories.type,
+      budgetRuleBucket: categories.budgetRuleBucket,
       isSystem: categories.isSystem,
       createdAt: categories.createdAt,
       ruleCount: sql<number>`COUNT(${categorisationRules.id})`,

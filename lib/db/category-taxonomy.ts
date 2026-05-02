@@ -13,37 +13,78 @@ export const MAIN_GROUP_NAMES = [
 
 export type MainGroupName = (typeof MAIN_GROUP_NAMES)[number];
 
+export type BudgetRuleBucketValue = "needs" | "wants" | "savings" | "none";
+
 export const MAIN_GROUP_DEFAULTS: {
   name: MainGroupName;
   color: string;
   icon: string;
-  type: "income" | "expense" | "transfer";
+  type: "income" | "expense" | "transfer" | "savings";
+  budgetRuleBucket: BudgetRuleBucketValue | null;
 }[] = [
-  { name: "Money IN", color: "#16A34A", icon: "Wallet", type: "income" },
-  { name: "Living Costs", color: "#2563EB", icon: "Home", type: "expense" },
-  { name: "Essentials", color: "#0D9488", icon: "Leaf", type: "expense" },
-  { name: "Enjoyment", color: "#7C3AED", icon: "Sparkles", type: "expense" },
-  { name: "Special", color: "#EA580C", icon: "Plane", type: "expense" },
+  {
+    name: "Money IN",
+    color: "#16A34A",
+    icon: "Wallet",
+    type: "income",
+    budgetRuleBucket: "none",
+  },
+  {
+    name: "Living Costs",
+    color: "#2563EB",
+    icon: "Home",
+    type: "expense",
+    budgetRuleBucket: "needs",
+  },
+  {
+    name: "Essentials",
+    color: "#0D9488",
+    icon: "Leaf",
+    type: "expense",
+    budgetRuleBucket: "needs",
+  },
+  {
+    name: "Enjoyment",
+    color: "#7C3AED",
+    icon: "Sparkles",
+    type: "expense",
+    budgetRuleBucket: "wants",
+  },
+  {
+    name: "Special",
+    color: "#EA580C",
+    icon: "Plane",
+    type: "expense",
+    budgetRuleBucket: "wants",
+  },
   {
     name: "Savings & Investing",
     color: "#059669",
     icon: "TrendingUp",
-    type: "expense",
+    type: "savings",
+    budgetRuleBucket: "savings",
   },
   {
     name: "Transfers",
     color: "#6B7280",
     icon: "ArrowLeftRight",
     type: "transfer",
+    budgetRuleBucket: "none",
   },
-  { name: "Misc", color: "#DC2626", icon: "HelpCircle", type: "expense" },
+  {
+    name: "Misc",
+    color: "#DC2626",
+    icon: "HelpCircle",
+    type: "expense",
+    budgetRuleBucket: "wants",
+  },
 ];
 
 export const DEFAULT_SUBS: {
   name: string;
   main: MainGroupName;
   icon: string;
-  type: "income" | "expense" | "transfer";
+  type: "income" | "expense" | "transfer" | "savings";
   color: string;
 }[] = [
   {
@@ -162,14 +203,14 @@ export const DEFAULT_SUBS: {
     name: "Investments",
     main: "Savings & Investing",
     icon: "LineChart",
-    type: "expense",
+    type: "savings",
     color: "#10B981",
   },
   {
     name: "Long-term savings (house, emergency fund)",
     main: "Savings & Investing",
     icon: "PiggyBank",
-    type: "expense",
+    type: "savings",
     color: "#34D399",
   },
   {

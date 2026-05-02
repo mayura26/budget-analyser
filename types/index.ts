@@ -1,10 +1,16 @@
+export type CategoryType = "income" | "expense" | "transfer" | "savings";
+
+/** 50/30/20 bucket on main groups; subs inherit via parent. */
+export type BudgetRuleBucket = "needs" | "wants" | "savings" | "none";
+
 export type Category = {
   id: number;
   name: string;
   color: string;
   icon: string | null;
   parentId: number | null;
-  type: "income" | "expense" | "transfer";
+  type: CategoryType;
+  budgetRuleBucket: BudgetRuleBucket | null;
   isSystem: boolean;
   createdAt: number;
 };
@@ -195,6 +201,8 @@ export type BudgetMonthStatus = {
   updatedAt: number;
 };
 
+export type BudgetCategoryKind = "expense" | "savings";
+
 export type BudgetCategoryRow = {
   categoryId: number;
   categoryName: string;
@@ -204,13 +212,34 @@ export type BudgetCategoryRow = {
   actualSpent: number;
   scheduledAmount: number;
   avg3Month: number;
+  categoryKind: BudgetCategoryKind;
+  /** Resolved from parent main for 50/30/20 (null if not in a bucket). */
+  ruleBucket: BudgetRuleBucket | null;
+};
+
+export type BudgetRule502030Band = {
+  targetTotal: number;
+  actualTotal: number;
+  guideline: number;
 };
 
 export type BudgetSummary = {
+  /** Expense-category targets only (excludes savings goals). */
   totalBudgeted: number;
+  /** Net expense outflows only (50/30 “Needs + Wants” spending). */
   totalSpent: number;
   totalRemaining: number;
   expectedIncome: number;
+  /** Savings goal targets and net allocations (same sign convention as spending). */
+  totalSavingsBudgeted: number;
+  totalSavingsAllocated: number;
+  /** Income basis for 50/30/20 (scheduled vs realised — see UI note). */
+  incomeBasis: number;
+  rule502030: {
+    needs: BudgetRule502030Band;
+    wants: BudgetRule502030Band;
+    savings: BudgetRule502030Band;
+  };
   daysInMonth: number;
   daysElapsed: number;
   daysRemaining: number;
@@ -261,6 +290,8 @@ export type MonthlyTotal = {
   month: string; // YYYY-MM
   income: number;
   expenses: number;
+  /** Net allocations to savings categories (positive = toward savings). */
+  savings: number;
   net: number;
 };
 
@@ -290,6 +321,15 @@ export type AnalyticsExpenseTransactionLine = {
   accountName: string;
 };
 
+/** Budget drill-down: signed home-currency amounts (negative = out, positive = in). */
+export type AnalyticsBudgetTransactionLine = {
+  id: number;
+  date: string;
+  description: string;
+  signedConverted: number;
+  accountName: string;
+};
+
 /** Spending hierarchy for analytics (expense debits, transfers excluded). */
 export type CategoryHierarchyNode = {
   id: number | null;
@@ -311,5 +351,7 @@ export type AnalyticsTreemapDatum = {
 export type AnalyticsSummary = {
   income: number;
   expenses: number;
+  savings: number;
+  /** Income minus expenses minus savings allocations. */
   net: number;
 };

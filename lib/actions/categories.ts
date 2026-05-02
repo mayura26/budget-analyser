@@ -20,11 +20,16 @@ import {
 import { categories, categorisationRules, transactions } from "@/lib/db/schema";
 import type { ActionResult, RuleDraftInput } from "@/types";
 
+const bucketSchema = z.enum(["needs", "wants", "savings", "none"]).optional();
+
 const CategorySchema = z.object({
   name: z.string().min(1).max(100),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   icon: z.string().optional(),
-  type: z.enum(["income", "expense", "transfer"]).default("expense"),
+  type: z
+    .enum(["income", "expense", "transfer", "savings"])
+    .default("expense"),
+  budgetRuleBucket: bucketSchema,
 });
 
 const RuleSchema = z.object({
@@ -57,11 +62,16 @@ export async function createCategory(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
+  const rawBucket = formData.get("budgetRuleBucket");
   const parsed = CategorySchema.safeParse({
     name: categoryNameFromFormData(formData),
     color: formData.get("color") || "#6366f1",
     icon: formData.get("icon") || undefined,
     type: formData.get("type") || "expense",
+    budgetRuleBucket:
+      rawBucket === "" || rawBucket === undefined || rawBucket === null
+        ? undefined
+        : String(rawBucket),
   });
 
   if (!parsed.success) {
@@ -76,7 +86,7 @@ export async function createCategory(
   }
 
   const parentId = parseParentId(formData);
-  const { name, color, icon, type } = parsed.data;
+  const { name, color, icon, type, budgetRuleBucket } = parsed.data;
 
   if (parentId) {
     const parent = db
@@ -117,6 +127,13 @@ export async function createCategory(
       icon: icon ?? null,
       parentId: null,
       type,
+      budgetRuleBucket:
+        budgetRuleBucket ??
+        (type === "income" || type === "transfer"
+          ? "none"
+          : type === "savings"
+            ? "savings"
+            : "wants"),
       isSystem: false,
     })
     .returning({ id: categories.id })
@@ -130,11 +147,16 @@ export async function updateCategory(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
+  const rawBucket = formData.get("budgetRuleBucket");
   const parsed = CategorySchema.safeParse({
     name: categoryNameFromFormData(formData),
     color: formData.get("color") || "#6366f1",
     icon: formData.get("icon") || undefined,
     type: formData.get("type") || "expense",
+    budgetRuleBucket:
+      rawBucket === "" || rawBucket === undefined || rawBucket === null
+        ? undefined
+        : String(rawBucket),
   });
 
   if (!parsed.success) {
@@ -151,7 +173,7 @@ export async function updateCategory(
   }
 
   const parentId = parseParentId(formData);
-  const { name, color, icon, type } = parsed.data;
+  const { name, color, icon, type, budgetRuleBucket } = parsed.data;
 
   if (existing.parentId === null) {
     const child = db
@@ -173,6 +195,13 @@ export async function updateCategory(
         icon: icon ?? null,
         type,
         parentId: null,
+        budgetRuleBucket:
+          budgetRuleBucket ??
+          (type === "income" || type === "transfer"
+            ? "none"
+            : type === "savings"
+              ? "savings"
+              : "wants"),
       })
       .where(eq(categories.id, id))
       .run();

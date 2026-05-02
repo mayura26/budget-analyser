@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
+  getActualIncomeForMonth,
   getScheduledAmountsByCategory,
 } from "@/lib/budget/queries";
 import { getHomeCurrency } from "@/lib/currency/home";
@@ -64,7 +65,8 @@ export async function POST(request: Request) {
   const allCats = db.select().from(categories).all() as Category[];
   const rows = await buildBudgetCategoryRows(month, allCats, homeCurrency);
   const { income } = await getScheduledAmountsByCategory(month, homeCurrency);
-  const summary = buildBudgetSummary(rows, month, income);
+  const actualIncome = await getActualIncomeForMonth(month, homeCurrency);
+  const summary = buildBudgetSummary(rows, month, income, actualIncome);
 
   const budgetedRows = rows.filter((r) => r.targetAmount > 0);
 

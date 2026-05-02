@@ -10,7 +10,7 @@ import { ScheduleList } from "@/components/budget/schedule-list";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getExpenseDebitLinesByCategoryForRange } from "@/lib/analytics/queries";
+import { getBudgetCategoryLinesByCategoryForRange } from "@/lib/analytics/queries";
 import { buildBalancePoints, generateOccurrences } from "@/lib/budget/generate";
 import {
   convertOccurrencesToHomeCurrency,
@@ -19,6 +19,7 @@ import {
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
+  getActualIncomeForMonth,
   getScheduledAmountsByCategory,
   hasBudgetTargets,
   isMonthClosed,
@@ -140,10 +141,12 @@ export default async function BudgetPage({
     selectedMonth,
     homeCurrency,
   );
+  const actualIncome = await getActualIncomeForMonth(selectedMonth, homeCurrency);
   const budgetSummary = buildBudgetSummary(
     budgetRows,
     selectedMonth,
     expectedIncome,
+    actualIncome,
   );
   const previousMonth = addCalendarMonths(selectedMonth, -1);
   const hasPrevBudget = hasBudgetTargets(previousMonth);
@@ -154,7 +157,7 @@ export default async function BudgetPage({
   const { start: monthRangeStart, end: monthRangeEnd } =
     getMonthRange(selectedMonth);
   const expenseTransactionsByCategory =
-    await getExpenseDebitLinesByCategoryForRange(
+    await getBudgetCategoryLinesByCategoryForRange(
       monthRangeStart,
       monthRangeEnd,
       homeCurrency,

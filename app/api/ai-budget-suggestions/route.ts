@@ -86,7 +86,9 @@ export async function POST(request: Request) {
   );
 
   const expenseSubs = allCats.filter(
-    (c) => c.parentId !== null && c.type === "expense",
+    (c) =>
+      c.parentId !== null &&
+      (c.type === "expense" || c.type === "savings"),
   );
 
   // Only include categories that have some historical data or scheduled amounts

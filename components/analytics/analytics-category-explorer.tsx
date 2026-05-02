@@ -212,12 +212,16 @@ function CategoryRow({
 }
 
 export function AnalyticsCategoryExplorer({
+  title = "Spending by category",
+  description = "Expense debits in home currency; transfers excluded. Expand a category to see subcategories and transactions.",
   categoryRoots,
   expenseTransactionsByCategory,
   rangeStart,
   rangeEnd,
   homeCurrency,
 }: {
+  title?: string;
+  description?: string;
   categoryRoots: CategoryHierarchyNode[];
   expenseTransactionsByCategory: Record<
     string,
@@ -270,12 +274,9 @@ export function AnalyticsCategoryExplorer({
     <Card>
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3 space-y-0">
         <div className="space-y-1 min-w-0">
-          <CardTitle className="text-base font-semibold">
-            Spending by category
-          </CardTitle>
+          <CardTitle className="text-base font-semibold">{title}</CardTitle>
           <p className="text-xs text-muted-foreground font-normal">
-            Expense debits in home currency; transfers excluded. Expand a
-            category to see subcategories and transactions.
+            {description}
           </p>
         </div>
         {hasAnySpending && allKeys.size > 0 && (

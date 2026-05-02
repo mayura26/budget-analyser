@@ -62,9 +62,15 @@ export const categories = sqliteTable("categories", {
   icon: text("icon"),
   // FK to categories(id) enforced in migration (self-reference breaks Drizzle TS inference).
   parentId: integer("parent_id"),
-  type: text("type", { enum: ["income", "expense", "transfer"] })
+  type: text("type", {
+    enum: ["income", "expense", "transfer", "savings"],
+  })
     .notNull()
     .default("expense"),
+  /** 50/30/20 bucket for main groups only; subs inherit from parent. */
+  budgetRuleBucket: text("budget_rule_bucket", {
+    enum: ["needs", "wants", "savings", "none"],
+  }),
   isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
 });

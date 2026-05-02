@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import type {
   AccountCashflowRow,
+  AnalyticsBudgetTransactionLine,
   AnalyticsExpenseTransactionLine,
   AnalyticsSummary,
   AnalyticsTreemapDatum,
@@ -20,6 +21,10 @@ type DirectSpend = { total: number; count: number };
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function netOutflowFromSignedSum(signedSumConverted: number): number {
+  return Math.max(0, -signedSumConverted);
 }
 
 function nonTransferFilter() {
@@ -105,15 +110,31 @@ async function loadConvertedRows(
 function aggregateSummary(loaded: LoadedRow[]): AnalyticsSummary {
   let income = 0;
   let expenses = 0;
+  let savings = 0;
   for (const r of loaded) {
     const v = r.converted;
+    const t = r.categoryType;
+    if (t === "transfer") continue;
+    if (t === "income") {
+      income += v;
+      continue;
+    }
+    if (t === "savings") {
+      savings += -v;
+      continue;
+    }
+    if (t === "expense") {
+      expenses += -v;
+      continue;
+    }
     if (v > 0) income += v;
-    else expenses += Math.abs(v);
+    else expenses += -v;
   }
   return {
     income: roundMoney(income),
     expenses: roundMoney(expenses),
-    net: roundMoney(income - expenses),
+    savings: roundMoney(savings),
+    net: roundMoney(income - expenses - savings),
   };
 }
 
@@ -158,25 +179,43 @@ function aggregateMonthly(
   rangeEnd: string,
 ): MonthlyTotal[] {
   const monthKeys = monthsInDateRangeInclusive(rangeStart, rangeEnd);
-  const byMonth = new Map<string, { income: number; expenses: number }>();
+  const byMonth = new Map<
+    string,
+    { income: number; expenses: number; savings: number }
+  >();
   for (const m of monthKeys) {
-    byMonth.set(m, { income: 0, expenses: 0 });
+    byMonth.set(m, { income: 0, expenses: 0, savings: 0 });
   }
   for (const r of loaded) {
     const m = r.date.slice(0, 7);
     const b = byMonth.get(m);
     if (!b) continue;
     const v = r.converted;
+    const t = r.categoryType;
+    if (t === "transfer") continue;
+    if (t === "income") {
+      b.income += v;
+      continue;
+    }
+    if (t === "savings") {
+      b.savings += -v;
+      continue;
+    }
+    if (t === "expense") {
+      b.expenses += -v;
+      continue;
+    }
     if (v > 0) b.income += v;
-    else b.expenses += Math.abs(v);
+    else b.expenses += -v;
   }
   return monthKeys.map((month) => {
-    const b = byMonth.get(month) ?? { income: 0, expenses: 0 };
+    const b = byMonth.get(month) ?? { income: 0, expenses: 0, savings: 0 };
     return {
       month,
       income: roundMoney(b.income),
       expenses: roundMoney(b.expenses),
-      net: roundMoney(b.income - b.expenses),
+      savings: roundMoney(b.savings),
+      net: roundMoney(b.income - b.expenses - b.savings),
     };
   });
 }
@@ -184,6 +223,7 @@ function aggregateMonthly(
 function isExpenseDebit(row: LoadedRow): boolean {
   if (row.converted >= 0) return false;
   if (row.categoryType === "transfer") return false;
+  if (row.categoryType === "savings") return false;
   return true;
 }
 
@@ -328,14 +368,196 @@ function buildCategoryHierarchy(loaded: LoadedRow[]): {
   return { roots, treemapData };
 }
 
+function buildSavingsHierarchy(loaded: LoadedRow[]): {
+  roots: CategoryHierarchyNode[];
+  treemapData: AnalyticsTreemapDatum | null;
+} {
+  const signedByCat = new Map<
+    number | null,
+    { signed: number; count: number }
+  >();
+  for (const r of loaded) {
+    if (r.categoryType !== "savings") continue;
+    const key = r.categoryId;
+    const ex = signedByCat.get(key) ?? { signed: 0, count: 0 };
+    ex.signed += r.converted;
+    ex.count += 1;
+    signedByCat.set(key, ex);
+  }
+
+  const direct = new Map<number | null, DirectSpend>();
+  for (const [key, v] of signedByCat) {
+    const net = netOutflowFromSignedSum(v.signed);
+    direct.set(key, { total: roundMoney(net), count: v.count });
+  }
+
+  const allCats = db.select().from(categories).all() as Category[];
+  const catById = new Map(allCats.map((c) => [c.id, c]));
+
+  const childrenByParent = new Map<number | null, Category[]>();
+  for (const c of allCats) {
+    const p = c.parentId ?? null;
+    const list = childrenByParent.get(p) ?? [];
+    list.push(c);
+    childrenByParent.set(p, list);
+  }
+  for (const [, list] of childrenByParent) {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const memo = new Map<number | null, DirectSpend>();
+
+  function subtreeTotals(id: number | null): DirectSpend {
+    const cached = memo.get(id);
+    if (cached) return cached;
+
+    if (id === null) {
+      const only = direct.get(null) ?? { total: 0, count: 0 };
+      const merged = { total: roundMoney(only.total), count: only.count };
+      memo.set(null, merged);
+      return merged;
+    }
+
+    const base = direct.get(id) ?? { total: 0, count: 0 };
+    let total = base.total;
+    let count = base.count;
+    const kids = (childrenByParent.get(id) ?? []).filter(
+      (c) => c.type === "savings",
+    );
+    for (const ch of kids) {
+      const sub = subtreeTotals(ch.id);
+      total += sub.total;
+      count += sub.count;
+    }
+    const merged = { total: roundMoney(total), count };
+    memo.set(id, merged);
+    return merged;
+  }
+
+  function nodeMeta(id: number | null): { name: string; color: string } {
+    if (id === null) return { name: "Not processed", color: "#9ca3af" };
+    const c = catById.get(id);
+    return { name: c?.name ?? "Unknown", color: c?.color ?? "#9ca3af" };
+  }
+
+  function buildNode(id: number | null): CategoryHierarchyNode {
+    const meta = nodeMeta(id);
+    const kids =
+      id === null
+        ? []
+        : (childrenByParent.get(id) ?? []).filter((c) => c.type === "savings");
+    const childNodes = kids
+      .map((c) => buildNode(c.id))
+      .filter((n) => n.total > 0 || n.children.length > 0);
+    const self = subtreeTotals(id);
+    return {
+      id,
+      name: meta.name,
+      color: meta.color,
+      total: self.total,
+      transactionCount: self.count,
+      children: childNodes.sort((a, b) => b.total - a.total),
+    };
+  }
+
+  const rootCategories = (childrenByParent.get(null) ?? []).filter(
+    (c) => c.type === "savings",
+  );
+
+  const roots: CategoryHierarchyNode[] = [];
+
+  for (const rc of rootCategories) {
+    const node = buildNode(rc.id);
+    if (node.total > 0 || node.children.length > 0) roots.push(node);
+  }
+
+  if ((direct.get(null)?.total ?? 0) > 0) {
+    roots.push(buildNode(null));
+  }
+
+  roots.sort((a, b) => b.total - a.total);
+
+  const treemapData = buildTreemapDatumForNodes(roots);
+
+  return { roots, treemapData };
+}
+
+function aggregateSavingsDebitsByCategory(
+  loaded: LoadedRow[],
+): Record<string, AnalyticsExpenseTransactionLine[]> {
+  const buckets = new Map<string, AnalyticsExpenseTransactionLine[]>();
+
+  for (const r of loaded) {
+    if (r.categoryType !== "savings" || r.converted >= 0) continue;
+    const key = categoryKey(r.categoryId);
+    const list = buckets.get(key) ?? [];
+    list.push({
+      id: r.transactionId,
+      date: r.date,
+      description: r.description,
+      converted: roundMoney(Math.abs(r.converted)),
+      accountName: r.accountName,
+    });
+    buckets.set(key, list);
+  }
+
+  const out: Record<string, AnalyticsExpenseTransactionLine[]> = {};
+  for (const [key, list] of buckets) {
+    list.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.id - a.id;
+    });
+    out[key] = list;
+  }
+  return out;
+}
+
+function aggregateBudgetLinesByCategory(
+  loaded: LoadedRow[],
+): Record<string, AnalyticsBudgetTransactionLine[]> {
+  const buckets = new Map<string, AnalyticsBudgetTransactionLine[]>();
+
+  for (const r of loaded) {
+    const t = r.categoryType;
+    if (t !== "expense" && t !== "savings") continue;
+    if (r.categoryId == null) continue;
+    const key = categoryKey(r.categoryId);
+    const list = buckets.get(key) ?? [];
+    list.push({
+      id: r.transactionId,
+      date: r.date,
+      description: r.description,
+      signedConverted: roundMoney(r.converted),
+      accountName: r.accountName,
+    });
+    buckets.set(key, list);
+  }
+
+  const out: Record<string, AnalyticsBudgetTransactionLine[]> = {};
+  for (const [key, list] of buckets) {
+    list.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.id - a.id;
+    });
+    out[key] = list;
+  }
+  return out;
+}
+
 export type AnalyticsPageData = {
   summary: AnalyticsSummary;
   accounts: AccountCashflowRow[];
   monthly: MonthlyTotal[];
   categoryRoots: CategoryHierarchyNode[];
   treemapData: AnalyticsTreemapDatum | null;
+  categorySavingsRoots: CategoryHierarchyNode[];
+  savingsTreemapData: AnalyticsTreemapDatum | null;
   /** Expense debits grouped by category id (`"none"` for uncategorised). */
   expenseTransactionsByCategory: Record<
+    string,
+    AnalyticsExpenseTransactionLine[]
+  >;
+  savingsTransactionsByCategory: Record<
     string,
     AnalyticsExpenseTransactionLine[]
   >;
@@ -352,15 +574,22 @@ export async function getAnalyticsPageData(
   const accounts = aggregateAccounts(loaded);
   const monthly = aggregateMonthly(loaded, start, end);
   const { roots, treemapData } = buildCategoryHierarchy(loaded);
+  const { roots: savingsRoots, treemapData: savingsTreemapData } =
+    buildSavingsHierarchy(loaded);
   const expenseTransactionsByCategory =
     aggregateExpenseDebitsByCategory(loaded);
+  const savingsTransactionsByCategory =
+    aggregateSavingsDebitsByCategory(loaded);
   return {
     summary,
     accounts,
     monthly,
     categoryRoots: roots,
     treemapData,
+    categorySavingsRoots: savingsRoots,
+    savingsTreemapData,
     expenseTransactionsByCategory,
+    savingsTransactionsByCategory,
   };
 }
 
@@ -411,4 +640,14 @@ export async function getExpenseDebitLinesByCategoryForRange(
 ): Promise<Record<string, AnalyticsExpenseTransactionLine[]>> {
   const loaded = await loadConvertedRows(start, end, homeCurrency);
   return aggregateExpenseDebitsByCategory(loaded);
+}
+
+/** Expense + savings categories: signed amounts for net budget drill-down. */
+export async function getBudgetCategoryLinesByCategoryForRange(
+  start: string,
+  end: string,
+  homeCurrency: SupportedCurrency,
+): Promise<Record<string, AnalyticsBudgetTransactionLine[]>> {
+  const loaded = await loadConvertedRows(start, end, homeCurrency);
+  return aggregateBudgetLinesByCategory(loaded);
 }

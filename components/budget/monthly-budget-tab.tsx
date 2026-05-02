@@ -7,6 +7,7 @@ import { AiBudgetSuggestionsDialog } from "@/components/budget/ai-budget-suggest
 import { BudgetCategoryList } from "@/components/budget/budget-category-list";
 import { GenerateBudgetDialog } from "@/components/budget/generate-budget-dialog";
 import { BudgetInsightsPanel } from "@/components/budget/budget-insights-panel";
+import { BudgetRule502030Strip } from "@/components/budget/budget-rule-502030-strip";
 import { BudgetSummaryStrip } from "@/components/budget/budget-summary-strip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatMonth } from "@/lib/utils";
 import type {
+  AnalyticsBudgetTransactionLine,
   AnalyticsExpenseTransactionLine,
   BudgetCategoryRow,
   BudgetSummary,
@@ -49,7 +51,7 @@ export function MonthlyBudgetTab({
   canCloseMonth: boolean;
   homeCurrency: SupportedCurrency;
   expenseTransactionsByCategory?:
-    | Record<string, AnalyticsExpenseTransactionLine[]>
+    | Record<string, AnalyticsBudgetTransactionLine[]>
     | undefined;
   monthRangeStart: string;
   monthRangeEnd: string;
@@ -130,6 +132,8 @@ export function MonthlyBudgetTab({
           </div>
 
           <BudgetSummaryStrip summary={summary} homeCurrency={homeCurrency} />
+
+          <BudgetRule502030Strip summary={summary} homeCurrency={homeCurrency} />
 
           <BudgetCategoryList
             rows={rows}

@@ -92,7 +92,7 @@ test.describe("Budget", () => {
     await expect(
       page
         .getByText("Set up your budget for")
-        .or(page.getByText("Total Budgeted")),
+        .or(page.getByText("Expense budget")),
     ).toBeVisible({ timeout: 10000 });
     // Column headers
     await expect(page.getByText("Target").first()).toBeVisible();
@@ -241,7 +241,7 @@ test.describe("Budget", () => {
     await expect(
       page
         .getByText("Set up your budget for")
-        .or(page.getByText("Total Budgeted")),
+        .or(page.getByText("Expense budget")),
     ).toBeVisible({ timeout: 10000 });
 
     await expect(

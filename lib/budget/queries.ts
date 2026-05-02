@@ -1,4 +1,16 @@
-import { and, eq, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
 import type { SupportedCurrency } from "@/lib/currency/supported";
@@ -18,13 +30,16 @@ import {
 } from "@/lib/utils";
 import type {
   Budget,
+  BudgetCategoryKind,
   BudgetCategoryRow,
   BudgetGenerateAnalyticsRow,
   BudgetMonthStatus,
+  BudgetRule502030Band,
   BudgetSummary,
   Category,
 } from "@/types";
 import { generateOccurrences } from "./generate";
+import { ruleBucketForSubcategory } from "./rule-bucket";
 
 export function getBudgetTargetsForMonth(month: string): Budget[] {
   return db
@@ -66,6 +81,56 @@ export function closeMonth(month: string): void {
   `);
 }
 
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Net cash out of category: debits minus credits, clamped at zero. */
+export function netOutflowFromSignedSum(signedSumConverted: number): number {
+  return Math.max(0, -signedSumConverted);
+}
+
+export async function getActualIncomeForMonth(
+  month: string,
+  homeCurrency: SupportedCurrency,
+): Promise<number> {
+  const { start, end } = getMonthRange(month);
+  const rows = db
+    .select({
+      amount: transactions.amount,
+      date: transactions.date,
+      currency: accounts.currency,
+    })
+    .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        gte(transactions.date, start),
+        lte(transactions.date, end),
+        eq(categories.type, "income"),
+      ),
+    )
+    .all();
+
+  await prefetchRatesToHome(
+    db,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.currency, homeCurrency),
+    })),
+    homeCurrency,
+  );
+
+  let sum = 0;
+  for (const row of rows) {
+    const cur = parseAccountCurrency(row.currency, homeCurrency);
+    const conv = convertToHome(db, row.amount, cur, homeCurrency, row.date);
+    if (conv > 0) sum += conv;
+  }
+  return roundMoney(sum);
+}
+
 export async function getActualSpendingByCategory(
   month: string,
   homeCurrency: SupportedCurrency,
@@ -80,13 +145,13 @@ export async function getActualSpendingByCategory(
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
     .where(
       and(
         gte(transactions.date, start),
         lte(transactions.date, end),
-        lt(transactions.amount, sql`0`),
-        or(isNull(categories.type), ne(categories.type, "transfer")),
+        isNotNull(transactions.categoryId),
+        inArray(categories.type, ["expense", "savings"]),
       ),
     )
     .all();
@@ -100,18 +165,24 @@ export async function getActualSpendingByCategory(
     homeCurrency,
   );
 
-  const map = new Map<number, number>();
+  const signed = new Map<number, number>();
   for (const row of rows) {
     if (row.categoryId == null) continue;
     const cur = parseAccountCurrency(row.currency, homeCurrency);
     const conv = convertToHome(
       db,
-      Math.abs(row.amount),
+      row.amount,
       cur,
       homeCurrency,
       row.date,
     );
-    map.set(row.categoryId, (map.get(row.categoryId) ?? 0) + conv);
+    const id = row.categoryId;
+    signed.set(id, (signed.get(id) ?? 0) + conv);
+  }
+
+  const map = new Map<number, number>();
+  for (const [categoryId, sum] of signed) {
+    map.set(categoryId, roundMoney(netOutflowFromSignedSum(sum)));
   }
   return map;
 }
@@ -137,13 +208,13 @@ export async function getHistoricalAverages(
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
     .where(
       and(
         gte(transactions.date, firstStart),
         lte(transactions.date, lastEnd),
-        lt(transactions.amount, sql`0`),
-        or(isNull(categories.type), ne(categories.type, "transfer")),
+        isNotNull(transactions.categoryId),
+        inArray(categories.type, ["expense", "savings"]),
       ),
     )
     .all();
@@ -157,23 +228,35 @@ export async function getHistoricalAverages(
     homeCurrency,
   );
 
-  const totals = new Map<number, number>();
+  const byCatMonth = new Map<number, Map<string, number>>();
   for (const row of rows) {
     if (row.categoryId == null) continue;
     const cur = parseAccountCurrency(row.currency, homeCurrency);
     const conv = convertToHome(
       db,
-      Math.abs(row.amount),
+      row.amount,
       cur,
       homeCurrency,
       row.date,
     );
-    totals.set(row.categoryId, (totals.get(row.categoryId) ?? 0) + conv);
+    const mKey = row.date.slice(0, 7);
+    if (!byCatMonth.has(row.categoryId))
+      byCatMonth.set(row.categoryId, new Map());
+    const mm = byCatMonth.get(row.categoryId)!;
+    mm.set(mKey, (mm.get(mKey) ?? 0) + conv);
   }
 
   const map = new Map<number, number>();
-  for (const [categoryId, total] of totals) {
-    map.set(categoryId, Math.round((total / months.length) * 100) / 100);
+  for (const [categoryId, monthMap] of byCatMonth) {
+    let sumMonthlyNet = 0;
+    for (const m of months) {
+      const signed = monthMap.get(m) ?? 0;
+      sumMonthlyNet += netOutflowFromSignedSum(signed);
+    }
+    map.set(
+      categoryId,
+      roundMoney(sumMonthlyNet / months.length),
+    );
   }
   return map;
 }
@@ -199,13 +282,13 @@ export async function getMonthlySpendingByCategory(
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
     .where(
       and(
         gte(transactions.date, firstStart),
         lte(transactions.date, lastEnd),
-        lt(transactions.amount, sql`0`),
-        or(isNull(categories.type), ne(categories.type, "transfer")),
+        isNotNull(transactions.categoryId),
+        inArray(categories.type, ["expense", "savings"]),
       ),
     )
     .all();
@@ -219,28 +302,31 @@ export async function getMonthlySpendingByCategory(
     homeCurrency,
   );
 
-  const map = new Map<number, Map<string, number>>();
+  const byCatMonth = new Map<number, Map<string, number>>();
   for (const row of rows) {
     if (row.categoryId == null) continue;
     const cur = parseAccountCurrency(row.currency, homeCurrency);
     const conv = convertToHome(
       db,
-      Math.abs(row.amount),
+      row.amount,
       cur,
       homeCurrency,
       row.date,
     );
     const rowMonth = row.date.slice(0, 7);
-    if (!map.has(row.categoryId)) map.set(row.categoryId, new Map());
-    const catMap = map.get(row.categoryId)!;
-    catMap.set(rowMonth, (catMap.get(rowMonth) ?? 0) + conv);
+    if (!byCatMonth.has(row.categoryId))
+      byCatMonth.set(row.categoryId, new Map());
+    const mm = byCatMonth.get(row.categoryId)!;
+    mm.set(rowMonth, (mm.get(rowMonth) ?? 0) + conv);
   }
 
   const result = new Map<number, { month: string; amount: number }[]>();
-  for (const [categoryId, monthMap] of map) {
+  for (const [categoryId, monthMap] of byCatMonth) {
     const entries = months.map((m) => ({
       month: m,
-      amount: Math.round((monthMap.get(m) ?? 0) * 100) / 100,
+      amount: roundMoney(
+        netOutflowFromSignedSum(monthMap.get(m) ?? 0),
+      ),
     }));
     result.set(categoryId, entries);
   }
@@ -254,6 +340,7 @@ export async function getScheduledAmountsByCategory(
   const { start, end } = getMonthRange(month);
 
   const allCats = db.select().from(categories).all() as Category[];
+  const catType = new Map(allCats.map((c) => [c.id, c.type]));
   const categoryColorMap = new Map(allCats.map((c) => [c.id, c.color]));
 
   const rawSchedules = db.select().from(scheduledTransactions).all();
@@ -295,14 +382,17 @@ export async function getScheduledAmountsByCategory(
     if (conv > 0) {
       income += conv;
     } else if (occ.categoryId != null) {
-      expenses.set(
-        occ.categoryId,
-        (expenses.get(occ.categoryId) ?? 0) + Math.abs(conv),
-      );
+      const t = catType.get(occ.categoryId);
+      if (t === "expense" || t === "savings") {
+        expenses.set(
+          occ.categoryId,
+          (expenses.get(occ.categoryId) ?? 0) + Math.abs(conv),
+        );
+      }
     }
   }
 
-  return { expenses, income: Math.round(income * 100) / 100 };
+  return { expenses, income: roundMoney(income) };
 }
 
 export async function buildBudgetCategoryRows(
@@ -320,28 +410,40 @@ export async function buildBudgetCategoryRows(
     homeCurrency,
   );
 
-  const mainGroups = new Map(
-    allCategories.filter((c) => c.parentId === null).map((c) => [c.id, c.name]),
+  const mains = allCategories.filter((c) => c.parentId === null);
+  const mainGroups = new Map(mains.map((c) => [c.id, c.name]));
+  const mainById = new Map(mains.map((c) => [c.id, c]));
+
+  const budgetSubs = allCategories.filter(
+    (c) =>
+      c.parentId !== null &&
+      (c.type === "expense" || c.type === "savings"),
   );
 
-  const expenseSubs = allCategories.filter(
-    (c) => c.parentId !== null && c.type === "expense",
-  );
+  const kindFor = (t: string): BudgetCategoryKind =>
+    t === "savings" ? "savings" : "expense";
 
-  return expenseSubs
-    .map((cat) => ({
-      categoryId: cat.id,
-      categoryName: cat.name,
-      parentName:
-        cat.parentId != null
-          ? (mainGroups.get(cat.parentId) ?? "Other")
-          : "Other",
-      color: cat.color,
-      targetAmount: targetMap.get(cat.id) ?? 0,
-      actualSpent: actual.get(cat.id) ?? 0,
-      scheduledAmount: scheduled.get(cat.id) ?? 0,
-      avg3Month: averages.get(cat.id) ?? 0,
-    }))
+  return budgetSubs
+    .map((cat) => {
+      const parentMain =
+        cat.parentId != null ? mainById.get(cat.parentId) : undefined;
+      const rb = ruleBucketForSubcategory(parentMain);
+      return {
+        categoryId: cat.id,
+        categoryName: cat.name,
+        parentName:
+          cat.parentId != null
+            ? (mainGroups.get(cat.parentId) ?? "Other")
+            : "Other",
+        color: cat.color,
+        targetAmount: targetMap.get(cat.id) ?? 0,
+        actualSpent: actual.get(cat.id) ?? 0,
+        scheduledAmount: scheduled.get(cat.id) ?? 0,
+        avg3Month: averages.get(cat.id) ?? 0,
+        categoryKind: kindFor(cat.type),
+        ruleBucket: rb,
+      };
+    })
     .sort((a, b) => {
       const groupCmp = a.parentName.localeCompare(b.parentName);
       if (groupCmp !== 0) return groupCmp;
@@ -378,7 +480,9 @@ export async function buildBudgetGenerateAnalyticsRows(
   );
 
   const expenseSubs = allCategories.filter(
-    (c) => c.parentId !== null && c.type === "expense",
+    (c) =>
+      c.parentId !== null &&
+      (c.type === "expense" || c.type === "savings"),
   );
 
   return expenseSubs
@@ -403,14 +507,64 @@ export async function buildBudgetGenerateAnalyticsRows(
     });
 }
 
+function emptyBand(): BudgetRule502030Band {
+  return { targetTotal: 0, actualTotal: 0, guideline: 0 };
+}
+
 export function buildBudgetSummary(
   rows: BudgetCategoryRow[],
   month: string,
   expectedIncome: number,
+  incomeBasisFromActual: number,
 ): BudgetSummary {
-  const totalBudgeted = rows.reduce((s, r) => s + r.targetAmount, 0);
-  const totalSpent = rows.reduce((s, r) => s + r.actualSpent, 0);
+  const expenseRows = rows.filter((r) => r.categoryKind === "expense");
+  const savingsRows = rows.filter((r) => r.categoryKind === "savings");
+
+  const totalBudgeted = expenseRows.reduce((s, r) => s + r.targetAmount, 0);
+  const totalSpent = expenseRows.reduce((s, r) => s + r.actualSpent, 0);
   const totalRemaining = totalBudgeted - totalSpent;
+
+  const totalSavingsBudgeted = savingsRows.reduce(
+    (s, r) => s + r.targetAmount,
+    0,
+  );
+  const totalSavingsAllocated = savingsRows.reduce(
+    (s, r) => s + r.actualSpent,
+    0,
+  );
+
+  const incomeBasis = roundMoney(
+    Math.max(expectedIncome, incomeBasisFromActual),
+  );
+
+  const needs = emptyBand();
+  const wants = emptyBand();
+  const savingsBand = emptyBand();
+
+  for (const r of rows) {
+    const b = r.ruleBucket;
+    if (b === "needs") {
+      needs.targetTotal += r.targetAmount;
+      needs.actualTotal += r.actualSpent;
+    } else if (b === "wants") {
+      wants.targetTotal += r.targetAmount;
+      wants.actualTotal += r.actualSpent;
+    } else if (b === "savings") {
+      savingsBand.targetTotal += r.targetAmount;
+      savingsBand.actualTotal += r.actualSpent;
+    }
+  }
+
+  needs.guideline = roundMoney(0.5 * incomeBasis);
+  wants.guideline = roundMoney(0.3 * incomeBasis);
+  savingsBand.guideline = roundMoney(0.2 * incomeBasis);
+
+  needs.targetTotal = roundMoney(needs.targetTotal);
+  needs.actualTotal = roundMoney(needs.actualTotal);
+  wants.targetTotal = roundMoney(wants.targetTotal);
+  wants.actualTotal = roundMoney(wants.actualTotal);
+  savingsBand.targetTotal = roundMoney(savingsBand.targetTotal);
+  savingsBand.actualTotal = roundMoney(savingsBand.actualTotal);
 
   const { start, end } = getMonthRange(month);
   const daysInMonth =
@@ -446,16 +600,24 @@ export function buildBudgetSummary(
   const onTrack = totalBudgeted === 0 || projectedSpend <= totalBudgeted;
 
   return {
-    totalBudgeted: Math.round(totalBudgeted * 100) / 100,
-    totalSpent: Math.round(totalSpent * 100) / 100,
-    totalRemaining: Math.round(totalRemaining * 100) / 100,
-    expectedIncome: Math.round(expectedIncome * 100) / 100,
+    totalBudgeted: roundMoney(totalBudgeted),
+    totalSpent: roundMoney(totalSpent),
+    totalRemaining: roundMoney(totalRemaining),
+    expectedIncome: roundMoney(expectedIncome),
+    totalSavingsBudgeted: roundMoney(totalSavingsBudgeted),
+    totalSavingsAllocated: roundMoney(totalSavingsAllocated),
+    incomeBasis,
+    rule502030: {
+      needs,
+      wants,
+      savings: savingsBand,
+    },
     daysInMonth,
     daysElapsed,
     daysRemaining,
-    dailyBurnRate: Math.round(dailyBurnRate * 100) / 100,
-    allowedDailyRate: Math.round(allowedDailyRate * 100) / 100,
-    projectedSpend: Math.round(projectedSpend * 100) / 100,
+    dailyBurnRate: roundMoney(dailyBurnRate),
+    allowedDailyRate: roundMoney(allowedDailyRate),
+    projectedSpend: roundMoney(projectedSpend),
     onTrack,
   };
 }

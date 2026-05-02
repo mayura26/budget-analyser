@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  PiggyBank,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -50,8 +51,9 @@ export default async function AnalyticsPage({
           <>
             <span>{rangeLabel}</span>
             <span className="block text-xs mt-1">
-              Amounts in {homeCurrency}. Transfers are excluded from income,
-              expense, and category totals.
+              Amounts in {homeCurrency}. Transfers excluded. Savings categories
+              count toward Savings, not Expenses. Net is income minus expenses
+              minus savings allocations.
             </span>
           </>
         }
@@ -64,7 +66,7 @@ export default async function AnalyticsPage({
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
           label="Income"
           icon={ArrowUpCircle}
@@ -76,6 +78,13 @@ export default async function AnalyticsPage({
           icon={ArrowDownCircle}
           tone="expense"
           value={formatCurrency(data.summary.expenses, homeCurrency)}
+        />
+        <KPICard
+          label="Savings"
+          icon={PiggyBank}
+          tone="neutral"
+          value={formatCurrency(data.summary.savings, homeCurrency)}
+          subtitle="Allocated to savings categories"
         />
         <KPICard
           label="Net"
@@ -107,8 +116,20 @@ export default async function AnalyticsPage({
       />
 
       <AnalyticsCategoryExplorer
+        title="Spending by category"
+        description="Expense activity (net of refunds) in home currency; transfers excluded. Expand a category to see subcategories and transactions."
         categoryRoots={data.categoryRoots}
         expenseTransactionsByCategory={data.expenseTransactionsByCategory}
+        rangeStart={start}
+        rangeEnd={end}
+        homeCurrency={homeCurrency}
+      />
+
+      <AnalyticsCategoryExplorer
+        title="Savings & investments"
+        description="Net allocations to savings categories (debits minus credits)."
+        categoryRoots={data.categorySavingsRoots}
+        expenseTransactionsByCategory={data.savingsTransactionsByCategory}
         rangeStart={start}
         rangeEnd={end}
         homeCurrency={homeCurrency}
