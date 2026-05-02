@@ -36,6 +36,7 @@ function CategoryTreeRows({
   rangeStart,
   rangeEnd,
   homeCurrency,
+  variant,
 }: {
   nodes: CategoryHierarchyNode[];
   parentTotal: number;
@@ -49,8 +50,12 @@ function CategoryTreeRows({
   rangeStart: string;
   rangeEnd: string;
   homeCurrency: SupportedCurrency;
+  variant: "expense" | "income";
 }) {
-  const visible = nodes.filter((n) => n.total > 0);
+  const visible =
+    variant === "income"
+      ? nodes.filter((n) => n.total !== 0)
+      : nodes.filter((n) => n.total > 0);
   return (
     <>
       {visible.map((node) => (
@@ -65,6 +70,7 @@ function CategoryTreeRows({
           rangeStart={rangeStart}
           rangeEnd={rangeEnd}
           homeCurrency={homeCurrency}
+          variant={variant}
         />
       ))}
     </>
@@ -81,6 +87,7 @@ function CategoryRow({
   rangeStart,
   rangeEnd,
   homeCurrency,
+  variant,
 }: {
   node: CategoryHierarchyNode;
   parentTotal: number;
@@ -94,6 +101,7 @@ function CategoryRow({
   rangeStart: string;
   rangeEnd: string;
   homeCurrency: SupportedCurrency;
+  variant: "expense" | "income";
 }) {
   const key = categoryKey(node.id);
   const directTxns = expenseTransactionsByCategory[key] ?? [];
@@ -101,7 +109,9 @@ function CategoryRow({
   const canExpand = hasChildCategories || directTxns.length > 0;
   const isExpanded = expanded.has(key);
   const pct =
-    parentTotal > 0 ? Math.round((node.total / parentTotal) * 100) : 0;
+    parentTotal !== 0
+      ? Math.round((node.total / parentTotal) * 100)
+      : 0;
 
   const padLeft = 8 + depth * 16;
 
@@ -177,11 +187,14 @@ function CategoryRow({
               rangeStart={rangeStart}
               rangeEnd={rangeEnd}
               homeCurrency={homeCurrency}
+              variant={variant}
             />
           ) : null}
           {directTxns.map((t) => {
             const txnPct =
-              node.total > 0 ? Math.round((t.converted / node.total) * 100) : 0;
+              node.total !== 0
+                ? Math.round((t.converted / node.total) * 100)
+                : 0;
             const txnPad = 8 + (depth + 1) * 16;
             return (
               <tr
@@ -219,6 +232,7 @@ export function AnalyticsCategoryExplorer({
   rangeStart,
   rangeEnd,
   homeCurrency,
+  variant = "expense",
 }: {
   title?: string;
   description?: string;
@@ -230,6 +244,7 @@ export function AnalyticsCategoryExplorer({
   rangeStart: string;
   rangeEnd: string;
   homeCurrency: SupportedCurrency;
+  variant?: "expense" | "income";
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
@@ -246,7 +261,9 @@ export function AnalyticsCategoryExplorer({
     const keys = new Set<string>();
     function visit(nodes: CategoryHierarchyNode[]) {
       for (const n of nodes) {
-        if (n.total > 0) {
+        const include =
+          variant === "income" ? n.total !== 0 : n.total > 0;
+        if (include) {
           keys.add(categoryKey(n.id));
           visit(n.children);
         }
@@ -254,13 +271,19 @@ export function AnalyticsCategoryExplorer({
     }
     visit(categoryRoots);
     return keys;
-  }, [categoryRoots]);
+  }, [categoryRoots, variant]);
 
   const allExpanded = expanded.size > 0 && expanded.size >= allKeys.size;
 
   const treemapData = useMemo(
-    () => buildTreemapDatumForNodes(categoryRoots),
-    [categoryRoots],
+    () =>
+      buildTreemapDatumForNodes(
+        categoryRoots,
+        variant === "income"
+          ? { rootLabel: "Income", incomeStyle: true }
+          : undefined,
+      ),
+    [categoryRoots, variant],
   );
 
   const rootParentTotal = useMemo(
@@ -268,7 +291,10 @@ export function AnalyticsCategoryExplorer({
     [categoryRoots],
   );
 
-  const hasAnySpending = categoryRoots.some((n) => n.total > 0);
+  const hasAnySpending =
+    variant === "income"
+      ? categoryRoots.some((n) => n.total !== 0)
+      : categoryRoots.some((n) => n.total > 0);
 
   return (
     <Card>
@@ -324,7 +350,9 @@ export function AnalyticsCategoryExplorer({
           </div>
         ) : (
           <div className="hidden md:flex h-[120px] items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
-            No spending in this period for this view
+            {variant === "income"
+              ? "No income in this period for this view"
+              : "No spending in this period for this view"}
           </div>
         )}
 
@@ -347,7 +375,9 @@ export function AnalyticsCategoryExplorer({
                     colSpan={4}
                     className="p-4 text-center text-muted-foreground"
                   >
-                    No spending in this period
+                    {variant === "income"
+                      ? "No income in this period"
+                      : "No spending in this period"}
                   </td>
                 </tr>
               ) : (
@@ -361,6 +391,7 @@ export function AnalyticsCategoryExplorer({
                   rangeStart={rangeStart}
                   rangeEnd={rangeEnd}
                   homeCurrency={homeCurrency}
+                  variant={variant}
                 />
               )}
             </tbody>

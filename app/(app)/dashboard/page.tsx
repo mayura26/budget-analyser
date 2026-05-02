@@ -4,6 +4,7 @@ import { and, gte, lte, sql } from "drizzle-orm";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  PiggyBank,
   Target,
   TrendingDown,
   TrendingUp,
@@ -200,6 +201,7 @@ export default async function DashboardPage({
     month: selectedMonth,
     income: 0,
     expenses: 0,
+    savings: 0,
     net: 0,
   };
 
@@ -238,7 +240,7 @@ export default async function DashboardPage({
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
         <KPICard
           compact
           label="Income"
@@ -252,6 +254,14 @@ export default async function DashboardPage({
           icon={ArrowDownCircle}
           tone="expense"
           value={formatCurrency(currentMonthData.expenses, homeCurrency)}
+        />
+        <KPICard
+          compact
+          label="Savings"
+          icon={PiggyBank}
+          tone="neutral"
+          value={formatCurrency(currentMonthData.savings, homeCurrency)}
+          subtitle="Allocated to savings categories"
         />
         <KPICard
           compact
@@ -278,6 +288,7 @@ export default async function DashboardPage({
         monthlyTotals={monthlyTotals}
         categoryExpenseTotals={expenseTotals}
         monthNet={currentMonthData.net}
+        monthSavings={currentMonthData.savings}
         homeCurrency={homeCurrency}
       />
     </div>

@@ -13,6 +13,7 @@ test.describe("Analytics", () => {
     await page.goto("/analytics");
     await expect(page.getByText(/Cashflow by month/i)).toBeVisible();
     await expect(page.getByText(/By account/i)).toBeVisible();
+    await expect(page.getByText(/Income by category/i)).toBeVisible();
     await expect(page.getByText(/Spending by category/i)).toBeVisible();
   });
 

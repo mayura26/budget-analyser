@@ -516,6 +516,7 @@ export function buildBudgetSummary(
   month: string,
   expectedIncome: number,
   incomeBasisFromActual: number,
+  monthClosed: boolean,
 ): BudgetSummary {
   const expenseRows = rows.filter((r) => r.categoryKind === "expense");
   const savingsRows = rows.filter((r) => r.categoryKind === "savings");
@@ -566,6 +567,19 @@ export function buildBudgetSummary(
   savingsBand.targetTotal = roundMoney(savingsBand.targetTotal);
   savingsBand.actualTotal = roundMoney(savingsBand.actualTotal);
 
+  let implicitSurplusAsSavings = 0;
+  if (monthClosed) {
+    const spentR = roundMoney(totalSpent);
+    const savedTrackedR = roundMoney(totalSavingsAllocated);
+    const surplus = incomeBasis - spentR - savedTrackedR;
+    if (surplus > 0.001) {
+      implicitSurplusAsSavings = roundMoney(surplus);
+      savingsBand.actualTotal = roundMoney(
+        savingsBand.actualTotal + implicitSurplusAsSavings,
+      );
+    }
+  }
+
   const { start, end } = getMonthRange(month);
   const daysInMonth =
     Math.round(
@@ -606,6 +620,7 @@ export function buildBudgetSummary(
     expectedIncome: roundMoney(expectedIncome),
     totalSavingsBudgeted: roundMoney(totalSavingsBudgeted),
     totalSavingsAllocated: roundMoney(totalSavingsAllocated),
+    implicitSurplusAsSavings,
     incomeBasis,
     rule502030: {
       needs,

@@ -116,6 +116,17 @@ export default async function AnalyticsPage({
       />
 
       <AnalyticsCategoryExplorer
+        variant="income"
+        title="Income by category"
+        description="Income in home currency by category; uncategorised inflows appear under Not processed. Expand to see transactions (amounts may be negative for reversals)."
+        categoryRoots={data.categoryIncomeRoots}
+        expenseTransactionsByCategory={data.incomeTransactionsByCategory}
+        rangeStart={start}
+        rangeEnd={end}
+        homeCurrency={homeCurrency}
+      />
+
+      <AnalyticsCategoryExplorer
         title="Spending by category"
         description="Expense activity (net of refunds) in home currency; transfers excluded. Expand a category to see subcategories and transactions."
         categoryRoots={data.categoryRoots}

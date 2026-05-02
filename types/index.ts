@@ -233,6 +233,11 @@ export type BudgetSummary = {
   /** Savings goal targets and net allocations (same sign convention as spending). */
   totalSavingsBudgeted: number;
   totalSavingsAllocated: number;
+  /**
+   * When the month is closed, positive surplus (income basis minus expense spend minus
+   * tracked savings allocations) counted toward savings for reporting only.
+   */
+  implicitSurplusAsSavings: number;
   /** Income basis for 50/30/20 (scheduled vs realised — see UI note). */
   incomeBasis: number;
   rule502030: {
@@ -312,7 +317,10 @@ export type AccountCashflowRow = {
   net: number;
 };
 
-/** Single expense line for analytics category drill-down (home-currency amount). */
+/**
+ * Single line for analytics category drill-down (home-currency).
+ * For spending/savings drill-down, `converted` is a positive magnitude; for income, it may be signed.
+ */
 export type AnalyticsExpenseTransactionLine = {
   id: number;
   date: string;

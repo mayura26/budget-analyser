@@ -25,9 +25,15 @@ test.describe("Dashboard", () => {
     await expect(page.getByLabel("Next month")).toBeVisible();
   });
 
-  test("four summary cards present", async ({ page }) => {
+  test("five summary cards present", async ({ page }) => {
     await page.goto("/dashboard");
-    for (const label of ["Income", "Expenses", "Net", "Transactions"]) {
+    for (const label of [
+      "Income",
+      "Expenses",
+      "Savings",
+      "Net",
+      "Transactions",
+    ]) {
       await expect(page.getByText(label).first()).toBeVisible();
     }
   });

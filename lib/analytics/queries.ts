@@ -231,6 +231,17 @@ function categoryKey(categoryId: number | null): string {
   return categoryId === null ? "none" : String(categoryId);
 }
 
+/** Matches rows counted toward income in `aggregateSummary` (signed amounts). */
+function incomeContribution(r: LoadedRow): number | null {
+  const v = r.converted;
+  const t = r.categoryType;
+  if (t === "transfer") return null;
+  if (t === "income") return v;
+  if (t === "savings" || t === "expense") return null;
+  if (v > 0) return v;
+  return null;
+}
+
 function aggregateExpenseDebitsByCategory(
   loaded: LoadedRow[],
 ): Record<string, AnalyticsExpenseTransactionLine[]> {
@@ -366,6 +377,155 @@ function buildCategoryHierarchy(loaded: LoadedRow[]): {
   const treemapData = buildTreemapDatumForNodes(roots);
 
   return { roots, treemapData };
+}
+
+function buildIncomeHierarchy(loaded: LoadedRow[]): {
+  roots: CategoryHierarchyNode[];
+  treemapData: AnalyticsTreemapDatum | null;
+} {
+  const direct = new Map<number | null, DirectSpend>();
+
+  for (const r of loaded) {
+    const c = incomeContribution(r);
+    if (c === null) continue;
+    const key = r.categoryId;
+    const ex = direct.get(key) ?? { total: 0, count: 0 };
+    ex.total += c;
+    ex.count += 1;
+    direct.set(key, ex);
+  }
+
+  const allCats = db.select().from(categories).all() as Category[];
+  const catById = new Map(allCats.map((c) => [c.id, c]));
+
+  const childrenByParent = new Map<number | null, Category[]>();
+  for (const c of allCats) {
+    const p = c.parentId ?? null;
+    const list = childrenByParent.get(p) ?? [];
+    list.push(c);
+    childrenByParent.set(p, list);
+  }
+  for (const [, list] of childrenByParent) {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const memo = new Map<number | null, DirectSpend>();
+
+  function subtreeTotals(id: number | null): DirectSpend {
+    const cached = memo.get(id);
+    if (cached) return cached;
+
+    if (id === null) {
+      const only = direct.get(null) ?? { total: 0, count: 0 };
+      const merged = { total: roundMoney(only.total), count: only.count };
+      memo.set(null, merged);
+      return merged;
+    }
+
+    const base = direct.get(id) ?? { total: 0, count: 0 };
+    let total = base.total;
+    let count = base.count;
+    const kids = (childrenByParent.get(id) ?? []).filter(
+      (c) => c.type === "income",
+    );
+    for (const ch of kids) {
+      const sub = subtreeTotals(ch.id);
+      total += sub.total;
+      count += sub.count;
+    }
+    const merged = { total: roundMoney(total), count };
+    memo.set(id, merged);
+    return merged;
+  }
+
+  function nodeMeta(id: number | null): { name: string; color: string } {
+    if (id === null) return { name: "Not processed", color: "#9ca3af" };
+    const c = catById.get(id);
+    return { name: c?.name ?? "Unknown", color: c?.color ?? "#9ca3af" };
+  }
+
+  function buildNode(id: number | null): CategoryHierarchyNode {
+    const meta = nodeMeta(id);
+    const kids =
+      id === null
+        ? []
+        : (childrenByParent.get(id) ?? []).filter((c) => c.type === "income");
+    const childNodes = kids
+      .map((c) => buildNode(c.id))
+      .filter((n) => n.total !== 0 || n.children.length > 0);
+    const self = subtreeTotals(id);
+    return {
+      id,
+      name: meta.name,
+      color: meta.color,
+      total: self.total,
+      transactionCount: self.count,
+      children: childNodes.sort((a, b) =>
+        Math.abs(b.total) !== Math.abs(a.total)
+          ? Math.abs(b.total) - Math.abs(a.total)
+          : b.total - a.total,
+      ),
+    };
+  }
+
+  const rootCategories = (childrenByParent.get(null) ?? []).filter(
+    (c) => c.type === "income",
+  );
+
+  const roots: CategoryHierarchyNode[] = [];
+
+  for (const rc of rootCategories) {
+    const node = buildNode(rc.id);
+    if (node.total !== 0 || node.children.length > 0) roots.push(node);
+  }
+
+  if ((direct.get(null)?.total ?? 0) !== 0) {
+    roots.push(buildNode(null));
+  }
+
+  roots.sort((a, b) =>
+    Math.abs(b.total) !== Math.abs(a.total)
+      ? Math.abs(b.total) - Math.abs(a.total)
+      : b.total - a.total,
+  );
+
+  const treemapData = buildTreemapDatumForNodes(roots, {
+    rootLabel: "Income",
+    incomeStyle: true,
+  });
+
+  return { roots, treemapData };
+}
+
+function aggregateIncomeTransactionsByCategory(
+  loaded: LoadedRow[],
+): Record<string, AnalyticsExpenseTransactionLine[]> {
+  const buckets = new Map<string, AnalyticsExpenseTransactionLine[]>();
+
+  for (const r of loaded) {
+    const c = incomeContribution(r);
+    if (c === null) continue;
+    const key = categoryKey(r.categoryId);
+    const list = buckets.get(key) ?? [];
+    list.push({
+      id: r.transactionId,
+      date: r.date,
+      description: r.description,
+      converted: roundMoney(c),
+      accountName: r.accountName,
+    });
+    buckets.set(key, list);
+  }
+
+  const out: Record<string, AnalyticsExpenseTransactionLine[]> = {};
+  for (const [key, list] of buckets) {
+    list.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.id - a.id;
+    });
+    out[key] = list;
+  }
+  return out;
 }
 
 function buildSavingsHierarchy(loaded: LoadedRow[]): {
@@ -561,6 +721,12 @@ export type AnalyticsPageData = {
     string,
     AnalyticsExpenseTransactionLine[]
   >;
+  categoryIncomeRoots: CategoryHierarchyNode[];
+  /** Income credits/adjustments; `converted` may be negative (signed home currency). */
+  incomeTransactionsByCategory: Record<
+    string,
+    AnalyticsExpenseTransactionLine[]
+  >;
 };
 
 /** Single DB round-trip + FX prefetch for all analytics aggregates. */
@@ -576,10 +742,13 @@ export async function getAnalyticsPageData(
   const { roots, treemapData } = buildCategoryHierarchy(loaded);
   const { roots: savingsRoots, treemapData: savingsTreemapData } =
     buildSavingsHierarchy(loaded);
+  const { roots: incomeRoots } = buildIncomeHierarchy(loaded);
   const expenseTransactionsByCategory =
     aggregateExpenseDebitsByCategory(loaded);
   const savingsTransactionsByCategory =
     aggregateSavingsDebitsByCategory(loaded);
+  const incomeTransactionsByCategory =
+    aggregateIncomeTransactionsByCategory(loaded);
   return {
     summary,
     accounts,
@@ -590,6 +759,8 @@ export async function getAnalyticsPageData(
     savingsTreemapData,
     expenseTransactionsByCategory,
     savingsTransactionsByCategory,
+    categoryIncomeRoots: incomeRoots,
+    incomeTransactionsByCategory,
   };
 }
 

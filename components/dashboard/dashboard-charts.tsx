@@ -29,6 +29,7 @@ import { formatCurrency } from "@/lib/utils";
 import type { CategoryTotal, MonthlyTotal } from "@/types";
 
 const UNSPENT_SLICE_COLOR = "#10b981";
+const SAVINGS_PIE_COLOR = "#059669";
 
 type PieDatum = {
   name: string;
@@ -94,11 +95,13 @@ export function DashboardCharts({
   monthlyTotals,
   categoryExpenseTotals,
   monthNet,
+  monthSavings,
   homeCurrency,
 }: {
   monthlyTotals: MonthlyTotal[];
   categoryExpenseTotals: CategoryTotal[];
   monthNet: number;
+  monthSavings: number;
   homeCurrency: SupportedCurrency;
 }) {
   const [includeNet, setIncludeNet] = useState(false);
@@ -134,12 +137,21 @@ export function DashboardCharts({
       signedAmount: monthNet,
     };
 
-    if (expenseSlices.length === 0) {
+    if (expenseSlices.length === 0 && monthSavings <= 0) {
       return [unspent];
     }
 
-    return [...expenseSlices, unspent];
-  }, [includeNetEffective, categoryExpenseTotals, monthNet]);
+    const withNet: PieDatum[] = [...expenseSlices];
+    if (monthSavings > 0) {
+      withNet.push({
+        name: "Savings",
+        value: monthSavings,
+        color: SAVINGS_PIE_COLOR,
+      });
+    }
+    withNet.push(unspent);
+    return withNet;
+  }, [includeNetEffective, categoryExpenseTotals, monthNet, monthSavings]);
 
   const hasBarData = barData.some(
     (d) => d.Income > 0 || d.Expenses > 0 || d.Savings > 0,
@@ -148,10 +160,10 @@ export function DashboardCharts({
   const sliderDisabled = monthNet <= 0;
 
   const pieHelpLong = includeNetEffective
-    ? "Top spending categories plus unspent income (same net as the summary card)."
-    : "Outflows only — same as expense totals elsewhere. Turn on Include Net when net is positive to add unspent income to the chart.";
+    ? "Top spending categories, savings allocations (when greater than zero), and unspent income (same net as the summary card)."
+    : "Outflows only — same as expense totals elsewhere. Turn on Include Net when net is positive to add savings (if any) and unspent income to the chart.";
   const pieHelpShort = includeNetEffective
-    ? "Top categories plus remaining net (same as Net on the summary)."
+    ? "Top categories, savings if any, plus remaining net (same as Net on the summary)."
     : "Outflows only — matches expense totals elsewhere.";
 
   return (

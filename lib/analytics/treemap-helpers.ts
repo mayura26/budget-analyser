@@ -1,17 +1,39 @@
 import type { AnalyticsTreemapDatum, CategoryHierarchyNode } from "@/types";
 
+export type BuildTreemapDatumOptions = {
+  /** Root node label when multiple children are grouped (default `"Spending"`). */
+  rootLabel?: string;
+  /**
+   * Income hierarchies may include signed nets; treemap cell size uses max(0, total)
+   * and only includes nodes with non-zero totals.
+   */
+  incomeStyle?: boolean;
+};
+
 export function buildTreemapDatumForNodes(
   nodes: CategoryHierarchyNode[],
+  options?: BuildTreemapDatumOptions,
 ): AnalyticsTreemapDatum | null {
-  const withValue = nodes.filter((r) => r.total > 0);
+  const rootLabel = options?.rootLabel ?? "Spending";
+  const incomeStyle = options?.incomeStyle ?? false;
+
+  const cellValue = (total: number) =>
+    incomeStyle ? Math.max(0, total) : total;
+
+  const includeInTreemap = (total: number) =>
+    incomeStyle ? total !== 0 && cellValue(total) > 0 : total > 0;
+
+  const withValue = nodes.filter((r) => includeInTreemap(r.total));
   if (withValue.length === 0) return null;
 
   function toDatum(n: CategoryHierarchyNode): AnalyticsTreemapDatum {
-    const childList = n.children.filter((c) => c.total > 0).map(toDatum);
+    const childList = n.children
+      .filter((c) => includeInTreemap(c.total))
+      .map(toDatum);
     const children = childList.length > 0 ? childList : undefined;
     return {
       name: n.name,
-      value: n.total,
+      value: cellValue(n.total),
       fill: n.color,
       categoryId: n.id,
       ...(children ? { children } : {}),
@@ -24,8 +46,8 @@ export function buildTreemapDatumForNodes(
     if (only) return only;
   }
   return {
-    name: "Spending",
-    value: withValue.reduce((s, r) => s + r.total, 0),
+    name: rootLabel,
+    value: withValue.reduce((s, r) => s + cellValue(r.total), 0),
     fill: "#64748b",
     categoryId: null,
     children,
