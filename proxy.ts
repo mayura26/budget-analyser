@@ -10,6 +10,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow public share links (read-only review pages, no auth required)
+  if (pathname.startsWith("/share/review/")) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
   if (!token) {

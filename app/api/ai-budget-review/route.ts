@@ -47,12 +47,26 @@ type ReviewMetrics = {
   taggedSavings: number;
   effectiveSavings: number;
   buckets: { needs: BucketBand; wants: BucketBand; savings: BucketBand };
-  topOverspend: { category: string; bucket: Bucket; amount: number; message: string }[];
-  topUnderspend: { category: string; bucket: Bucket; amount: number; message: string }[];
+  topOverspend: {
+    category: string;
+    bucket: Bucket;
+    amount: number;
+    message: string;
+  }[];
+  topUnderspend: {
+    category: string;
+    bucket: Bucket;
+    amount: number;
+    message: string;
+  }[];
   categoriesOverTarget: number;
 };
 
-type DigestRiskTag = { severity: "high" | "medium" | "low"; bucket: Bucket; text: string };
+type DigestRiskTag = {
+  severity: "high" | "medium" | "low";
+  bucket: Bucket;
+  text: string;
+};
 type ListItemTag = { bucket: Bucket; text: string };
 
 type DigestReview = {
@@ -86,13 +100,18 @@ function asListItems(raw: unknown): ListItemTag[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((item) => {
-      if (typeof item === "string") return { bucket: "overall" as Bucket, text: item };
+      if (typeof item === "string")
+        return { bucket: "overall" as Bucket, text: item };
       if (item && typeof item === "object") {
-        const text = typeof (item as { text?: unknown }).text === "string"
-          ? (item as { text: string }).text
-          : "";
+        const text =
+          typeof (item as { text?: unknown }).text === "string"
+            ? (item as { text: string }).text
+            : "";
         if (!text) return null;
-        return { bucket: asBucket((item as { bucket?: unknown }).bucket), text };
+        return {
+          bucket: asBucket((item as { bucket?: unknown }).bucket),
+          text,
+        };
       }
       return null;
     })
@@ -104,12 +123,17 @@ function asRiskItems(raw: unknown): DigestRiskTag[] {
   return raw
     .map((item) => {
       if (typeof item === "string") {
-        return { severity: "medium" as const, bucket: "overall" as Bucket, text: item };
+        return {
+          severity: "medium" as const,
+          bucket: "overall" as Bucket,
+          text: item,
+        };
       }
       if (item && typeof item === "object") {
-        const text = typeof (item as { text?: unknown }).text === "string"
-          ? (item as { text: string }).text
-          : "";
+        const text =
+          typeof (item as { text?: unknown }).text === "string"
+            ? (item as { text: string }).text
+            : "";
         if (!text) return null;
         const sev = (item as { severity?: unknown }).severity;
         const severity =
@@ -273,8 +297,7 @@ export async function POST(request: Request) {
     Math.round((incomeForReview - summary.totalSpent) * 100) / 100,
   );
   const taggedSavings = summary.totalSavingsAllocated;
-  const effectiveSavings =
-    Math.round((taggedSavings + surplus) * 100) / 100;
+  const effectiveSavings = Math.round((taggedSavings + surplus) * 100) / 100;
 
   const needsBand = summary.rule502030.needs;
   const wantsBand = summary.rule502030.wants;

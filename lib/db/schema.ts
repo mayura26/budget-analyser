@@ -262,6 +262,22 @@ export const budgetMonthReviews = sqliteTable(
   ],
 );
 
+export const budgetReviewShares = sqliteTable(
+  "budget_review_shares",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    token: text("token").notNull(),
+    month: text("month").notNull(), // YYYY-MM
+    format: text("format").notNull(), // 'digest' | 'deep'
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    revokedAt: integer("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("budget_review_shares_token").on(table.token),
+    index("budget_review_shares_month_format_idx").on(table.month, table.format),
+  ],
+);
+
 export const dismissedMismatches = sqliteTable(
   "dismissed_mismatches",
   {

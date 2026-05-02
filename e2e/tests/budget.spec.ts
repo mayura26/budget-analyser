@@ -144,7 +144,9 @@ test.describe("Budget", () => {
       await closeMonthBtn.click();
     }
 
-    await expect(page.getByRole("button", { name: "Month Closed" })).toBeVisible({
+    await expect(
+      page.getByRole("button", { name: "Month Closed" }),
+    ).toBeVisible({
       timeout: 8000,
     });
 
@@ -155,53 +157,145 @@ test.describe("Budget", () => {
   test("closed month unlocks review page with quick and deep formats", async ({
     page,
   }) => {
+    let regenerateCalls = 0;
+    const baseMetrics = (month: string) => ({
+      month,
+      monthLabel: "January 2026",
+      totalBudgeted: 2000,
+      totalSpent: 1900,
+      projectedSpend: 1900,
+      netVariance: -100,
+      onTrack: true,
+      actualIncome: 3000,
+      expectedIncome: 3100,
+      incomeVariance: -100,
+      savingsRate: 36.7,
+      surplus: 1100,
+      taggedSavings: 0,
+      effectiveSavings: 1100,
+      buckets: {
+        needs: {
+          targetAmount: 1500,
+          actualAmount: 1450,
+          guidelineAmount: 1500,
+          targetPct: 50,
+          actualPct: 48.3,
+        },
+        wants: {
+          targetAmount: 500,
+          actualAmount: 450,
+          guidelineAmount: 900,
+          targetPct: 30,
+          actualPct: 15.0,
+        },
+        savings: {
+          targetAmount: 0,
+          actualAmount: 1100,
+          guidelineAmount: 600,
+          targetPct: 20,
+          actualPct: 36.7,
+        },
+      },
+      topOverspend: [
+        {
+          category: "Dining out",
+          bucket: "wants",
+          amount: 80,
+          message: "Dining out is over.",
+        },
+      ],
+      topUnderspend: [
+        {
+          category: "Groceries",
+          bucket: "needs",
+          amount: 50,
+          message: "Groceries finished under.",
+        },
+      ],
+      categoriesOverTarget: 1,
+    });
+
     await page.route("**/api/ai-budget-review", async (route) => {
       const body = route.request().postDataJSON() as {
         month?: string;
         format?: "digest" | "deep";
+        regenerate?: boolean;
       };
+      if (body.regenerate) regenerateCalls++;
       const format = body.format === "deep" ? "deep" : "digest";
+      const month = body.month ?? "2026-01";
       const payload =
         format === "digest"
           ? {
               format: "digest",
-              metrics: {
-                month: body.month ?? "2026-01",
-                monthLabel: "January 2026",
-                totalBudgeted: 2000,
-                totalSpent: 1900,
-                projectedSpend: 1900,
-                netVariance: -100,
-                onTrack: true,
-                topOverspend: [],
-                topUnderspend: [],
-              },
+              metrics: baseMetrics(month),
               review: {
                 headline: "Strong finish for the month.",
-                risks: ["Dining out is still near your limit."],
-                wins: ["Groceries closed under target."],
-                actions: ["Carry $50 into your utilities buffer next month."],
+                bucketCommentary: {
+                  needs: "Needs landed at 48.3%, just under target.",
+                  wants: "Wants ran cool at 15%, well under the 30% guideline.",
+                  savings: "Savings cleared 36.7% thanks to the surplus.",
+                },
+                risks: [
+                  {
+                    severity: "medium",
+                    bucket: "wants",
+                    text: "Dining out is still near your limit.",
+                  },
+                ],
+                wins: [
+                  { bucket: "needs", text: "Groceries closed under target." },
+                ],
+                actions: [
+                  {
+                    bucket: "savings",
+                    text: "Sweep $50 surplus into your utilities buffer.",
+                  },
+                ],
               },
+              cached: false,
+              model: "gpt-4o-mini",
+              generatedAt: Math.floor(Date.now() / 1000),
             }
           : {
               format: "deep",
               metrics: {
-                month: body.month ?? "2026-01",
-                monthLabel: "January 2026",
-                totalBudgeted: 2000,
+                ...baseMetrics(month),
                 totalSpent: 2100,
-                projectedSpend: 2100,
                 netVariance: 100,
                 onTrack: false,
-                topOverspend: [],
-                topUnderspend: [],
               },
               review: {
                 executiveSummary: "You closed slightly over budget.",
-                keyFindings: ["Transport and dining drove most variance."],
-                varianceDrivers: ["Dining out exceeded target by $80."],
-                recommendations: ["Reduce dining cap by one meal per week."],
+                narrative:
+                  "Wants and Needs both drifted close to their guidelines this month.",
+                bucketCommentary: {
+                  needs: "Needs at 48% — within target.",
+                  wants: "Wants at 32% — over the 30% target by 2pts.",
+                  savings: "Savings landed light because of the overspend.",
+                },
+                keyFindings: [
+                  {
+                    bucket: "wants",
+                    text: "Transport and dining drove most variance.",
+                  },
+                ],
+                varianceDrivers: [
+                  {
+                    bucket: "wants",
+                    text: "Dining out exceeded target by $80.",
+                  },
+                ],
+                recommendations: [
+                  {
+                    bucket: "wants",
+                    text: "Reduce dining cap by one meal per week.",
+                  },
+                ],
               },
+              cached: false,
+              model: "gpt-4o-mini",
+              generatedAt: Math.floor(Date.now() / 1000),
             };
       await route.fulfill({
         status: 200,
@@ -216,7 +310,14 @@ test.describe("Budget", () => {
     await page.goto(`/budget?month=${prevMonth}`);
 
     const closeButton = page.getByRole("button", { name: "Close Month" });
-    if (await closeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const isOpen = await closeButton
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    if (isOpen) {
+      // Review Month button should not exist while the month is still open.
+      await expect(
+        page.getByRole("button", { name: "Review Month" }),
+      ).toHaveCount(0);
       await closeButton.click();
       await expect(
         page.getByRole("button", { name: "Month Closed" }),
@@ -224,18 +325,144 @@ test.describe("Budget", () => {
     }
 
     const reviewButton = page.getByRole("button", { name: "Review Month" });
-    await expect(reviewButton).toBeEnabled();
+    await expect(reviewButton).toBeVisible();
     await reviewButton.click();
 
-    await expect(page.getByText(/End-of-month review for/i)).toBeVisible();
+    // Hero band + tabs render
+    await expect(page.getByText("Monthly review")).toBeVisible();
     await expect(page.getByRole("tab", { name: "Quick Digest" })).toBeVisible();
     await expect(page.getByText("Strong finish for the month.")).toBeVisible();
 
+    // 50/30/20 verdict band shows three buckets and the actual-income note
+    await expect(page.getByText("50 / 30 / 20 verdict")).toBeVisible();
+    await expect(page.getByText(/Based on actual income/)).toBeVisible();
+
+    // Regenerate button triggers a POST with regenerate=true
+    const regenerateBefore = regenerateCalls;
+    await page.getByRole("button", { name: /Regenerate/ }).click();
+    await expect.poll(() => regenerateCalls).toBeGreaterThan(regenerateBefore);
+
+    // Switch to Deep Review and verify deep payload renders
     await page.getByRole("tab", { name: "Deep Review" }).click();
     await expect(
       page.getByText("You closed slightly over budget."),
     ).toBeVisible();
-    await expect(page.getByText("Variance Drivers")).toBeVisible();
+    await expect(page.getByText("Variance drivers")).toBeVisible();
+  });
+
+  test("share button opens dialog and reveals a public read-only link", async ({
+    page,
+    context,
+  }) => {
+    // Mock the review API the same way the prior test does.
+    await page.route("**/api/ai-budget-review", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          format: "digest",
+          metrics: {
+            month: "2026-01",
+            monthLabel: "January 2026",
+            totalBudgeted: 2000,
+            totalSpent: 1900,
+            projectedSpend: 1900,
+            netVariance: -100,
+            onTrack: true,
+            actualIncome: 3000,
+            expectedIncome: 3000,
+            incomeVariance: 0,
+            savingsRate: 36.7,
+            surplus: 1100,
+            taggedSavings: 0,
+            effectiveSavings: 1100,
+            buckets: {
+              needs: {
+                targetAmount: 1500,
+                actualAmount: 1450,
+                guidelineAmount: 1500,
+                targetPct: 50,
+                actualPct: 48.3,
+              },
+              wants: {
+                targetAmount: 500,
+                actualAmount: 450,
+                guidelineAmount: 900,
+                targetPct: 30,
+                actualPct: 15,
+              },
+              savings: {
+                targetAmount: 0,
+                actualAmount: 1100,
+                guidelineAmount: 600,
+                targetPct: 20,
+                actualPct: 36.7,
+              },
+            },
+            topOverspend: [],
+            topUnderspend: [],
+            categoriesOverTarget: 0,
+          },
+          review: {
+            headline: "Strong finish for the month.",
+            bucketCommentary: { needs: "", wants: "", savings: "" },
+            risks: [],
+            wins: [],
+            actions: [],
+          },
+          cached: true,
+          model: "gpt-4o-mini",
+          generatedAt: Math.floor(Date.now() / 1000),
+        }),
+      });
+    });
+
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    // Make sure the previous month is closed so the review page renders.
+    await page.goto(`/budget?month=${prevMonth}`);
+    const closeBtn = page.getByRole("button", { name: "Close Month" });
+    if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await closeBtn.click();
+      await expect(
+        page.getByRole("button", { name: "Month Closed" }),
+      ).toBeVisible();
+    }
+    const hasReviewBtn = await page
+      .getByRole("button", { name: "Review Month" })
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    test.skip(
+      !hasReviewBtn,
+      "Needs the previous month to be closeable for the share link test",
+    );
+
+    await page.goto(`/budget/review?month=${prevMonth}`);
+    await expect(page.getByText("Monthly review")).toBeVisible({
+      timeout: 10000,
+    });
+
+    await page.getByRole("button", { name: "Share" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Share this review")).toBeVisible();
+
+    // Wait for the URL input to appear (after createOrGetReviewShare resolves).
+    const urlInput = dialog.locator("input[readonly]");
+    await expect(urlInput).toBeVisible({ timeout: 10000 });
+    const shareUrl = await urlInput.inputValue();
+    expect(shareUrl).toMatch(/\/share\/review\/[A-Za-z0-9_-]+$/);
+
+    // Verify the share path is reachable without auth (no redirect to /login).
+    // The page may render the report (if a review JSON was persisted) or
+    // notFound (if not) — either way, the proxy must NOT redirect to /login.
+    const anon = await context.browser()!.newContext();
+    const anonPage = await anon.newPage();
+    const response = await anonPage.goto(shareUrl);
+    expect(response?.url()).not.toContain("/login");
+    await anon.close();
   });
 
   test("current month monthly budget tab; optional transaction drill-down", async ({

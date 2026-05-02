@@ -19,6 +19,7 @@ import {
   accounts,
   budgetMonthReviews,
   budgetMonthStatus,
+  budgetReviewShares,
   budgets,
   categories,
   scheduledTransactions,
@@ -153,6 +154,45 @@ export function saveMonthReview(args: {
     )
     .get();
   return ts?.generatedAt ?? Math.floor(Date.now() / 1000);
+}
+
+export function findReviewByShareToken<TReview, TMetrics>(
+  token: string,
+): {
+  month: string;
+  format: "digest" | "deep";
+  review: TReview;
+  metrics: TMetrics;
+  model: string;
+  generatedAt: number;
+} | null {
+  if (!token) return null;
+  const share = db
+    .select()
+    .from(budgetReviewShares)
+    .where(
+      and(
+        eq(budgetReviewShares.token, token),
+        isNull(budgetReviewShares.revokedAt),
+      ),
+    )
+    .get() as
+    | {
+        month: string;
+        format: "digest" | "deep";
+      }
+    | undefined;
+  if (!share) return null;
+  const review = getMonthReview<TReview, TMetrics>(share.month, share.format);
+  if (!review) return null;
+  return {
+    month: share.month,
+    format: share.format,
+    review: review.review,
+    metrics: review.metrics,
+    model: review.model,
+    generatedAt: review.generatedAt,
+  };
 }
 
 function roundMoney(n: number): number {

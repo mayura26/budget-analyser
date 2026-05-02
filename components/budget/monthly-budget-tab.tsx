@@ -137,7 +137,10 @@ export function MonthlyBudgetTab({
 
           <BudgetSummaryStrip summary={summary} homeCurrency={homeCurrency} />
 
-          <BudgetRule502030Strip summary={summary} homeCurrency={homeCurrency} />
+          <BudgetRule502030Strip
+            summary={summary}
+            homeCurrency={homeCurrency}
+          />
 
           <BudgetCategoryList
             rows={rows}

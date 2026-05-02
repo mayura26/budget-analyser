@@ -120,6 +120,13 @@
       "when": 1777549800000,
       "tag": "0016_budget_month_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777649800000,
+      "tag": "0017_budget_review_shares",
+      "breakpoints": true
     }
   ]
 }
