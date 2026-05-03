@@ -12,11 +12,12 @@ import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { budgets, categories, settings } from "@/lib/db/schema";
 import { getCurrentMonth } from "@/lib/utils";
-import type {
-  ActionResult,
-  BudgetGenerateAnalyticsRow,
-  BudgetGenerateRecommendationRow,
-  Category,
+import {
+  BUDGET_SYNTHETIC_SURPLUS_CATEGORY_ID,
+  type ActionResult,
+  type BudgetGenerateAnalyticsRow,
+  type BudgetGenerateRecommendationRow,
+  type Category,
 } from "@/types";
 
 export async function saveBudgetTargets(
@@ -32,6 +33,7 @@ export async function saveBudgetTargets(
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith("target_")) continue;
     const categoryId = Number(key.slice(7));
+    if (categoryId === BUDGET_SYNTHETIC_SURPLUS_CATEGORY_ID) continue;
     const amount = Number(value);
     if (Number.isNaN(categoryId) || Number.isNaN(amount)) continue;
     entries.push({ categoryId, amount: Math.max(0, amount) });

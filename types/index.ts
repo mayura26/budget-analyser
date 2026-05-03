@@ -215,7 +215,12 @@ export type BudgetCategoryRow = {
   categoryKind: BudgetCategoryKind;
   /** Resolved from parent main for 50/30/20 (null if not in a bucket). */
   ruleBucket: BudgetRuleBucket | null;
+  /** Computed surplus line (not a DB category); `categoryId` is `BUDGET_SYNTHETIC_SURPLUS_CATEGORY_ID`. */
+  isSyntheticSurplus?: boolean;
 };
+
+/** Sentinel id for the computed income-surplus budget row (no `budgets` row). */
+export const BUDGET_SYNTHETIC_SURPLUS_CATEGORY_ID = 0;
 
 export type BudgetRule502030Band = {
   targetTotal: number;

@@ -16,6 +16,7 @@ import {
   convertOccurrencesToHomeCurrency,
   getTotalBalanceInHomeCurrency,
 } from "@/lib/budget/home-currency-cashflow";
+import { appendSurplusDisplayRows } from "@/lib/budget/surplus-display-row";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -150,6 +151,7 @@ export default async function BudgetPage({
     actualIncome,
     monthClosed,
   );
+  const budgetDisplayRows = appendSurplusDisplayRows(budgetRows, budgetSummary);
   const previousMonth = addCalendarMonths(selectedMonth, -1);
   const hasPrevBudget = hasBudgetTargets(previousMonth);
   const isReadOnly = selectedMonth < currentMonth;
@@ -202,6 +204,7 @@ export default async function BudgetPage({
           <MonthlyBudgetTab
             month={selectedMonth}
             rows={budgetRows}
+            displayRows={budgetDisplayRows}
             summary={budgetSummary}
             hasPreviousMonth={hasPrevBudget}
             previousMonth={previousMonth}

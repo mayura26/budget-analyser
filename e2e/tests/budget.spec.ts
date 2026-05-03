@@ -141,6 +141,18 @@ test.describe("Budget", () => {
     }
   });
 
+  test("income surplus synthetic row appears on budget grid with month query", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    await page.goto(`/budget?month=${prevMonth}`);
+    await expect(
+      page.getByText(/Income surplus \(unallocated\)/),
+    ).toBeVisible({ timeout: 10000 });
+  });
+
   test("closed past month shows realised vs scheduled income when budget exists", async ({
     page,
   }) => {

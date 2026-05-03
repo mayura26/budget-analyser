@@ -1,6 +1,11 @@
 "use client";
 
-import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Info,
+} from "lucide-react";
 import Link from "next/link";
 import { useActionState, useRef, useState, useTransition } from "react";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
@@ -72,11 +77,14 @@ function CategoryRow({
   onToggleExpand: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const isEditing = editingId === row.categoryId;
+  const isSynthetic = row.isSyntheticSurplus === true;
+  const isEditing = !isSynthetic && editingId === row.categoryId;
   const pct =
     row.targetAmount > 0
       ? Math.round((row.actualSpent / row.targetAmount) * 100)
-      : 0;
+      : row.targetAmount < 0
+        ? Math.round((row.actualSpent / row.targetAmount) * 100)
+        : 0;
   const remaining = row.targetAmount - row.actualSpent;
   const belowScheduled =
     row.targetAmount > 0 && row.targetAmount < row.scheduledAmount;
@@ -84,7 +92,7 @@ function CategoryRow({
   const catKey = String(row.categoryId);
   const lines = expenseTransactionsByCategory?.[catKey] ?? [];
   const drilldownContext = expenseTransactionsByCategory != null;
-  const canDrillDown = lines.length > 0;
+  const canDrillDown = !isSynthetic && lines.length > 0;
 
   const gridClass = drilldownContext ? gridColsDrilldown : gridColsBase;
 
@@ -124,19 +132,58 @@ function CategoryRow({
 
         {/* Category name: short on mobile when name has (…) or […] */}
         <div
-          className="min-w-0 truncate text-sm"
+          className="min-w-0 truncate text-sm flex items-center gap-1"
           title={row.categoryName}
           aria-label={row.categoryName}
         >
-          <span className="sm:hidden">
+          <span className="sm:hidden min-w-0 truncate">
             {budgetCategoryShortTitle(row.categoryName)}
           </span>
-          <span className="hidden sm:inline">{row.categoryName}</span>
+          <span className="hidden sm:inline min-w-0 truncate">
+            {row.categoryName}
+          </span>
+          {isSynthetic ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground"
+                    aria-label="How surplus is calculated"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">
+                  <p className="font-medium mb-1">Computed row (not a category)</p>
+                  <p>
+                    Target: scheduled expected income minus all expense and savings
+                    targets. Actual: income basis (max of scheduled and realised)
+                    minus expense outflows minus savings transfers — updates as the
+                    month progresses.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
         </div>
 
         {/* Target (editable) */}
         <div className="text-right">
-          {isEditing && !readOnly ? (
+          {isSynthetic ? (
+            <span
+              className={cn(
+                "text-sm tabular-nums px-1.5 py-0.5",
+                row.targetAmount < 0
+                  ? "text-red-600 dark:text-red-400"
+                  : row.targetAmount > 0
+                    ? "text-foreground"
+                    : "text-muted-foreground",
+              )}
+            >
+              {formatCurrency(row.targetAmount, homeCurrency)}
+            </span>
+          ) : isEditing && !readOnly ? (
             <div className="relative">
               <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                 {currencySymbol(homeCurrency)}
@@ -213,7 +260,20 @@ function CategoryRow({
 
         {/* Actual spent / allocated */}
         <div className="text-right text-sm tabular-nums">
-          {row.actualSpent > 0 ? (
+          {isSynthetic ? (
+            <span
+              className={
+                row.actualSpent < 0
+                  ? "text-red-600 dark:text-red-400"
+                  : row.actualSpent > 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-muted-foreground"
+              }
+            >
+              {row.actualSpent < 0 ? "−" : ""}
+              {formatCurrency(Math.abs(row.actualSpent), homeCurrency)}
+            </span>
+          ) : row.actualSpent > 0 ? (
             <span
               className={
                 row.categoryKind === "savings"
@@ -232,7 +292,13 @@ function CategoryRow({
 
         {/* Progress bar */}
         <div className="hidden sm:block">
-          {row.targetAmount > 0 ? (
+          {isSynthetic ? (
+            <div className="h-2 flex items-center justify-end pr-1">
+              <span className="text-xs text-muted-foreground tabular-nums">
+                &mdash;
+              </span>
+            </div>
+          ) : row.targetAmount > 0 ? (
             <div className="flex items-center gap-2">
               <BudgetProgressBar
                 spent={row.actualSpent}
@@ -250,7 +316,22 @@ function CategoryRow({
 
         {/* Remaining */}
         <div className="text-right text-sm tabular-nums">
-          {row.targetAmount > 0 ? (
+          {isSynthetic ? (
+            row.targetAmount !== 0 || row.actualSpent !== 0 ? (
+              <span
+                className={
+                  remaining >= 0
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }
+              >
+                {remaining >= 0 ? "" : "−"}
+                {formatCurrency(Math.abs(remaining), homeCurrency)}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">&mdash;</span>
+            )
+          ) : row.targetAmount > 0 ? (
             <span
               className={
                 remaining >= 0
@@ -399,16 +480,18 @@ export function BudgetCategoryList({
           <input type="hidden" name="month" value={month} />
 
           {/* Hidden inputs for non-editing rows to preserve their values */}
-          {rows.map((row) =>
-            editingId !== row.categoryId ? (
-              <input
-                key={row.categoryId}
-                type="hidden"
-                name={`target_${row.categoryId}`}
-                value={row.targetAmount}
-              />
-            ) : null,
-          )}
+          {rows
+            .filter((row) => !row.isSyntheticSurplus)
+            .map((row) =>
+              editingId !== row.categoryId ? (
+                <input
+                  key={row.categoryId}
+                  type="hidden"
+                  name={`target_${row.categoryId}`}
+                  value={row.targetAmount}
+                />
+              ) : null,
+            )}
 
           {/* Column headers */}
           <div

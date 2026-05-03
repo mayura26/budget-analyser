@@ -35,6 +35,7 @@ import type {
 export function MonthlyBudgetTab({
   month,
   rows,
+  displayRows,
   summary,
   hasPreviousMonth,
   previousMonth,
@@ -49,6 +50,8 @@ export function MonthlyBudgetTab({
 }: {
   month: string;
   rows: BudgetCategoryRow[];
+  /** Real category rows plus computed surplus line for the grid only. */
+  displayRows: BudgetCategoryRow[];
   summary: BudgetSummary;
   hasPreviousMonth: boolean;
   previousMonth: string;
@@ -143,7 +146,7 @@ export function MonthlyBudgetTab({
           />
 
           <BudgetCategoryList
-            rows={rows}
+            rows={displayRows}
             month={month}
             readOnly={readOnly}
             homeCurrency={homeCurrency}
@@ -240,7 +243,7 @@ export function MonthlyBudgetTab({
 
           {/* Show the category list anyway so users can set targets manually */}
           <BudgetCategoryList
-            rows={rows}
+            rows={displayRows}
             month={month}
             readOnly={readOnly}
             homeCurrency={homeCurrency}
