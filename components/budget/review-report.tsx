@@ -152,6 +152,19 @@ function bucketStatus(actualPct: number, targetPct: number) {
   return { label: `${delta.toFixed(1)}% under`, tone: "under" as const };
 }
 
+/**
+ * Savings inverts over/under sentiment: exceeding the savings target is a win,
+ * falling short is the miss. Needs/wants keep the conventional over=bad mapping.
+ */
+function bucketSentiment(
+  bucket: "needs" | "wants" | "savings",
+  tone: "ok" | "over" | "under",
+): "good" | "bad" | "ok" {
+  if (tone === "ok") return "ok";
+  if (bucket === "savings") return tone === "over" ? "good" : "bad";
+  return tone === "over" ? "bad" : "good";
+}
+
 function HeroBand({
   metrics,
   homeCurrency,
@@ -224,6 +237,7 @@ function BucketVerdictCard({
 }) {
   const t = BUCKET_THEME[bucket];
   const status = bucketStatus(band.actualPct, band.targetPct);
+  const sentiment = bucketSentiment(bucket, status.tone);
   const fillPct = Math.min(150, band.actualPct);
   return (
     <div
@@ -247,14 +261,12 @@ function BucketVerdictCard({
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-            status.tone === "ok" &&
+            sentiment === "good" &&
               "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-            status.tone === "over" &&
+            sentiment === "bad" &&
               "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30",
-            status.tone === "under" &&
-              (bucket === "savings"
-                ? "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30"
-                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"),
+            sentiment === "ok" &&
+              "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
           )}
         >
           {status.label}
