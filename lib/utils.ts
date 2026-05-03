@@ -52,6 +52,14 @@ export function budgetCategoryShortTitle(name: string): string {
   return shortened.length > 0 ? shortened : name;
 }
 
+export function relativeTime(unixSeconds: number): string {
+  const diff = Date.now() / 1000 - unixSeconds;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
 export function getCurrentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

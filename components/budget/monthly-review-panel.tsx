@@ -8,7 +8,6 @@ import {
   type ReviewFormat,
   type ReviewPayload,
   ReviewReport,
-  relativeTime,
 } from "@/components/budget/review-report";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,7 @@ import {
   revokeReviewShare,
 } from "@/lib/actions/budget-review-shares";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { cn } from "@/lib/utils";
+import { cn, relativeTime } from "@/lib/utils";
 
 type ReviewResponse = ReviewPayload & {
   cached?: boolean;

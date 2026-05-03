@@ -5,10 +5,10 @@ import {
   type DigestReview,
   type ReviewMetrics,
   ReviewReport,
-  relativeTime,
 } from "@/components/budget/review-report";
 import { findReviewByShareToken } from "@/lib/budget/queries";
 import { getHomeCurrency } from "@/lib/currency/home";
+import { relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 

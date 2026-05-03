@@ -478,13 +478,17 @@ test.describe("Budget", () => {
     const shareUrl = await urlInput.inputValue();
     expect(shareUrl).toMatch(/\/share\/review\/[A-Za-z0-9_-]+$/);
 
-    // Verify the share path is reachable without auth (no redirect to /login).
-    // The page may render the report (if a review JSON was persisted) or
-    // notFound (if not) — either way, the proxy must NOT redirect to /login.
+    // Verify the share path renders without auth (no redirect to /login,
+    // server returns 200, and the report itself is visible).
     const anon = await context.browser()!.newContext();
     const anonPage = await anon.newPage();
     const response = await anonPage.goto(shareUrl);
     expect(response?.url()).not.toContain("/login");
+    expect(response?.status()).toBe(200);
+    await expect(
+      anonPage.getByText("Budget Analyser · Shared review"),
+    ).toBeVisible();
+    await expect(anonPage.getByText("50 / 30 / 20 verdict")).toBeVisible();
     await anon.close();
   });
 
