@@ -79,9 +79,13 @@ function CategoryRow({
   const inputRef = useRef<HTMLInputElement>(null);
   const isSynthetic = row.isSyntheticSurplus === true;
   const isEditing = !isSynthetic && editingId === row.categoryId;
+  const barSpentForPct =
+    isSynthetic && row.targetAmount > 0
+      ? Math.max(0, row.actualSpent)
+      : row.actualSpent;
   const pct =
     row.targetAmount > 0
-      ? Math.round((row.actualSpent / row.targetAmount) * 100)
+      ? Math.round((barSpentForPct / row.targetAmount) * 100)
       : row.targetAmount < 0
         ? Math.round((row.actualSpent / row.targetAmount) * 100)
         : 0;
@@ -292,12 +296,20 @@ function CategoryRow({
 
         {/* Progress bar */}
         <div className="hidden sm:block">
-          {isSynthetic ? (
-            <div className="h-2 flex items-center justify-end pr-1">
-              <span className="text-xs text-muted-foreground tabular-nums">
-                &mdash;
+          {isSynthetic && row.targetAmount > 0 ? (
+            <div className="flex items-center gap-2">
+              <BudgetProgressBar
+                spent={Math.max(0, row.actualSpent)}
+                target={row.targetAmount}
+                className="flex-1"
+                variant="surplus"
+              />
+              <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
+                {pct}%
               </span>
             </div>
+          ) : isSynthetic ? (
+            <div className="h-2" />
           ) : row.targetAmount > 0 ? (
             <div className="flex items-center gap-2">
               <BudgetProgressBar

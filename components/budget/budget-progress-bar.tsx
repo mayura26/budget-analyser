@@ -6,10 +6,13 @@ export function BudgetProgressBar({
   spent,
   target,
   className,
+  /** Surplus-style: actual above target uses green tones (beat plan), not red. */
+  variant = "default",
 }: {
   spent: number;
   target: number;
   className?: string;
+  variant?: "default" | "surplus";
 }) {
   if (target === 0) return null;
 
@@ -20,13 +23,20 @@ export function BudgetProgressBar({
     : 0;
 
   let barColor: string;
-  if (overBudget) {
+  if (overBudget && variant === "default") {
     barColor = "bg-red-500 dark:bg-red-400";
+  } else if (overBudget && variant === "surplus") {
+    barColor = "bg-emerald-500 dark:bg-emerald-400";
   } else if (pct >= 75) {
     barColor = "bg-amber-500 dark:bg-amber-400";
   } else {
     barColor = "bg-green-500 dark:bg-green-400";
   }
+
+  const overLayClass =
+    variant === "surplus"
+      ? "bg-emerald-500/35 dark:bg-emerald-400/35"
+      : "bg-red-500/30 dark:bg-red-400/30";
 
   return (
     <div
@@ -44,7 +54,10 @@ export function BudgetProgressBar({
       />
       {overBudget && (
         <div
-          className="absolute top-0 right-0 h-full rounded-r-full bg-red-500/30 dark:bg-red-400/30"
+          className={cn(
+            "absolute top-0 right-0 h-full rounded-r-full",
+            overLayClass,
+          )}
           style={{ width: `${overPct}%` }}
         />
       )}

@@ -100,25 +100,34 @@ export function getMonthsEndingAt(endMonth: string, count: number): string[] {
   return enumerateMonthsInclusive(start, endMonth);
 }
 
+function clampMonthToRange(
+  month: string,
+  minMonth: string,
+  maxMonth: string,
+): string {
+  if (month < minMonth) return minMonth;
+  if (month > maxMonth) return maxMonth;
+  return month;
+}
+
 /**
- * Normalise `?month=` (YYYY-MM). Invalid or out-of-range values fall back to
- * `maxMonth` (typically the current month).
+ * Normalise `?month=` (YYYY-MM). Missing or invalid values use the current
+ * calendar month, clamped to [minMonth, maxMonth].
  */
 export function parseMonthParam(
   param: string | undefined,
   minMonth: string,
   maxMonth: string,
 ): string {
+  const fallback = clampMonthToRange(getCurrentMonth(), minMonth, maxMonth);
   if (!param || !/^\d{4}-\d{2}$/.test(param)) {
-    return maxMonth;
+    return fallback;
   }
   const monthNum = Number(param.slice(5, 7));
   if (monthNum < 1 || monthNum > 12) {
-    return maxMonth;
+    return fallback;
   }
   const year = param.slice(0, 4);
   const candidate = `${year}-${String(monthNum).padStart(2, "0")}`;
-  if (candidate < minMonth) return minMonth;
-  if (candidate > maxMonth) return maxMonth;
-  return candidate;
+  return clampMonthToRange(candidate, minMonth, maxMonth);
 }
