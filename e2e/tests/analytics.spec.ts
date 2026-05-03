@@ -13,8 +13,30 @@ test.describe("Analytics", () => {
     await page.goto("/analytics");
     await expect(page.getByText(/Cashflow by month/i)).toBeVisible();
     await expect(page.getByText(/By account/i)).toBeVisible();
-    await expect(page.getByText(/Income by category/i)).toBeVisible();
+    // Category explorer is now a single tabbed card; Spending is the default.
+    await expect(page.getByRole("tab", { name: "Spending" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Income" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Savings" })).toBeVisible();
     await expect(page.getByText(/Spending by category/i)).toBeVisible();
+  });
+
+  test("category tabs swap content", async ({ page }) => {
+    await page.goto("/analytics");
+    await expect(page.getByRole("tab", { name: "Spending" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    await page.getByRole("tab", { name: "Income" }).click();
+    await expect(page.getByText(/Income by category/i)).toBeVisible();
+    await page.getByRole("tab", { name: "Savings" }).click();
+    await expect(page.getByText(/Savings & investments/i)).toBeVisible();
+  });
+
+  test("view all transactions link is in the header", async ({ page }) => {
+    await page.goto("/analytics");
+    await expect(
+      page.getByRole("link", { name: /View all transactions in this period/i }),
+    ).toBeVisible();
   });
 
   test("preset navigation updates URL", async ({ page }) => {

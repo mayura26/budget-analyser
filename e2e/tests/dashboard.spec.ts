@@ -57,19 +57,39 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
   });
 
+  test("50/30/20 compact widget renders alongside Budget Status when targets exist", async ({
+    page,
+  }) => {
+    await page.goto("/dashboard");
+    const hasBudgetStatus = await page
+      .getByText("Budget Status", { exact: true })
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    test.skip(
+      !hasBudgetStatus,
+      "Needs budget targets in the current month for the compact widget",
+    );
+
+    await expect(page.getByText("50 / 30 / 20 guideline")).toBeVisible();
+    await expect(page.getByTestId("rule-band-chart-needs")).toBeVisible();
+    await expect(page.getByTestId("rule-band-chart-wants")).toBeVisible();
+    await expect(page.getByTestId("rule-band-chart-savings")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open budget" })).toBeVisible();
+  });
+
   test("spending chart help popover on narrow viewports", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/dashboard");
     await expect(page.getByText(/monthly overview/i)).toBeVisible({
       timeout: 10000,
     });
-    await page
-      .getByRole("button", { name: /full chart explanation/i })
-      .click();
+    await page.getByRole("button", { name: /full chart explanation/i }).click();
     await expect(
-      page.getByRole("dialog").getByText(
-        /Outflows only — same as expense totals elsewhere\. Turn on Include Net/i,
-      ),
+      page
+        .getByRole("dialog")
+        .getByText(
+          /Outflows only — same as expense totals elsewhere\. Turn on Include Net/i,
+        ),
     ).toBeVisible();
   });
 
@@ -151,9 +171,7 @@ test.describe("Dashboard", () => {
       await expect(
         page.getByText("Income allocation", { exact: true }),
       ).toBeVisible({ timeout: 10000 });
-      await expect(
-        page.getByText("Unspent", { exact: true }),
-      ).toBeVisible();
+      await expect(page.getByText("Unspent", { exact: true })).toBeVisible();
     });
   });
 

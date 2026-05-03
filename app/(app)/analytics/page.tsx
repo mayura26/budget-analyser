@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { AnalyticsAccountsSection } from "@/components/analytics/analytics-accounts-section";
-import { AnalyticsCategoryExplorer } from "@/components/analytics/analytics-category-explorer";
+import { AnalyticsCategoryTabs } from "@/components/analytics/analytics-category-tabs";
 import { AnalyticsMonthlyChart } from "@/components/analytics/analytics-monthly-chart";
 import { AnalyticsPeriodSelector } from "@/components/analytics/analytics-period-selector";
 import { KPICard } from "@/components/layout/kpi-card";
@@ -55,6 +55,12 @@ export default async function AnalyticsPage({
               count toward Savings, not Expenses. Net is income minus expenses
               minus savings allocations.
             </span>
+            <Link
+              href={transactionsInRangeUrl({ from: start, to: end })}
+              className="inline-block text-xs mt-1 text-primary hover:underline"
+            >
+              View all transactions in this period →
+            </Link>
           </>
         }
         actions={
@@ -66,7 +72,7 @@ export default async function AnalyticsPage({
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KPICard
           label="Income"
           icon={ArrowUpCircle}
@@ -94,15 +100,6 @@ export default async function AnalyticsPage({
         />
       </div>
 
-      <p className="text-sm">
-        <Link
-          href={transactionsInRangeUrl({ from: start, to: end })}
-          className="text-primary hover:underline font-medium"
-        >
-          View all transactions in this period
-        </Link>
-      </p>
-
       <AnalyticsMonthlyChart
         monthly={data.monthly}
         homeCurrency={homeCurrency}
@@ -115,32 +112,13 @@ export default async function AnalyticsPage({
         homeCurrency={homeCurrency}
       />
 
-      <AnalyticsCategoryExplorer
-        variant="income"
-        title="Income by category"
-        description="Income in home currency by category; uncategorised inflows appear under Not processed. Expand to see transactions (amounts may be negative for reversals)."
-        categoryRoots={data.categoryIncomeRoots}
-        expenseTransactionsByCategory={data.incomeTransactionsByCategory}
-        rangeStart={start}
-        rangeEnd={end}
-        homeCurrency={homeCurrency}
-      />
-
-      <AnalyticsCategoryExplorer
-        title="Spending by category"
-        description="Expense activity (net of refunds) in home currency; transfers excluded. Expand a category to see subcategories and transactions."
-        categoryRoots={data.categoryRoots}
-        expenseTransactionsByCategory={data.expenseTransactionsByCategory}
-        rangeStart={start}
-        rangeEnd={end}
-        homeCurrency={homeCurrency}
-      />
-
-      <AnalyticsCategoryExplorer
-        title="Savings & investments"
-        description="Net allocations to savings categories (debits minus credits)."
-        categoryRoots={data.categorySavingsRoots}
-        expenseTransactionsByCategory={data.savingsTransactionsByCategory}
+      <AnalyticsCategoryTabs
+        spendingRoots={data.categoryRoots}
+        incomeRoots={data.categoryIncomeRoots}
+        savingsRoots={data.categorySavingsRoots}
+        spendingTransactionsByCategory={data.expenseTransactionsByCategory}
+        incomeTransactionsByCategory={data.incomeTransactionsByCategory}
+        savingsTransactionsByCategory={data.savingsTransactionsByCategory}
         rangeStart={start}
         rangeEnd={end}
         homeCurrency={homeCurrency}

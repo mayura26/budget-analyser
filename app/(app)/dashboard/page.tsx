@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
+import { BudgetRule502030Compact } from "@/components/budget/budget-rule-502030-strip";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-picker";
 import { KPICard } from "@/components/layout/kpi-card";
@@ -41,7 +42,7 @@ import {
   getMonthsEndingAt,
   parseMonthParam,
 } from "@/lib/utils";
-import type { Category } from "@/types";
+import type { BudgetCategoryRow, BudgetSummary, Category } from "@/types";
 
 function getEarliestTransactionMonth(): string | null {
   const row = db
@@ -52,37 +53,20 @@ function getEarliestTransactionMonth(): string | null {
   return row.d.slice(0, 7);
 }
 
-async function DashboardBudgetStatus({
+function DashboardBudgetStatus({
   selectedMonth,
+  rows,
+  summary,
+  homeCurrency,
 }: {
   selectedMonth: string;
+  rows: BudgetCategoryRow[];
+  summary: BudgetSummary;
+  homeCurrency: ReturnType<typeof getHomeCurrency>;
 }) {
-  if (!hasBudgetTargets(selectedMonth)) return null;
-
-  const homeCurrency = getHomeCurrency();
-  const allCats = db.select().from(categories).all() as Category[];
-  const rows = await buildBudgetCategoryRows(
-    selectedMonth,
-    allCats,
-    homeCurrency,
-  );
-  const { income } = await getScheduledAmountsByCategory(
-    selectedMonth,
-    homeCurrency,
-  );
-  const actualIncome = await getActualIncomeForMonth(selectedMonth, homeCurrency);
-  const summary = buildBudgetSummary(
-    rows,
-    selectedMonth,
-    income,
-    actualIncome,
-    isMonthClosed(selectedMonth),
-  );
-
   const budgetedRows = rows.filter(
     (r) => r.targetAmount > 0 && r.categoryKind === "expense",
   );
-  // Top categories closest to / over budget
   const topCategories = [...budgetedRows]
     .sort(
       (a, b) => b.actualSpent / b.targetAmount - a.actualSpent / a.targetAmount,
@@ -133,8 +117,9 @@ async function DashboardBudgetStatus({
 
         {summary.monthClosed && (
           <p className="text-xs text-muted-foreground">
-            Income: {formatCurrency(summary.actualIncome, homeCurrency)} realised ·{" "}
-            {formatCurrency(summary.expectedIncome, homeCurrency)} expected (scheduled)
+            Income: {formatCurrency(summary.actualIncome, homeCurrency)}{" "}
+            realised · {formatCurrency(summary.expectedIncome, homeCurrency)}{" "}
+            expected (scheduled)
           </p>
         )}
 
@@ -183,6 +168,53 @@ async function DashboardBudgetStatus({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+async function DashboardBudgetSection({
+  selectedMonth,
+}: {
+  selectedMonth: string;
+}) {
+  if (!hasBudgetTargets(selectedMonth)) return null;
+
+  const homeCurrency = getHomeCurrency();
+  const allCats = db.select().from(categories).all() as Category[];
+  const rows = await buildBudgetCategoryRows(
+    selectedMonth,
+    allCats,
+    homeCurrency,
+  );
+  const { income } = await getScheduledAmountsByCategory(
+    selectedMonth,
+    homeCurrency,
+  );
+  const actualIncome = await getActualIncomeForMonth(
+    selectedMonth,
+    homeCurrency,
+  );
+  const summary = buildBudgetSummary(
+    rows,
+    selectedMonth,
+    income,
+    actualIncome,
+    isMonthClosed(selectedMonth),
+  );
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <DashboardBudgetStatus
+        selectedMonth={selectedMonth}
+        rows={rows}
+        summary={summary}
+        homeCurrency={homeCurrency}
+      />
+      <BudgetRule502030Compact
+        summary={summary}
+        homeCurrency={homeCurrency}
+        href={`/budget?month=${selectedMonth}`}
+      />
+    </div>
   );
 }
 
@@ -253,22 +285,30 @@ export default async function DashboardPage({
         }
       />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
+      {/* Primary KPIs — Income, Expenses, Net */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <KPICard
-          compact
           label="Income"
           icon={ArrowUpCircle}
           tone="income"
           value={formatCurrency(currentMonthData.income, homeCurrency)}
         />
         <KPICard
-          compact
           label="Expenses"
           icon={ArrowDownCircle}
           tone="expense"
           value={formatCurrency(currentMonthData.expenses, homeCurrency)}
         />
+        <KPICard
+          label="Net"
+          icon={currentMonthData.net >= 0 ? TrendingUp : TrendingDown}
+          tone={currentMonthData.net >= 0 ? "net-positive" : "net-negative"}
+          value={`${currentMonthData.net >= 0 ? "+" : ""}${formatCurrency(Math.abs(currentMonthData.net), homeCurrency)}`}
+        />
+      </div>
+
+      {/* Secondary KPIs — Savings, Transactions */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <KPICard
           compact
           label="Savings"
@@ -276,13 +316,6 @@ export default async function DashboardPage({
           tone="neutral"
           value={formatCurrency(currentMonthData.savings, homeCurrency)}
           subtitle="Allocated to savings categories"
-        />
-        <KPICard
-          compact
-          label="Net"
-          icon={currentMonthData.net >= 0 ? TrendingUp : TrendingDown}
-          tone={currentMonthData.net >= 0 ? "net-positive" : "net-negative"}
-          value={`${currentMonthData.net >= 0 ? "+" : ""}${formatCurrency(Math.abs(currentMonthData.net), homeCurrency)}`}
         />
         <KPICard
           compact
@@ -294,8 +327,8 @@ export default async function DashboardPage({
         />
       </div>
 
-      {/* Budget Status */}
-      <DashboardBudgetStatus selectedMonth={selectedMonth} />
+      {/* Budget + 50/30/20 */}
+      <DashboardBudgetSection selectedMonth={selectedMonth} />
 
       {/* Charts */}
       <DashboardCharts

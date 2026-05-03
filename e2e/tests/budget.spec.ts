@@ -100,6 +100,22 @@ test.describe("Budget", () => {
     await expect(page.getByText("Left").first()).toBeVisible();
   });
 
+  test("50/30/20 strip renders three mini grouped bar charts when budget exists", async ({
+    page,
+  }) => {
+    await page.goto("/budget");
+    const hasBudget = await page
+      .getByText("Expense budget")
+      .isVisible({ timeout: 8000 })
+      .catch(() => false);
+    test.skip(!hasBudget, "Needs budget targets for the current month");
+
+    await expect(page.getByText("50 / 30 / 20 guideline")).toBeVisible();
+    await expect(page.getByTestId("rule-band-chart-needs")).toBeVisible();
+    await expect(page.getByTestId("rule-band-chart-wants")).toBeVisible();
+    await expect(page.getByTestId("rule-band-chart-savings")).toBeVisible();
+  });
+
   test("past month monthly budget tab loads; optional transaction drill-down", async ({
     page,
   }) => {
