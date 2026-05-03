@@ -44,6 +44,29 @@ function groupRows(rows: BudgetCategoryRow[]): GroupedRows {
     .map(([group, rows]) => ({ group, rows }));
 }
 
+/** Savings "Left": ahead of target = positive + green; under target = red shortfall. */
+function savingsRemainingDisplay(
+  row: BudgetCategoryRow,
+  homeCurrency: SupportedCurrency,
+) {
+  const ahead = row.actualSpent - row.targetAmount;
+  if (ahead >= -0.005) {
+    const v = ahead <= 0.005 ? 0 : ahead;
+    return (
+      <span className="text-emerald-600 dark:text-emerald-400">
+        {v > 0 ? "+" : ""}
+        {formatCurrency(v, homeCurrency)}
+      </span>
+    );
+  }
+  const short = row.targetAmount - row.actualSpent;
+  return (
+    <span className="text-red-600 dark:text-red-400">
+      {formatCurrency(short, homeCurrency)}
+    </span>
+  );
+}
+
 const gridColsBase =
   "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
 const gridColsDrilldown =
@@ -90,6 +113,10 @@ function CategoryRow({
         ? Math.round((row.actualSpent / row.targetAmount) * 100)
         : 0;
   const remaining = row.targetAmount - row.actualSpent;
+  const pctLabelClass =
+    row.categoryKind === "savings" && row.targetAmount > 0 && pct > 100
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-muted-foreground";
   const belowScheduled =
     row.targetAmount > 0 && row.targetAmount < row.scheduledAmount;
 
@@ -304,7 +331,12 @@ function CategoryRow({
                 className="flex-1"
                 variant="savings"
               />
-              <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
+              <span
+                className={cn(
+                  "text-xs tabular-nums w-8 text-right",
+                  pctLabelClass,
+                )}
+              >
                 {pct}%
               </span>
             </div>
@@ -320,7 +352,12 @@ function CategoryRow({
                   row.categoryKind === "savings" ? "savings" : "default"
                 }
               />
-              <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
+              <span
+                className={cn(
+                  "text-xs tabular-nums w-8 text-right",
+                  pctLabelClass,
+                )}
+              >
                 {pct}%
               </span>
             </div>
@@ -331,21 +368,8 @@ function CategoryRow({
 
         {/* Remaining */}
         <div className="text-right text-sm tabular-nums">
-          {isSynthetic ? (
-            row.targetAmount !== 0 || row.actualSpent !== 0 ? (
-              <span
-                className={
-                  remaining >= 0
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
-                }
-              >
-                {remaining >= 0 ? "" : "−"}
-                {formatCurrency(Math.abs(remaining), homeCurrency)}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">&mdash;</span>
-            )
+          {row.categoryKind === "savings" && row.targetAmount > 0 ? (
+            savingsRemainingDisplay(row, homeCurrency)
           ) : row.targetAmount > 0 ? (
             <span
               className={
@@ -355,6 +379,18 @@ function CategoryRow({
               }
             >
               {remaining >= 0 ? "" : "-"}
+              {formatCurrency(Math.abs(remaining), homeCurrency)}
+            </span>
+          ) : isSynthetic &&
+            (row.targetAmount !== 0 || row.actualSpent !== 0) ? (
+            <span
+              className={
+                remaining >= 0
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }
+            >
+              {remaining >= 0 ? "" : "−"}
               {formatCurrency(Math.abs(remaining), homeCurrency)}
             </span>
           ) : (
