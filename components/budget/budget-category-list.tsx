@@ -302,7 +302,7 @@ function CategoryRow({
                 spent={Math.max(0, row.actualSpent)}
                 target={row.targetAmount}
                 className="flex-1"
-                variant="surplus"
+                variant="savings"
               />
               <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
                 {pct}%
@@ -316,6 +316,9 @@ function CategoryRow({
                 spent={row.actualSpent}
                 target={row.targetAmount}
                 className="flex-1"
+                variant={
+                  row.categoryKind === "savings" ? "savings" : "default"
+                }
               />
               <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
                 {pct}%

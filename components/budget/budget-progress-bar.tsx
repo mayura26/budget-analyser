@@ -6,37 +6,45 @@ export function BudgetProgressBar({
   spent,
   target,
   className,
-  /** Surplus-style: actual above target uses green tones (beat plan), not red. */
+  /**
+   * Savings goals: beating the target is good (green/emerald); under target is red.
+   * Expenses use `default` (over spend is red).
+   */
   variant = "default",
 }: {
   spent: number;
   target: number;
   className?: string;
-  variant?: "default" | "surplus";
+  variant?: "default" | "savings";
 }) {
   if (target === 0) return null;
 
   const pct = Math.min((spent / target) * 100, 100);
-  const overBudget = spent > target;
-  const overPct = overBudget
+  const overTarget = spent > target;
+  const overPct = overTarget
     ? Math.min(((spent - target) / target) * 100, 100)
     : 0;
 
   let barColor: string;
-  if (overBudget && variant === "default") {
+  let overLayClass: string | null = null;
+
+  if (variant === "savings") {
+    if (overTarget) {
+      barColor = "bg-emerald-500 dark:bg-emerald-400";
+      overLayClass = "bg-emerald-500/35 dark:bg-emerald-400/35";
+    } else if (spent < target) {
+      barColor = "bg-red-500 dark:bg-red-400";
+    } else {
+      barColor = "bg-green-500 dark:bg-green-400";
+    }
+  } else if (overTarget) {
     barColor = "bg-red-500 dark:bg-red-400";
-  } else if (overBudget && variant === "surplus") {
-    barColor = "bg-emerald-500 dark:bg-emerald-400";
+    overLayClass = "bg-red-500/30 dark:bg-red-400/30";
   } else if (pct >= 75) {
     barColor = "bg-amber-500 dark:bg-amber-400";
   } else {
     barColor = "bg-green-500 dark:bg-green-400";
   }
-
-  const overLayClass =
-    variant === "surplus"
-      ? "bg-emerald-500/35 dark:bg-emerald-400/35"
-      : "bg-red-500/30 dark:bg-red-400/30";
 
   return (
     <div
@@ -52,7 +60,7 @@ export function BudgetProgressBar({
         )}
         style={{ width: `${pct}%` }}
       />
-      {overBudget && (
+      {overTarget && overLayClass ? (
         <div
           className={cn(
             "absolute top-0 right-0 h-full rounded-r-full",
@@ -60,7 +68,7 @@ export function BudgetProgressBar({
           )}
           style={{ width: `${overPct}%` }}
         />
-      )}
+      ) : null}
     </div>
   );
 }
