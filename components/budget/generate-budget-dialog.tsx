@@ -1,6 +1,12 @@
 "use client";
 
-import { Check, ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +36,10 @@ import type { BudgetGenerateRecommendationRow } from "@/types";
 
 type Direction = "increase" | "decrease" | "keep" | "new";
 
-function getDirection(row: BudgetGenerateRecommendationRow, amount: number): Direction {
+function getDirection(
+  row: BudgetGenerateRecommendationRow,
+  amount: number,
+): Direction {
   if (row.currentMonthTarget <= 0) return "new";
   if (amount > row.currentMonthTarget) return "increase";
   if (amount < row.currentMonthTarget) return "decrease";
@@ -107,7 +116,9 @@ export function GenerateBudgetDialog({
       );
       setExpandedGroups(
         new Set(
-          [...new Set(recommendations.map((row) => row.parentName || "Other"))].sort(),
+          [
+            ...new Set(recommendations.map((row) => row.parentName || "Other")),
+          ].sort(),
         ),
       );
       setLoading(false);
@@ -248,19 +259,25 @@ export function GenerateBudgetDialog({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="rounded-lg border bg-card/80 p-3">
-                <p className="text-xs text-muted-foreground">Selected categories</p>
+                <p className="text-xs text-muted-foreground">
+                  Selected categories
+                </p>
                 <p className="text-lg font-semibold">
                   {selectedCount} / {rows.length}
                 </p>
               </div>
               <div className="rounded-lg border bg-amber-500/5 p-3">
-                <p className="text-xs text-muted-foreground">Budget increases</p>
+                <p className="text-xs text-muted-foreground">
+                  Budget increases
+                </p>
                 <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">
                   {increaseCount}
                 </p>
               </div>
               <div className="rounded-lg border bg-emerald-500/5 p-3">
-                <p className="text-xs text-muted-foreground">Budget decreases</p>
+                <p className="text-xs text-muted-foreground">
+                  Budget decreases
+                </p>
                 <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
                   {decreaseCount}
                 </p>
@@ -287,7 +304,9 @@ export function GenerateBudgetDialog({
                   selectedIds.has(row.categoryId),
                 );
                 const groupTotal = groupSelected.reduce((sum, row) => {
-                  return sum + (amounts.get(row.categoryId) ?? row.recommendedTarget);
+                  return (
+                    sum + (amounts.get(row.categoryId) ?? row.recommendedTarget)
+                  );
                 }, 0);
                 const isExpanded = expandedGroups.has(group.group);
 
@@ -318,16 +337,23 @@ export function GenerateBudgetDialog({
                           <TableRow>
                             <TableHead className="w-16">Apply</TableHead>
                             <TableHead>Subcategory</TableHead>
-                            <TableHead className="min-w-[260px]">Signals</TableHead>
-                            <TableHead className="text-right">New target</TableHead>
-                            <TableHead className="text-right">Direction</TableHead>
+                            <TableHead className="min-w-[260px]">
+                              Signals
+                            </TableHead>
+                            <TableHead className="text-right">
+                              New target
+                            </TableHead>
+                            <TableHead className="text-right">
+                              Direction
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {group.rows.map((row) => {
                             const selected = selectedIds.has(row.categoryId);
                             const currentAmount =
-                              amounts.get(row.categoryId) ?? row.recommendedTarget;
+                              amounts.get(row.categoryId) ??
+                              row.recommendedTarget;
                             const direction = getDirection(row, currentAmount);
                             return (
                               <TableRow key={row.categoryId}>
@@ -337,7 +363,9 @@ export function GenerateBudgetDialog({
                                     variant={selected ? "default" : "outline"}
                                     size="sm"
                                     className="h-8 px-2"
-                                    onClick={() => toggleSelected(row.categoryId)}
+                                    onClick={() =>
+                                      toggleSelected(row.categoryId)
+                                    }
                                   >
                                     <Check className="h-3.5 w-3.5" />
                                   </Button>
@@ -350,7 +378,9 @@ export function GenerateBudgetDialog({
                                         style={{ backgroundColor: row.color }}
                                       />
                                       <span className="sm:hidden">
-                                        {budgetCategoryShortTitle(row.categoryName)}
+                                        {budgetCategoryShortTitle(
+                                          row.categoryName,
+                                        )}
                                       </span>
                                       <span className="hidden sm:inline">
                                         {row.categoryName}
@@ -363,21 +393,41 @@ export function GenerateBudgetDialog({
                                 </TableCell>
                                 <TableCell>
                                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:text-sm">
-                                    <span className="text-muted-foreground">Last target</span>
-                                    <span className="text-right tabular-nums">
-                                      {formatCurrency(row.lastMonthTarget, homeCurrency)}
+                                    <span className="text-muted-foreground">
+                                      Last target
                                     </span>
-                                    <span className="text-muted-foreground">Last spent</span>
+                                    <span className="text-right tabular-nums">
+                                      {formatCurrency(
+                                        row.lastMonthTarget,
+                                        homeCurrency,
+                                      )}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      Last spent
+                                    </span>
                                     <span className="text-right tabular-nums text-red-600 dark:text-red-400">
-                                      {formatCurrency(row.lastMonthSpent, homeCurrency)}
+                                      {formatCurrency(
+                                        row.lastMonthSpent,
+                                        homeCurrency,
+                                      )}
                                     </span>
-                                    <span className="text-muted-foreground">3M avg</span>
+                                    <span className="text-muted-foreground">
+                                      3M avg
+                                    </span>
                                     <span className="text-right tabular-nums">
-                                      {formatCurrency(row.avg3Month, homeCurrency)}
+                                      {formatCurrency(
+                                        row.avg3Month,
+                                        homeCurrency,
+                                      )}
                                     </span>
-                                    <span className="text-muted-foreground">Expected</span>
+                                    <span className="text-muted-foreground">
+                                      Expected
+                                    </span>
                                     <span className="text-right tabular-nums text-amber-600 dark:text-amber-400">
-                                      {formatCurrency(row.expectedSpend, homeCurrency)}
+                                      {formatCurrency(
+                                        row.expectedSpend,
+                                        homeCurrency,
+                                      )}
                                     </span>
                                   </div>
                                 </TableCell>
@@ -388,7 +438,10 @@ export function GenerateBudgetDialog({
                                     step={10}
                                     value={currentAmount}
                                     onChange={(event) =>
-                                      setAmount(row.categoryId, event.target.value)
+                                      setAmount(
+                                        row.categoryId,
+                                        event.target.value,
+                                      )
                                     }
                                     className="h-8 w-24 sm:w-28 ml-auto text-right"
                                   />

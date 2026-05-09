@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
-  Info,
-} from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Info } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useRef, useState, useTransition } from "react";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
@@ -165,7 +160,6 @@ function CategoryRow({
         <div
           className="min-w-0 truncate text-sm flex items-center gap-1"
           title={row.categoryName}
-          aria-label={row.categoryName}
         >
           <span className="sm:hidden min-w-0 truncate">
             {budgetCategoryShortTitle(row.categoryName)}
@@ -186,12 +180,14 @@ function CategoryRow({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs text-xs">
-                  <p className="font-medium mb-1">Computed row (not a category)</p>
+                  <p className="font-medium mb-1">
+                    Computed row (not a category)
+                  </p>
                   <p>
-                    Target: scheduled expected income minus all expense and savings
-                    targets. Actual: income basis (max of scheduled and realised)
-                    minus expense outflows minus savings transfers — updates as the
-                    month progresses.
+                    Target: scheduled expected income minus all expense and
+                    savings targets. Actual: income basis (max of scheduled and
+                    realised) minus expense outflows minus savings transfers —
+                    updates as the month progresses.
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -348,9 +344,7 @@ function CategoryRow({
                 spent={row.actualSpent}
                 target={row.targetAmount}
                 className="flex-1"
-                variant={
-                  row.categoryKind === "savings" ? "savings" : "default"
-                }
+                variant={row.categoryKind === "savings" ? "savings" : "default"}
               />
               <span
                 className={cn(
@@ -580,7 +574,7 @@ export function BudgetCategoryList({
                   ) : (
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
-                  <span title={group} aria-label={group}>
+                  <span title={group}>
                     <span className="sm:hidden">
                       {budgetCategoryShortTitle(group)}
                     </span>

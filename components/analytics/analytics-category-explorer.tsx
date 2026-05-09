@@ -109,9 +109,7 @@ function CategoryRow({
   const canExpand = hasChildCategories || directTxns.length > 0;
   const isExpanded = expanded.has(key);
   const pct =
-    parentTotal !== 0
-      ? Math.round((node.total / parentTotal) * 100)
-      : 0;
+    parentTotal !== 0 ? Math.round((node.total / parentTotal) * 100) : 0;
 
   const padLeft = 8 + depth * 16;
 
@@ -261,8 +259,7 @@ export function AnalyticsCategoryExplorer({
     const keys = new Set<string>();
     function visit(nodes: CategoryHierarchyNode[]) {
       for (const n of nodes) {
-        const include =
-          variant === "income" ? n.total !== 0 : n.total > 0;
+        const include = variant === "income" ? n.total !== 0 : n.total > 0;
         if (include) {
           keys.add(categoryKey(n.id));
           visit(n.children);

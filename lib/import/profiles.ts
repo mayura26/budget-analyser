@@ -99,6 +99,20 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     }),
     isSystem: true,
   },
+  {
+    name: "Kiwi Bank",
+    dateColumn: "Effective Date",
+    descriptionColumn: "Description",
+    amountColumn: "Amount",
+    debitColumn: null,
+    creditColumn: null,
+    dateFormat: "YYYY-MM-DD",
+    skipRows: 0,
+    delimiter: ",",
+    negativeIsDebit: true,
+    extraMappings: null,
+    isSystem: true,
+  },
 ];
 
 // Column aliases used for auto-detection

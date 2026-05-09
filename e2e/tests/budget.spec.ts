@@ -148,9 +148,9 @@ test.describe("Budget", () => {
     const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     await page.goto(`/budget?month=${prevMonth}`);
-    await expect(
-      page.getByText(/Income surplus \(unallocated\)/),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Income surplus \(unallocated\)/)).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test("closed past month shows realised vs scheduled income when budget exists", async ({
@@ -492,7 +492,11 @@ test.describe("Budget", () => {
 
     // Verify the share path renders without auth (no redirect to /login,
     // server returns 200, and the report itself is visible).
-    const anon = await context.browser()!.newContext();
+    const browserInstance = context.browser();
+    if (!browserInstance) {
+      throw new Error("Playwright browser unavailable");
+    }
+    const anon = await browserInstance.newContext();
     const anonPage = await anon.newPage();
     const response = await anonPage.goto(shareUrl);
     expect(response?.url()).not.toContain("/login");

@@ -26,9 +26,7 @@ const CategorySchema = z.object({
   name: z.string().min(1).max(100),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   icon: z.string().optional(),
-  type: z
-    .enum(["income", "expense", "transfer", "savings"])
-    .default("expense"),
+  type: z.enum(["income", "expense", "transfer", "savings"]).default("expense"),
   budgetRuleBucket: bucketSchema,
 });
 

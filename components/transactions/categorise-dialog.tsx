@@ -410,7 +410,9 @@ export function CategoriseDialog({
                     <th className="w-[10%] px-3 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">
                       Date
                     </th>
-                    <th className={`${isMismatches ? "w-[28%]" : "w-[32%]"} min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground`}>
+                    <th
+                      className={`${isMismatches ? "w-[28%]" : "w-[32%]"} min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground`}
+                    >
                       Description
                     </th>
                     <th className="w-[12%] min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
@@ -419,7 +421,9 @@ export function CategoriseDialog({
                     <th className="w-[11%] px-3 py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
                       Amount
                     </th>
-                    <th className={`${isMismatches ? "w-[18%]" : "w-[22%]"} min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground`}>
+                    <th
+                      className={`${isMismatches ? "w-[18%]" : "w-[22%]"} min-w-0 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground`}
+                    >
                       Category
                     </th>
                     <th
@@ -577,7 +581,9 @@ export function CategoriseDialog({
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className={`cursor-default font-medium ${confidenceColorClass(suggestionConfidencePercent(row.confidence))}`}>
+                                <span
+                                  className={`cursor-default font-medium ${confidenceColorClass(suggestionConfidencePercent(row.confidence))}`}
+                                >
                                   {suggestionConfidencePercent(row.confidence)}%
                                 </span>
                               </TooltipTrigger>

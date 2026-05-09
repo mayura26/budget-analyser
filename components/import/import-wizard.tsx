@@ -29,6 +29,24 @@ import type { Account, BankProfile, ImportPreview } from "@/types";
 
 type Step = "upload" | "preview" | "done";
 
+function resolveDefaultProfileIdForAccount(
+  accounts: Account[],
+  bankProfiles: BankProfile[],
+  nextAccountId: string,
+): string | null {
+  const selectedAccount = accounts.find((a) => String(a.id) === nextAccountId);
+  if (!selectedAccount) return null;
+
+  if (selectedAccount.bankProfileId != null) {
+    const matchedProfile = bankProfiles.find(
+      (profile) => profile.id === selectedAccount.bankProfileId,
+    );
+    if (matchedProfile) return String(matchedProfile.id);
+  }
+
+  return null;
+}
+
 export function ImportWizard({
   accounts,
   bankProfiles,
@@ -36,22 +54,6 @@ export function ImportWizard({
   accounts: Account[];
   bankProfiles: BankProfile[];
 }) {
-  function getDefaultProfileIdForAccount(nextAccountId: string): string | null {
-    const selectedAccount = accounts.find(
-      (a) => String(a.id) === nextAccountId,
-    );
-    if (!selectedAccount) return null;
-
-    if (selectedAccount.bankProfileId != null) {
-      const matchedProfile = bankProfiles.find(
-        (profile) => profile.id === selectedAccount.bankProfileId,
-      );
-      if (matchedProfile) return String(matchedProfile.id);
-    }
-
-    return null;
-  }
-
   const [step, setStep] = useState<Step>("upload");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,11 @@ export function ImportWizard({
   );
   const [profileId, setProfileId] = useState<string>(
     (accounts[0]
-      ? getDefaultProfileIdForAccount(String(accounts[0].id))
+      ? resolveDefaultProfileIdForAccount(
+          accounts,
+          bankProfiles,
+          String(accounts[0].id),
+        )
       : null) ?? (bankProfiles[0] ? String(bankProfiles[0].id) : ""),
   );
   const [file, setFile] = useState<File | null>(null);
@@ -77,7 +83,11 @@ export function ImportWizard({
 
   useEffect(() => {
     const accountChanged = lastAccountIdRef.current !== accountId;
-    const accountDefaultProfileId = getDefaultProfileIdForAccount(accountId);
+    const accountDefaultProfileId = resolveDefaultProfileIdForAccount(
+      accounts,
+      bankProfiles,
+      accountId,
+    );
 
     if (accountChanged) {
       if (accountDefaultProfileId) {
@@ -105,7 +115,7 @@ export function ImportWizard({
     }
 
     setProfileId(bankProfiles[0] ? String(bankProfiles[0].id) : "");
-  }, [accountId, bankProfiles, profileId]);
+  }, [accountId, accounts, bankProfiles, profileId]);
 
   const previewAccountCurrency = parseAccountCurrency(
     accounts.find((a) => String(a.id) === accountId)?.currency,

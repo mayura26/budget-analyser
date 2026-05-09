@@ -752,4 +752,3 @@ export function ReportSkeleton() {
     </div>
   );
 }
-

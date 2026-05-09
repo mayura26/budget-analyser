@@ -19,8 +19,8 @@ import {
 } from "@/lib/openai/model-params";
 import {
   canonicalInternalName,
-  scheduleSuggestionSignature,
   type ScheduleFrequency,
+  scheduleSuggestionSignature,
 } from "@/lib/schedules/ai-signature";
 
 type AIScheduleSuggestion = {
@@ -117,7 +117,13 @@ export async function POST() {
 
   for (const txn of rawRows) {
     const ccy = parseAccountCurrency(txn.accountCurrency, homeCurrency);
-    const amountHome = convertToHome(db, txn.amount, ccy, homeCurrency, txn.date);
+    const amountHome = convertToHome(
+      db,
+      txn.amount,
+      ccy,
+      homeCurrency,
+      txn.date,
+    );
 
     const key = txn.normalised;
     let g = groups.get(key);
@@ -250,7 +256,10 @@ Only return the JSON object, no other text.`;
           return false;
         }
         const internalName = canonicalInternalName(
-          suggestion.internalName ?? suggestion.name ?? suggestion.displayName ?? "",
+          suggestion.internalName ??
+            suggestion.name ??
+            suggestion.displayName ??
+            "",
         );
         if (!internalName) return false;
         const signature = scheduleSuggestionSignature({

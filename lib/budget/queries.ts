@@ -1,14 +1,11 @@
 import {
   and,
   eq,
-  gt,
   gte,
   inArray,
   isNotNull,
   isNull,
   lte,
-  ne,
-  or,
   sql,
 } from "drizzle-orm";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
@@ -283,13 +280,7 @@ export async function getActualSpendingByCategory(
   for (const row of rows) {
     if (row.categoryId == null) continue;
     const cur = parseAccountCurrency(row.currency, homeCurrency);
-    const conv = convertToHome(
-      db,
-      row.amount,
-      cur,
-      homeCurrency,
-      row.date,
-    );
+    const conv = convertToHome(db, row.amount, cur, homeCurrency, row.date);
     const id = row.categoryId;
     signed.set(id, (signed.get(id) ?? 0) + conv);
   }
@@ -346,17 +337,13 @@ export async function getHistoricalAverages(
   for (const row of rows) {
     if (row.categoryId == null) continue;
     const cur = parseAccountCurrency(row.currency, homeCurrency);
-    const conv = convertToHome(
-      db,
-      row.amount,
-      cur,
-      homeCurrency,
-      row.date,
-    );
+    const conv = convertToHome(db, row.amount, cur, homeCurrency, row.date);
     const mKey = row.date.slice(0, 7);
-    if (!byCatMonth.has(row.categoryId))
-      byCatMonth.set(row.categoryId, new Map());
-    const mm = byCatMonth.get(row.categoryId)!;
+    let mm = byCatMonth.get(row.categoryId);
+    if (!mm) {
+      mm = new Map();
+      byCatMonth.set(row.categoryId, mm);
+    }
     mm.set(mKey, (mm.get(mKey) ?? 0) + conv);
   }
 
@@ -367,10 +354,7 @@ export async function getHistoricalAverages(
       const signed = monthMap.get(m) ?? 0;
       sumMonthlyNet += netOutflowFromSignedSum(signed);
     }
-    map.set(
-      categoryId,
-      roundMoney(sumMonthlyNet / months.length),
-    );
+    map.set(categoryId, roundMoney(sumMonthlyNet / months.length));
   }
   return map;
 }
@@ -420,17 +404,13 @@ export async function getMonthlySpendingByCategory(
   for (const row of rows) {
     if (row.categoryId == null) continue;
     const cur = parseAccountCurrency(row.currency, homeCurrency);
-    const conv = convertToHome(
-      db,
-      row.amount,
-      cur,
-      homeCurrency,
-      row.date,
-    );
+    const conv = convertToHome(db, row.amount, cur, homeCurrency, row.date);
     const rowMonth = row.date.slice(0, 7);
-    if (!byCatMonth.has(row.categoryId))
-      byCatMonth.set(row.categoryId, new Map());
-    const mm = byCatMonth.get(row.categoryId)!;
+    let mm = byCatMonth.get(row.categoryId);
+    if (!mm) {
+      mm = new Map();
+      byCatMonth.set(row.categoryId, mm);
+    }
     mm.set(rowMonth, (mm.get(rowMonth) ?? 0) + conv);
   }
 
@@ -438,9 +418,7 @@ export async function getMonthlySpendingByCategory(
   for (const [categoryId, monthMap] of byCatMonth) {
     const entries = months.map((m) => ({
       month: m,
-      amount: roundMoney(
-        netOutflowFromSignedSum(monthMap.get(m) ?? 0),
-      ),
+      amount: roundMoney(netOutflowFromSignedSum(monthMap.get(m) ?? 0)),
     }));
     result.set(categoryId, entries);
   }
@@ -530,8 +508,7 @@ export async function buildBudgetCategoryRows(
 
   const budgetSubs = allCategories.filter(
     (c) =>
-      c.parentId !== null &&
-      (c.type === "expense" || c.type === "savings"),
+      c.parentId !== null && (c.type === "expense" || c.type === "savings"),
   );
 
   const kindFor = (t: string): BudgetCategoryKind =>
@@ -595,8 +572,7 @@ export async function buildBudgetGenerateAnalyticsRows(
 
   const expenseSubs = allCategories.filter(
     (c) =>
-      c.parentId !== null &&
-      (c.type === "expense" || c.type === "savings"),
+      c.parentId !== null && (c.type === "expense" || c.type === "savings"),
   );
 
   return expenseSubs

@@ -13,8 +13,8 @@ import { db } from "@/lib/db";
 import { budgets, categories, settings } from "@/lib/db/schema";
 import { getCurrentMonth } from "@/lib/utils";
 import {
-  BUDGET_SYNTHETIC_SURPLUS_CATEGORY_ID,
   type ActionResult,
+  BUDGET_SYNTHETIC_SURPLUS_CATEGORY_ID,
   type BudgetGenerateAnalyticsRow,
   type BudgetGenerateRecommendationRow,
   type Category,
@@ -200,9 +200,7 @@ function buildRecommendedTarget(row: BudgetGenerateAnalyticsRow): number {
   return Math.ceil((baseline * trendMultiplier) / 10) * 10;
 }
 
-export async function generateBudgetRecommendations(
-  month: string,
-): Promise<
+export async function generateBudgetRecommendations(month: string): Promise<
   ActionResult<{
     recommendations: BudgetGenerateRecommendationRow[];
     overallNotes: string;
@@ -278,10 +276,7 @@ export async function applyGeneratedBudgetTargets(
       } else {
         tx.delete(budgets)
           .where(
-            and(
-              eq(budgets.month, month),
-              eq(budgets.categoryId, categoryId),
-            ),
+            and(eq(budgets.month, month), eq(budgets.categoryId, categoryId)),
           )
           .run();
       }
@@ -293,7 +288,9 @@ export async function applyGeneratedBudgetTargets(
   return { success: true, data: undefined };
 }
 
-export async function closeBudgetMonthAction(month: string): Promise<ActionResult> {
+export async function closeBudgetMonthAction(
+  month: string,
+): Promise<ActionResult> {
   if (!/^\d{4}-\d{2}$/.test(month)) {
     return { success: false, error: "Invalid month" };
   }

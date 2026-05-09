@@ -1,10 +1,10 @@
 import OpenAI from "openai";
 import { formatCategoryForAI } from "@/lib/categories/display-name";
+import type { SupportedCurrency } from "@/lib/currency/supported";
 import {
   isOpenAIReasoningChatModel,
   openAIModelOnlySupportsDefaultTemperature,
 } from "@/lib/openai/model-params";
-import type { SupportedCurrency } from "@/lib/currency/supported";
 import type { Category } from "@/types";
 
 export type AICategorisationResult = {

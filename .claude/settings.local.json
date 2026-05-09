@@ -38,7 +38,8 @@
       "Bash(wait)",
       "Bash(cat app/\\\\\\(app\\\\\\)/transactions/new/page.tsx)",
       "Bash(kill %1)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(curl *)"
     ]
   },
   "remote": {

@@ -87,8 +87,7 @@ export async function POST(request: Request) {
 
   const expenseSubs = allCats.filter(
     (c) =>
-      c.parentId !== null &&
-      (c.type === "expense" || c.type === "savings"),
+      c.parentId !== null && (c.type === "expense" || c.type === "savings"),
   );
 
   // Only include categories that have some historical data or scheduled amounts
@@ -116,7 +115,9 @@ export async function POST(request: Request) {
       const historyStr =
         monthly.length > 0
           ? monthly
-              .map((m) => `${m.month}: ${formatCurrency(m.amount, homeCurrency)}`)
+              .map(
+                (m) => `${m.month}: ${formatCurrency(m.amount, homeCurrency)}`,
+              )
               .join(", ")
           : "no history";
       const avg = averages.get(cat.id) ?? 0;

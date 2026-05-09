@@ -54,6 +54,7 @@ e2e/fixtures/*
 !e2e/fixtures/amex.csv
 !e2e/fixtures/coles-pending.csv
 !e2e/fixtures/coles-settled.csv
+!e2e/fixtures/kiwi-bank.csv
 
 # Playwright
 e2e/.auth/

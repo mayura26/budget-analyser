@@ -15,6 +15,7 @@ const commbankPdf = path.join(__dirname, "../fixtures/commbank-statement.pdf");
 const commbank105Csv = path.join(__dirname, "../fixtures/commbank-105.csv");
 const wiseCsv = path.join(__dirname, "../fixtures/wise.csv");
 const amexCsv = path.join(__dirname, "../fixtures/amex.csv");
+const kiwiBankCsv = path.join(__dirname, "../fixtures/kiwi-bank.csv");
 
 test.describe("Import", () => {
   test.beforeAll(async ({ browser }) => {
@@ -159,10 +160,12 @@ test.describe("Import", () => {
     const accountCard = page.locator(".rounded-lg").filter({
       hasText: accountName,
     });
-    await expect(accountCard).toContainText(/Last import:\s(?!Never imported).+/);
-    await expect(
-      accountCard,
-    ).toContainText(/Latest transaction:\s\d{4}-\d{2}-\d{2}/);
+    await expect(accountCard).toContainText(
+      /Last import:\s(?!Never imported).+/,
+    );
+    await expect(accountCard).toContainText(
+      /Latest transaction:\s\d{4}-\d{2}-\d{2}/,
+    );
   });
 
   test("import success links to review pending categories", async ({
@@ -382,7 +385,9 @@ test.describe("Import", () => {
     await expect(page.getByText("BALANCE_TRANSACTION")).toHaveCount(0);
     // Money in: description uses Source name (not Target / recipient label).
     await expect(
-      page.locator("tbody tr").filter({ hasText: "Kanthavel Mayura Vivekananda" }),
+      page
+        .locator("tbody tr")
+        .filter({ hasText: "Kanthavel Mayura Vivekananda" }),
     ).toContainText("+");
     await expect(
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),
@@ -392,7 +397,9 @@ test.describe("Import", () => {
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),
     ).toContainText("10.00");
     await expect(
-      page.locator("tbody tr").filter({ hasText: "Kanthavel Mayura Vivekananda" }),
+      page
+        .locator("tbody tr")
+        .filter({ hasText: "Kanthavel Mayura Vivekananda" }),
     ).toContainText("USD");
     await expect(
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),
@@ -413,7 +420,9 @@ test.describe("Import", () => {
     await expect(page.locator("tbody tr")).toHaveCount(2);
   });
 
-  test("Wise CSV auto-detects when wrong profile selected", async ({ page }) => {
+  test("Wise CSV auto-detects when wrong profile selected", async ({
+    page,
+  }) => {
     await page.goto("/import");
 
     await page.getByRole("combobox").nth(0).click();
@@ -429,7 +438,9 @@ test.describe("Import", () => {
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 
-  test("Amex CSV auto-detects when wrong profile selected", async ({ page }) => {
+  test("Amex CSV auto-detects when wrong profile selected", async ({
+    page,
+  }) => {
     await page.goto("/import");
 
     await page.getByRole("combobox").nth(0).click();
@@ -442,6 +453,41 @@ test.describe("Import", () => {
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("2 new")).toBeVisible();
+    await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
+  });
+
+  test("Kiwi Bank CSV shows preview", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Kiwi Bank" }).click();
+    await page.locator("#csv-file").setInputFiles(kiwiBankCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("3 new")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(3);
+    await expect(
+      page.locator("tbody tr").filter({ hasText: "E2E Kiwi fixture cafe" }),
+    ).toBeVisible();
+  });
+
+  test("Kiwi Bank CSV auto-detects when wrong profile selected", async ({
+    page,
+  }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+
+    await page.locator("#csv-file").setInputFiles(kiwiBankCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("3 new")).toBeVisible();
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 

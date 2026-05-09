@@ -26,16 +26,8 @@ async function writeIconPngFromBase(dir, filename, size) {
 }
 
 async function main() {
-  await writeIconPngFromBase(
-    publicDir,
-    "web-app-manifest-192x192.png",
-    192,
-  );
-  await writeIconPngFromBase(
-    publicDir,
-    "web-app-manifest-512x512.png",
-    512,
-  );
+  await writeIconPngFromBase(publicDir, "web-app-manifest-192x192.png", 192);
+  await writeIconPngFromBase(publicDir, "web-app-manifest-512x512.png", 512);
   await writeIconPngFromBase(publicDir, "icon1.png", 32);
   // Used by `components/layout/*` via `import iconSrc from "@/app/icon1.png"`.
   await writeIconPngFromBase(appDir, "icon1.png", 32);

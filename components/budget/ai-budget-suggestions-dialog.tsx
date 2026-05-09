@@ -98,9 +98,7 @@ export function AiBudgetSuggestionsDialog({
       const suggs: AiBudgetSuggestion[] = data.suggestions ?? [];
       setSuggestions(suggs);
       setOverallNotes(data.overallNotes ?? "");
-      setAmounts(
-        new Map(suggs.map((s) => [s.categoryId, s.suggestedAmount])),
-      );
+      setAmounts(new Map(suggs.map((s) => [s.categoryId, s.suggestedAmount])));
     } catch {
       setError({ message: "Something went wrong. Please try again." });
     } finally {

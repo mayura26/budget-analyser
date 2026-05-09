@@ -159,6 +159,20 @@ const DEFAULT_BANK_PROFILES = [
     }),
     isSystem: true,
   },
+  {
+    name: "Kiwi Bank",
+    dateColumn: "Effective Date",
+    descriptionColumn: "Description",
+    amountColumn: "Amount",
+    debitColumn: null,
+    creditColumn: null,
+    dateFormat: "YYYY-MM-DD",
+    skipRows: 0,
+    delimiter: ",",
+    negativeIsDebit: true,
+    extraMappings: null,
+    isSystem: true,
+  },
 ];
 
 export async function seedDatabase() {

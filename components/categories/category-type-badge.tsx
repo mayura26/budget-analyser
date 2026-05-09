@@ -1,5 +1,5 @@
-import type { CategoryType } from "@/types";
 import { cn } from "@/lib/utils";
+import type { CategoryType } from "@/types";
 
 const STYLES: Record<CategoryType, string> = {
   income:

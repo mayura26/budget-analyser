@@ -12,8 +12,8 @@ import {
 import {
   canonicalInternalName,
   roundedAmount,
-  scheduleSuggestionSignature,
   type ScheduleFrequency,
+  scheduleSuggestionSignature,
 } from "@/lib/schedules/ai-signature";
 import type { ActionResult } from "@/types";
 

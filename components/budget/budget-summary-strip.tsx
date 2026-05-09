@@ -54,9 +54,12 @@ export function BudgetSummaryStrip({
               <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
                 {formatCurrency(summary.actualIncome, homeCurrency)}
               </p>
-              <p className="text-xs text-muted-foreground">Realised this month</p>
               <p className="text-xs text-muted-foreground">
-                Expected {formatCurrency(summary.expectedIncome, homeCurrency)} (scheduled)
+                Realised this month
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Expected {formatCurrency(summary.expectedIncome, homeCurrency)}{" "}
+                (scheduled)
               </p>
               {incomeMatchesExpected ? (
                 <p className="text-xs text-muted-foreground">
@@ -81,7 +84,9 @@ export function BudgetSummaryStrip({
               <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
                 {formatCurrency(summary.expectedIncome, homeCurrency)}
               </p>
-              <p className="text-xs text-muted-foreground">From scheduled income</p>
+              <p className="text-xs text-muted-foreground">
+                From scheduled income
+              </p>
             </>
           )}
         </CardContent>
@@ -126,7 +131,8 @@ export function BudgetSummaryStrip({
           <p className="text-xs text-muted-foreground">
             {summary.implicitSurplusAsSavings > 0 ? (
               <>
-                Includes {formatCurrency(summary.implicitSurplusAsSavings, homeCurrency)}{" "}
+                Includes{" "}
+                {formatCurrency(summary.implicitSurplusAsSavings, homeCurrency)}{" "}
                 unspent surplus (closed month).{" "}
               </>
             ) : null}

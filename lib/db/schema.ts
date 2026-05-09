@@ -152,7 +152,9 @@ export const mutedScheduleSuggestions = sqliteTable(
     uniqueIndex("muted_schedule_suggestions_signature_unique").on(
       table.signature,
     ),
-    index("muted_schedule_suggestions_internal_name_idx").on(table.internalName),
+    index("muted_schedule_suggestions_internal_name_idx").on(
+      table.internalName,
+    ),
   ],
 );
 
@@ -234,7 +236,9 @@ export const budgetMonthStatus = sqliteTable(
   "budget_month_status",
   {
     month: text("month").primaryKey(), // YYYY-MM
-    isClosed: integer("is_closed", { mode: "boolean" }).notNull().default(false),
+    isClosed: integer("is_closed", { mode: "boolean" })
+      .notNull()
+      .default(false),
     closedAt: integer("closed_at"),
     reviewGeneratedAt: integer("review_generated_at"),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
@@ -274,7 +278,10 @@ export const budgetReviewShares = sqliteTable(
   },
   (table) => [
     uniqueIndex("budget_review_shares_token").on(table.token),
-    index("budget_review_shares_month_format_idx").on(table.month, table.format),
+    index("budget_review_shares_month_format_idx").on(
+      table.month,
+      table.format,
+    ),
   ],
 );
 

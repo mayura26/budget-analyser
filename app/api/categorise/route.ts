@@ -10,12 +10,7 @@ import { categoriseWithAI } from "@/lib/categorisation/ai-client";
 import { amountsInHomeCurrency } from "@/lib/currency/convert";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
-import {
-  accounts,
-  categories,
-  settings,
-  transactions,
-} from "@/lib/db/schema";
+import { accounts, categories, settings, transactions } from "@/lib/db/schema";
 import type { Category } from "@/types";
 
 const RequestSchema = z.object({

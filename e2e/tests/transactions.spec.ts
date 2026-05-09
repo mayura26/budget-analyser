@@ -201,7 +201,9 @@ test.describe("Transactions", () => {
     await page.goto("/transactions/new");
     await page.getByLabel("Description").fill(txnDescription);
     await page.getByLabel("Amount (negative = expense)").fill("-150");
-    await page.locator("select#accountId").selectOption({ label: usdAccountName });
+    await page
+      .locator("select#accountId")
+      .selectOption({ label: usdAccountName });
     await page.getByRole("button", { name: "Save transaction" }).click();
     await expect(page).toHaveURL("/transactions", { timeout: 15000 });
 
@@ -209,9 +211,8 @@ test.describe("Transactions", () => {
     await expect(row).toBeVisible();
     const amountCell = row.locator("td").nth(5);
     await expect(amountCell.locator("span.text-sm.font-medium")).toBeVisible();
-    await expect(amountCell.locator("span.text-xs.text-muted-foreground")).toContainText(
-      "USD",
-    );
+    await expect(
+      amountCell.locator("span.text-xs.text-muted-foreground"),
+    ).toContainText("USD");
   });
-
 });

@@ -10,13 +10,13 @@ import {
 } from "@/lib/categories/assignable";
 import { categoriseWithAI } from "@/lib/categorisation/ai-client";
 import { categoriseTransactions } from "@/lib/categorisation/engine";
-import { amountsInHomeCurrency } from "@/lib/currency/convert";
-import { getHomeCurrency } from "@/lib/currency/home";
 import {
   findMatchingRule,
   matchRule,
   ruleDraftStub,
 } from "@/lib/categorisation/rule-matcher";
+import { amountsInHomeCurrency } from "@/lib/currency/convert";
+import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import {
   accounts,

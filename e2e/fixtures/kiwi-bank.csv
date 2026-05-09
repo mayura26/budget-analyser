@@ -1,0 +1,4 @@
+Account number,Effective Date,Transaction Date,Description,Transaction Code,Particulars,Code,Reference,Other Party Name,Other Party Account Number,Other Party Particulars,Other Party Code,Other Party Reference,Amount,Balance
+99-9999-0999999-99,2026-05-08,2026-05-08,E2E Kiwi fixture rates payment,DIRECT DEBIT,Test User,1 Example Rd,99999999,COUNCIL RATES PAYEE,12-3113-0999999-00,Test User,1 Example Rd,99999999,-950.00,16000.00
+99-9999-0999999-99,2026-05-07,2026-05-08,E2E Kiwi fixture cafe,EFTPOS PURCHASE,,,,,,,,,-12.50,15987.50
+99-9999-0999999-99,2026-05-07,2026-05-08,E2E Kiwi fixture fuel,EFTPOS PURCHASE,,,,,,,,,-40.00,15947.50

@@ -16,7 +16,6 @@ import {
   convertOccurrencesToHomeCurrency,
   getTotalBalanceInHomeCurrency,
 } from "@/lib/budget/home-currency-cashflow";
-import { appendSurplusDisplayRows } from "@/lib/budget/surplus-display-row";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -25,6 +24,7 @@ import {
   hasBudgetTargets,
   isMonthClosed,
 } from "@/lib/budget/queries";
+import { appendSurplusDisplayRows } from "@/lib/budget/surplus-display-row";
 import { filterAssignableCategories } from "@/lib/categories/assignable";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
@@ -142,7 +142,10 @@ export default async function BudgetPage({
     selectedMonth,
     homeCurrency,
   );
-  const actualIncome = await getActualIncomeForMonth(selectedMonth, homeCurrency);
+  const actualIncome = await getActualIncomeForMonth(
+    selectedMonth,
+    homeCurrency,
+  );
   const monthClosed = isMonthClosed(selectedMonth);
   const budgetSummary = buildBudgetSummary(
     budgetRows,

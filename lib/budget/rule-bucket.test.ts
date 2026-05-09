@@ -8,14 +8,12 @@ function main(
 ): Category {
   return {
     id: 1,
-    name: overrides.name,
     color: "#000",
     icon: null,
     parentId: null,
-    type: overrides.type,
-    budgetRuleBucket: overrides.budgetRuleBucket ?? null,
     isSystem: true,
     createdAt: 0,
+    budgetRuleBucket: overrides.budgetRuleBucket ?? null,
     ...overrides,
   };
 }
