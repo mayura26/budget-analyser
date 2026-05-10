@@ -137,7 +137,9 @@ const DEFAULT_BANK_PROFILES = [
     skipRows: 0,
     delimiter: ",",
     negativeIsDebit: false,
-    extraMappings: null,
+    extraMappings: JSON.stringify({
+      descriptionCreditSubstrings: ["ONLINE PAYMENT RECEIVED"],
+    }),
     isSystem: true,
   },
   {

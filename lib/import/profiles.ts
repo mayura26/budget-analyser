@@ -77,7 +77,9 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     skipRows: 0,
     delimiter: ",",
     negativeIsDebit: false,
-    extraMappings: null,
+    extraMappings: JSON.stringify({
+      descriptionCreditSubstrings: ["ONLINE PAYMENT RECEIVED"],
+    }),
     isSystem: true,
   },
   {

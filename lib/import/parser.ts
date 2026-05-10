@@ -42,6 +42,12 @@ export type ColumnMapping = {
   descriptionInColumn?: string;
   /** When Direction matches outValues, prefer this column for description. */
   descriptionOutColumn?: string;
+  /**
+   * Case-insensitive substrings on the resolved description. If any match, the
+   * amount is treated as an inward credit (positive) after normal sign rules —
+   * e.g. Amex card payments appear negative in CSV but should match bank debits for linking.
+   */
+  descriptionCreditSubstrings?: string[];
 };
 
 export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
@@ -70,6 +76,7 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         skipTransactionIdPrefixes?: string[];
         descriptionInColumn?: string;
         descriptionOutColumn?: string;
+        descriptionCreditSubstrings?: string[];
       };
       if (typeof parsed.hasHeader === "boolean") {
         hasHeader = parsed.hasHeader;
@@ -106,6 +113,11 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         skipTransactionIdPrefixes: parsed.skipTransactionIdPrefixes,
         descriptionInColumn: parsed.descriptionInColumn,
         descriptionOutColumn: parsed.descriptionOutColumn,
+        descriptionCreditSubstrings:
+          parsed.descriptionCreditSubstrings &&
+          parsed.descriptionCreditSubstrings.length > 0
+            ? parsed.descriptionCreditSubstrings
+            : undefined,
       };
     } catch {
       // Ignore invalid JSON and fall back to header-based parsing.
@@ -201,6 +213,7 @@ export function parseCSV(
       }
 
       amount = normaliseSignedAmount(amount, mapping);
+      amount = creditAmountIfDescriptionMatches(amount, desc, mapping);
 
       rows.push({
         date,
@@ -274,6 +287,7 @@ export function parseCSV(
     }
 
     amount = normaliseSignedAmount(amount, mapping, row);
+    amount = creditAmountIfDescriptionMatches(amount, desc, mapping);
 
     const merchant = mapping.merchantColumn
       ? row[mapping.merchantColumn]?.trim() || undefined
@@ -309,6 +323,22 @@ export function parseCSV(
 
 function normaliseAmount(raw: string): string {
   return raw.trim().replace(/[",$]/g, "");
+}
+
+function creditAmountIfDescriptionMatches(
+  amount: number,
+  description: string,
+  mapping: ColumnMapping,
+): number {
+  const needles = mapping.descriptionCreditSubstrings;
+  if (!needles?.length) return amount;
+  const upper = description.toUpperCase();
+  for (const n of needles) {
+    if (n && upper.includes(n.toUpperCase())) {
+      return Math.abs(amount);
+    }
+  }
+  return amount;
 }
 
 function normaliseSignedAmount(

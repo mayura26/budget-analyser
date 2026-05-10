@@ -416,8 +416,12 @@ test.describe("Import", () => {
     await page.locator("#csv-file").setInputFiles(amexCsv);
     await page.getByRole("button", { name: "Preview import" }).click();
 
-    await expect(page.getByText("2 new")).toBeVisible();
-    await expect(page.locator("tbody tr")).toHaveCount(2);
+    await expect(page.getByText("3 new")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(3);
+    const paymentRow = page
+      .locator("tbody tr")
+      .filter({ hasText: "ONLINE PAYMENT RECEIVED" });
+    await expect(paymentRow.locator("td").nth(3)).toHaveClass(/text-green-600/);
   });
 
   test("Wise CSV auto-detects when wrong profile selected", async ({
@@ -452,7 +456,7 @@ test.describe("Import", () => {
     await page.locator("#csv-file").setInputFiles(amexCsv);
     await page.getByRole("button", { name: "Preview import" }).click();
 
-    await expect(page.getByText("2 new")).toBeVisible();
+    await expect(page.getByText("3 new")).toBeVisible();
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 
