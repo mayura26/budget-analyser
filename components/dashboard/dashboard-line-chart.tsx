@@ -78,6 +78,22 @@ export function DashboardLineChart({
     (wantsTarget ?? 0) > 0;
   const showChart = hasData || hasTargets;
 
+  const maxDataValue = lineData.reduce((max, d) => {
+    return Math.max(
+      max,
+      d.Income ?? 0,
+      d.Needs ?? 0,
+      d.Wants ?? 0,
+    );
+  }, 0);
+  const maxTargetValue = Math.max(
+    incomeTarget ?? 0,
+    needsTarget ?? 0,
+    wantsTarget ?? 0,
+  );
+  const yMax = Math.max(maxDataValue, maxTargetValue);
+  const yDomainMax = yMax > 0 ? Math.ceil((yMax * 1.1) / 1000) * 1000 : "auto";
+
   return (
     <Card>
       <CardHeader>
@@ -118,6 +134,7 @@ export function DashboardLineChart({
                 axisLine={false}
                 tickLine={false}
                 width={44}
+                domain={[0, yDomainMax]}
               />
               <Tooltip
                 content={<LineTooltip homeCurrency={homeCurrency} />}
