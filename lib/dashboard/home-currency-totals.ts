@@ -255,6 +255,7 @@ export async function getDailyNeedsWantsForMonth(
     }
   }
 
+  const today = new Date().toISOString().slice(0, 10);
   const result: DailyNeedsWants[] = [];
   let cumIncome = 0;
   let cumNeeds = 0;
@@ -263,16 +264,19 @@ export async function getDailyNeedsWantsForMonth(
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
     const iso = d.toISOString().slice(0, 10);
-    const delta = dailyDelta.get(iso) ?? { income: 0, needs: 0, wants: 0 };
-    cumIncome += delta.income;
-    cumNeeds += delta.needs;
-    cumWants += delta.wants;
+    const isFuture = iso > today;
+    if (!isFuture) {
+      const delta = dailyDelta.get(iso) ?? { income: 0, needs: 0, wants: 0 };
+      cumIncome += delta.income;
+      cumNeeds += delta.needs;
+      cumWants += delta.wants;
+    }
     result.push({
       date: iso,
       day: d.getDate(),
-      income: Math.round(cumIncome * 100) / 100,
-      needs: Math.round(cumNeeds * 100) / 100,
-      wants: Math.round(cumWants * 100) / 100,
+      income: isFuture ? null : Math.round(cumIncome * 100) / 100,
+      needs: isFuture ? null : Math.round(cumNeeds * 100) / 100,
+      wants: isFuture ? null : Math.round(cumWants * 100) / 100,
     });
   }
   return result;

@@ -288,7 +288,10 @@ export default async function DashboardPage({
         income={currentMonthData.income}
         expenses={currentMonthData.expenses}
         net={currentMonthData.net}
-        savings={currentMonthData.savings}
+        savings={Math.max(
+          0,
+          currentMonthData.income - currentMonthData.expenses,
+        )}
         transactionCount={totalTransactions}
         accountCount={accountCount}
         homeCurrency={homeCurrency}

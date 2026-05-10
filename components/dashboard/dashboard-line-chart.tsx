@@ -63,7 +63,8 @@ export function DashboardLineChart({
   }));
 
   const hasData = lineData.some(
-    (d) => d.Income > 0 || d.Needs > 0 || d.Wants > 0,
+    (d) =>
+      (d.Income ?? 0) > 0 || (d.Needs ?? 0) > 0 || (d.Wants ?? 0) > 0,
   );
 
   return (

@@ -109,7 +109,7 @@ export function DashboardSummaryCard({
           <Stat
             label="Savings"
             value={formatCurrency(savings, homeCurrency)}
-            sub="Allocated to savings categories"
+            sub="Income minus expenses"
             icon={PiggyBank}
             iconClass="text-purple-600 dark:text-purple-400"
           />

@@ -314,12 +314,12 @@ export type DailyNeedsWants = {
   date: string;
   /** Day-of-month (1..31) for chart x-axis. */
   day: number;
-  /** Cumulative income through this day in the month. */
-  income: number;
-  /** Cumulative needs spending through this day. */
-  needs: number;
-  /** Cumulative wants spending through this day. */
-  wants: number;
+  /** Cumulative income through this day; null for days after today. */
+  income: number | null;
+  /** Cumulative needs spending through this day; null for days after today. */
+  needs: number | null;
+  /** Cumulative wants spending through this day; null for days after today. */
+  wants: number | null;
 };
 
 export type CategoryTotal = {
