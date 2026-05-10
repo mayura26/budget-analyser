@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CategoryColorField } from "@/components/categories/category-color-field";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
@@ -31,6 +31,7 @@ import {
   deleteCategory,
   deleteRule,
   updateCategory,
+  updateRule,
 } from "@/lib/actions/categories";
 import { deriveSubcategoryColor } from "@/lib/categories/colors";
 import { defaultParentIdStringForSubEdit } from "@/lib/categories/default-parent-for-edit";
@@ -86,6 +87,7 @@ export function CategoryList({
 }) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [addRuleFor, setAddRuleFor] = useState<number | null>(null);
+  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
 
   const rulesByCategory = useMemo(
     () =>
@@ -255,32 +257,58 @@ export function CategoryList({
                                 </p>
                               ) : (
                                 <div className="space-y-1">
-                                  {catRules.map((rule) => (
-                                    <div
-                                      key={rule.id}
-                                      className="flex items-center justify-between rounded bg-muted/40 px-3 py-1.5"
-                                    >
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <Badge
-                                          variant="outline"
-                                          className="text-xs shrink-0"
-                                        >
-                                          {rule.patternType}
-                                        </Badge>
-                                        <code className="text-xs font-mono truncate">
-                                          {rule.pattern}
-                                        </code>
-                                      </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-                                        onClick={() => deleteRule(rule.id)}
+                                  {catRules.map((rule) =>
+                                    editingRuleId === rule.id ? (
+                                      <RuleEditRow
+                                        key={rule.id}
+                                        rule={rule}
+                                        onSave={() => setEditingRuleId(null)}
+                                        onCancel={() => setEditingRuleId(null)}
+                                      />
+                                    ) : (
+                                      <div
+                                        key={rule.id}
+                                        className="flex items-center justify-between rounded bg-muted/40 px-3 py-1.5"
                                       >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  ))}
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs shrink-0"
+                                          >
+                                            {rule.patternType}
+                                          </Badge>
+                                          <code className="text-xs font-mono truncate">
+                                            {rule.pattern}
+                                          </code>
+                                          {rule.priority !== 0 && (
+                                            <span className="text-xs text-muted-foreground shrink-0">
+                                              p{rule.priority}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                            onClick={() => setEditingRuleId(rule.id)}
+                                            aria-label="Edit rule"
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                            onClick={() => deleteRule(rule.id)}
+                                            aria-label="Delete rule"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ),
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -727,6 +755,82 @@ function EditCategoryDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function RuleEditRow({
+  rule,
+  onSave,
+  onCancel,
+}: {
+  rule: CategorisationRule;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const [pattern, setPattern] = useState(rule.pattern);
+  const [patternType, setPatternType] = useState(rule.patternType);
+  const [priority, setPriority] = useState(String(rule.priority));
+  const [pending, setPending] = useState(false);
+
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/[0.03] px-2 py-1.5 ring-1 ring-primary/10">
+      <select
+        value={patternType}
+        onChange={(e) => setPatternType(e.target.value as CategorisationRule["patternType"])}
+        className="h-7 rounded-md border border-input bg-background px-2 text-xs shadow-sm shrink-0 focus:outline-none focus:ring-1 focus:ring-ring"
+        disabled={pending}
+      >
+        <option value="keyword">keyword</option>
+        <option value="exact">exact</option>
+        <option value="regex">regex</option>
+      </select>
+      <Input
+        value={pattern}
+        onChange={(e) => setPattern(e.target.value)}
+        className="h-7 text-xs font-mono flex-1 min-w-0"
+        disabled={pending}
+        aria-label="Rule pattern"
+        autoFocus
+      />
+      <Input
+        value={priority}
+        onChange={(e) => setPriority(e.target.value)}
+        type="number"
+        className="h-7 text-xs w-14 shrink-0 tabular-nums"
+        disabled={pending}
+        aria-label="Priority"
+        title="Priority (higher = checked first)"
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 shrink-0 text-emerald-600 hover:text-emerald-700"
+        disabled={pending || !pattern.trim()}
+        aria-label="Save rule"
+        onClick={async () => {
+          setPending(true);
+          await updateRule(rule.id, {
+            pattern: pattern.trim(),
+            patternType,
+            priority: Number(priority) || 0,
+          });
+          setPending(false);
+          onSave();
+        }}
+      >
+        <Check className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 shrink-0 text-muted-foreground"
+        disabled={pending}
+        aria-label="Cancel edit"
+        onClick={onCancel}
+      >
+        <X className="h-3.5 w-3.5" />
+      </Button>
+    </div>
   );
 }
 

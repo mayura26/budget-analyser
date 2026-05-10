@@ -182,6 +182,58 @@ test.describe("Transactions", () => {
     });
   });
 
+  test("create rule from transaction opens dialog pre-filled with description", async ({
+    page,
+  }) => {
+    await page.goto("/transactions");
+    await page.getByTestId("filter-account").click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    const firstRow = page.locator("tbody tr").first();
+    const description = await firstRow.locator("td").nth(2).innerText();
+    await firstRow.getByTestId("create-rule-from-transaction").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const patternInput = dialog.getByTestId("create-rule-pattern");
+    await expect(patternInput).toHaveValue(description.trim());
+  });
+
+  test("bulk select all rows shows action bar", async ({ page }) => {
+    await page.goto("/transactions");
+    await page.getByTestId("filter-account").click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    const rowCount = await page.locator("tbody tr").count();
+    test.skip(rowCount === 0, "No transactions for bulk select test");
+    await page.getByTestId("select-all-rows").click();
+    await expect(page.getByTestId("bulk-action-bar")).toBeVisible();
+    await expect(page.getByTestId("bulk-action-bar")).toContainText(`${rowCount} selected`);
+  });
+
+  test("bulk select individual rows shows count in bar", async ({ page }) => {
+    await page.goto("/transactions");
+    await page.getByTestId("filter-account").click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    const rowCount = await page.locator("tbody tr").count();
+    test.skip(rowCount < 2, "Need at least 2 rows for bulk select count test");
+    const checkboxes = page.getByTestId("select-row");
+    await checkboxes.nth(0).click();
+    await checkboxes.nth(1).click();
+    await expect(page.getByTestId("bulk-action-bar")).toContainText("2 selected");
+    await checkboxes.nth(0).click();
+    await expect(page.getByTestId("bulk-action-bar")).toContainText("1 selected");
+  });
+
+  test("bulk clear selection hides bar", async ({ page }) => {
+    await page.goto("/transactions");
+    await page.getByTestId("filter-account").click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    const rowCount = await page.locator("tbody tr").count();
+    test.skip(rowCount === 0, "No transactions for bulk clear test");
+    await page.getByTestId("select-all-rows").click();
+    await expect(page.getByTestId("bulk-action-bar")).toBeVisible();
+    await page.getByTestId("bulk-clear-selection").click();
+    await expect(page.getByTestId("bulk-action-bar")).not.toBeVisible();
+  });
+
   test("non-home account amounts show home value with account value below", async ({
     page,
   }) => {

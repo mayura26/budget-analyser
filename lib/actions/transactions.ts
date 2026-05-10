@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -272,6 +272,79 @@ export async function deleteTransaction(id: number): Promise<ActionResult> {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
+}
+
+export async function bulkDeleteTransactions(
+  ids: number[],
+): Promise<ActionResult<{ deleted: number }>> {
+  if (ids.length === 0) return { success: true, data: { deleted: 0 } };
+  const now = Math.floor(Date.now() / 1000);
+  // Unlink any paired transfer transactions first
+  db.update(transactions)
+    .set({ linkedTransactionId: null, updatedAt: now })
+    .where(
+      inArray(
+        transactions.id,
+        db
+          .select({ id: transactions.linkedTransactionId })
+          .from(transactions)
+          .where(
+            and(
+              inArray(transactions.id, ids),
+              isNotNull(transactions.linkedTransactionId),
+            ),
+          )
+          .all()
+          .map((r) => r.id)
+          .filter((x): x is number => x !== null),
+      ),
+    )
+    .run();
+  db.delete(transactions).where(inArray(transactions.id, ids)).run();
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  return { success: true, data: { deleted: ids.length } };
+}
+
+export async function bulkSetCategoryConfirmed(
+  ids: number[],
+  confirmed: boolean,
+): Promise<ActionResult<{ updated: number }>> {
+  if (ids.length === 0) return { success: true, data: { updated: 0 } };
+  const now = Math.floor(Date.now() / 1000);
+  const conditions = confirmed
+    ? and(inArray(transactions.id, ids), isNotNull(transactions.categoryId))
+    : inArray(transactions.id, ids);
+  db.update(transactions)
+    .set({ categoryConfirmed: confirmed, updatedAt: now })
+    .where(conditions)
+    .run();
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  return { success: true, data: { updated: ids.length } };
+}
+
+export async function bulkUpdateTransactionCategory(
+  ids: number[],
+  categoryId: number,
+): Promise<ActionResult<{ updated: number }>> {
+  if (ids.length === 0) return { success: true, data: { updated: 0 } };
+  const catErr = assignableCategoryError(categoryId);
+  if (catErr) return { success: false, error: catErr };
+  const now = Math.floor(Date.now() / 1000);
+  db.update(transactions)
+    .set({
+      categoryId,
+      categorySource: "manual",
+      categoryConfirmed: false,
+      confidence: 1.0,
+      updatedAt: now,
+    })
+    .where(inArray(transactions.id, ids))
+    .run();
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  return { success: true, data: { updated: ids.length } };
 }
 
 export async function recategoriseUncategorised(): Promise<

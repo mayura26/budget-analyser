@@ -321,6 +321,41 @@ export async function deleteRule(id: number): Promise<ActionResult> {
   return { success: true, data: undefined };
 }
 
+export async function updateRule(
+  id: number,
+  data: {
+    pattern: string;
+    patternType: "keyword" | "regex" | "exact";
+    priority: number;
+  },
+): Promise<ActionResult> {
+  const parsed = z
+    .object({
+      pattern: z.string().min(1),
+      patternType: z.enum(["regex", "keyword", "exact"]),
+      priority: z.number(),
+    })
+    .safeParse(data);
+  if (!parsed.success) return { success: false, error: "Validation failed" };
+  if (parsed.data.patternType === "regex") {
+    try {
+      new RegExp(parsed.data.pattern, "i");
+    } catch {
+      return { success: false, error: "Invalid regex pattern" };
+    }
+  }
+  db.update(categorisationRules)
+    .set({
+      pattern: parsed.data.pattern,
+      patternType: parsed.data.patternType,
+      priority: parsed.data.priority,
+    })
+    .where(eq(categorisationRules.id, id))
+    .run();
+  revalidatePath("/categories");
+  return { success: true, data: undefined };
+}
+
 export async function createRulesBulk(
   rules: { pattern: string; categoryId: number }[],
 ): Promise<ActionResult<{ created: number }>> {
@@ -426,10 +461,7 @@ export async function previewUnverifiedMatchesForRules(
     const patternType = r.patternType ?? "keyword";
     const stub = ruleDraftStub(r.pattern, r.categoryId, patternType);
     const count = rows.filter((row) => matchRule(row.normalised, stub)).length;
-    const key =
-      patternType === "keyword"
-        ? `${r.pattern}::${r.categoryId}`
-        : `${r.pattern}::${r.categoryId}::${patternType}`;
+    const key = `${r.pattern}::${r.categoryId}::${patternType}`;
     return { key, count };
   });
 

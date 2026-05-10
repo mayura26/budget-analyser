@@ -69,15 +69,48 @@ test.describe("Categories", () => {
     await expect(page.getByText("keyword").first()).toBeVisible();
   });
 
+  test("edit rule pattern inline", async ({ page }) => {
+    await page.goto("/categories");
+    await page.getByText("E2E Category").first().click();
+    const ruleRow = page
+      .locator("div")
+      .filter({ hasText: /TESTMERCHANT/ })
+      .first();
+    // Click the edit (pencil) button
+    await ruleRow.locator('[aria-label="Edit rule"]').click();
+    // The inline edit form should appear
+    const patternInput = page.locator('[aria-label="Rule pattern"]');
+    await expect(patternInput).toBeVisible();
+    await patternInput.fill("TESTMERCHANT_EDITED");
+    await page.locator('[aria-label="Save rule"]').click();
+    await expect(page.getByText("TESTMERCHANT_EDITED")).toBeVisible();
+    await expect(patternInput).not.toBeVisible();
+  });
+
+  test("cancel rule edit restores original", async ({ page }) => {
+    await page.goto("/categories");
+    await page.getByText("E2E Category").first().click();
+    const ruleRow = page
+      .locator("div")
+      .filter({ hasText: /TESTMERCHANT_EDITED/ })
+      .first();
+    await ruleRow.locator('[aria-label="Edit rule"]').click();
+    const patternInput = page.locator('[aria-label="Rule pattern"]');
+    await patternInput.fill("SHOULD_NOT_SAVE");
+    await page.locator('[aria-label="Cancel edit"]').click();
+    await expect(page.getByText("TESTMERCHANT_EDITED")).toBeVisible();
+    await expect(page.getByText("SHOULD_NOT_SAVE")).not.toBeVisible();
+  });
+
   test("delete rule", async ({ page }) => {
     await page.goto("/categories");
     await page.getByText("E2E Category").first().click();
     const ruleRow = page
       .locator("div")
-      .filter({ hasText: /^keyword.*TESTMERCHANT/ })
+      .filter({ hasText: /TESTMERCHANT/ })
       .first();
-    await ruleRow.locator("button").click();
-    await expect(page.getByText("TESTMERCHANT")).not.toBeVisible();
+    await ruleRow.locator('[aria-label="Delete rule"]').click();
+    await expect(page.getByText("TESTMERCHANT_EDITED")).not.toBeVisible();
   });
 
   test("delete non-system sub-category", async ({ page }) => {

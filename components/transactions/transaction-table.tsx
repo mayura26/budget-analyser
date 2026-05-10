@@ -6,6 +6,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  type RowSelectionState,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
@@ -17,12 +18,15 @@ import {
   CircleAlert,
   CircleCheck,
   Minus,
+  Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
+import { CreateRuleDialog } from "@/components/transactions/create-rule-dialog";
 import { LinkTransferPopover } from "@/components/transactions/link-transfer-popover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +47,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  bulkDeleteTransactions,
+  bulkSetCategoryConfirmed,
+  bulkUpdateTransactionCategory,
   deleteTransaction,
   setTransactionCategoryConfirmed,
   updateTransactionCategory,
@@ -112,6 +119,8 @@ export function TransactionTable({
   const pathname = usePathname();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState(currentFilters.search ?? "");
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [createRuleForDescription, setCreateRuleForDescription] = useState<string | null>(null);
 
   const updateFilter = useCallback(
     (key: string, value: string | undefined) => {
@@ -126,6 +135,22 @@ export function TransactionTable({
   );
 
   const columns = [
+    col.display({
+      id: "select",
+      header: ({ table }) => (
+        <SelectAllCheckbox
+          checked={table.getIsAllRowsSelected()}
+          indeterminate={table.getIsSomeRowsSelected()}
+          onChange={table.toggleAllRowsSelected}
+        />
+      ),
+      cell: ({ row }) => (
+        <RowCheckbox
+          checked={row.getIsSelected()}
+          onChange={() => row.toggleSelected()}
+        />
+      ),
+    }),
     col.accessor("date", {
       header: ({ column }) => (
         <button
@@ -278,16 +303,25 @@ export function TransactionTable({
     }),
     col.display({
       id: "actions",
-      cell: (info) => <DeleteCell transactionId={info.row.original.id} />,
+      cell: (info) => (
+        <RowActionsCell
+          transactionId={info.row.original.id}
+          description={info.row.original.description}
+          onCreateRule={(desc) => setCreateRuleForDescription(desc)}
+        />
+      ),
     }),
   ];
 
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, rowSelection },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
+    enableMultiRowSelection: true,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -389,6 +423,19 @@ export function TransactionTable({
         </Select>
       </div>
 
+      {/* Bulk action bar */}
+      {table.getSelectedRowModel().rows.length > 0 && (
+        <BulkActionBar
+          selectedIds={table.getSelectedRowModel().rows.map((r) => r.original.id)}
+          selectedDescriptions={table.getSelectedRowModel().rows.map((r) => r.original.description)}
+          selectedHaveCategory={table.getSelectedRowModel().rows.every((r) => r.original.categoryId !== null)}
+          categories={categories}
+          categoryMains={categoryMains}
+          onClearSelection={() => table.resetRowSelection()}
+          onCreateRule={(desc) => setCreateRuleForDescription(desc)}
+        />
+      )}
+
       {/* Table */}
       <div className="rounded-md border">
         <Table wrapperClassName="max-h-[calc(100vh-16rem)]">
@@ -403,6 +450,7 @@ export function TransactionTable({
                     }
                     className={cn(
                       "h-9 text-xs",
+                      header.column.id === "select" && "w-10 min-w-10 px-2",
                       header.column.id === "accountName" &&
                         "hidden sm:table-cell",
                       header.column.id === "confirm" &&
@@ -430,12 +478,19 @@ export function TransactionTable({
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="min-h-10">
+                <TableRow
+                  key={row.id}
+                  className={cn(
+                    "min-h-10",
+                    row.getIsSelected() && "bg-primary/5",
+                  )}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
                       className={cn(
                         "py-2",
+                        cell.column.id === "select" && "w-10 min-w-10 px-2",
                         cell.column.id === "accountName" &&
                           "hidden sm:table-cell",
                         cell.column.id === "description" && "align-top",
@@ -457,7 +512,20 @@ export function TransactionTable({
       </div>
       <p className="text-xs text-muted-foreground">
         Showing {table.getRowModel().rows.length} of {rows.length} transactions
+        {table.getSelectedRowModel().rows.length > 0 && (
+          <span className="ml-2 text-primary font-medium">
+            · {table.getSelectedRowModel().rows.length} selected
+          </span>
+        )}
       </p>
+
+      <CreateRuleDialog
+        open={createRuleForDescription !== null}
+        onClose={() => setCreateRuleForDescription(null)}
+        description={createRuleForDescription ?? ""}
+        categories={categories}
+        categoryMains={categoryMains}
+      />
     </div>
   );
 }
@@ -643,7 +711,60 @@ function CategoryCell({
   );
 }
 
-function DeleteCell({ transactionId }: { transactionId: number }) {
+function SelectAllCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      data-testid="select-all-rows"
+      checked={checked}
+      onChange={onChange}
+      className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+      aria-label="Select all rows"
+    />
+  );
+}
+
+function RowCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <input
+      type="checkbox"
+      data-testid="select-row"
+      checked={checked}
+      onChange={onChange}
+      className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+      aria-label="Select row"
+    />
+  );
+}
+
+function RowActionsCell({
+  transactionId,
+  description,
+  onCreateRule,
+}: {
+  transactionId: number;
+  description: string;
+  onCreateRule: (desc: string) => void;
+}) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -676,14 +797,188 @@ function DeleteCell({ transactionId }: { transactionId: number }) {
   }
 
   return (
-    <button
-      type="button"
-      aria-label="Delete"
-      data-testid="delete-transaction"
-      onClick={() => setConfirming(true)}
-      className="p-1 rounded text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-colors"
+    <div className="group flex items-center gap-0.5">
+      <button
+        type="button"
+        aria-label="Create rule from transaction"
+        data-testid="create-rule-from-transaction"
+        onClick={() => onCreateRule(description)}
+        className="p-1 rounded text-muted-foreground/0 group-hover:text-primary/40 hover:!text-primary hover:bg-primary/10 transition-colors"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        aria-label="Delete"
+        data-testid="delete-transaction"
+        onClick={() => setConfirming(true)}
+        className="p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground/30 hover:!text-destructive hover:bg-destructive/10 transition-colors"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function BulkActionBar({
+  selectedIds,
+  selectedDescriptions,
+  selectedHaveCategory,
+  categories,
+  categoryMains,
+  onClearSelection,
+  onCreateRule,
+}: {
+  selectedIds: number[];
+  selectedDescriptions: string[];
+  selectedHaveCategory: boolean;
+  categories: Category[];
+  categoryMains?: Category[];
+  onClearSelection: () => void;
+  onCreateRule: (desc: string) => void;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+
+  const mains = categoryMains ?? categories.filter((c) => c.parentId === null);
+
+  function runAndRefresh(action: () => Promise<unknown>) {
+    startTransition(async () => {
+      await action();
+      router.refresh();
+      onClearSelection();
+    });
+  }
+
+  return (
+    <div
+      data-testid="bulk-action-bar"
+      className={cn(
+        "flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm",
+        isPending && "opacity-60 pointer-events-none",
+      )}
     >
-      <Trash2 className="h-3.5 w-3.5" />
-    </button>
+      {/* Selection count + clear */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="font-semibold tabular-nums text-amber-800 dark:text-amber-300">
+          {selectedIds.length}
+        </span>
+        <span className="text-amber-700/80 dark:text-amber-400/80">selected</span>
+        <button
+          type="button"
+          data-testid="bulk-clear-selection"
+          aria-label="Clear selection"
+          onClick={onClearSelection}
+          className="ml-0.5 p-0.5 rounded-full text-amber-700/50 hover:text-amber-900 hover:bg-amber-500/15 dark:text-amber-400/50 dark:hover:text-amber-300 transition-colors"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+
+      <div className="h-4 w-px bg-amber-500/20 shrink-0" />
+
+      {/* Apply category */}
+      <Select
+        onValueChange={(v) =>
+          runAndRefresh(() => bulkUpdateTransactionCategory(selectedIds, Number(v)))
+        }
+        disabled={isPending}
+      >
+        <SelectTrigger className="h-7 text-xs w-40 border-amber-500/20 bg-background/80">
+          <SelectValue placeholder="Apply category…" />
+        </SelectTrigger>
+        <SelectContent>
+          <CategorySelectGrouped
+            categories={categories.filter((c) => c.parentId !== null)}
+            mains={mains}
+          />
+        </SelectContent>
+      </Select>
+
+      <div className="h-4 w-px bg-border/60 shrink-0 hidden sm:block" />
+
+      {/* Confirm / unconfirm */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 disabled:opacity-40"
+        disabled={isPending || !selectedHaveCategory}
+        title={!selectedHaveCategory ? "All selected rows need a category first" : undefined}
+        onClick={() =>
+          runAndRefresh(() => bulkSetCategoryConfirmed(selectedIds, true))
+        }
+      >
+        Confirm
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 text-xs text-muted-foreground"
+        disabled={isPending}
+        onClick={() =>
+          runAndRefresh(() => bulkSetCategoryConfirmed(selectedIds, false))
+        }
+      >
+        Unconfirm
+      </Button>
+
+      {/* Create rule */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs"
+        disabled={isPending}
+        onClick={() =>
+          onCreateRule(selectedIds.length === 1 ? (selectedDescriptions[0] ?? "") : "")
+        }
+      >
+        <Sparkles className="h-3 w-3 mr-1" />
+        Create rule
+      </Button>
+
+      {/* Destructive zone — pushed to the right on wider screens */}
+      <div className="sm:ml-auto flex items-center gap-1">
+        {deleteConfirming ? (
+          <>
+            <span className="text-xs text-destructive font-medium">
+              Delete {selectedIds.length}?
+            </span>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-7 px-2 text-xs"
+              disabled={isPending}
+              onClick={() => {
+                setDeleteConfirming(false);
+                runAndRefresh(() => bulkDeleteTransactions(selectedIds));
+              }}
+            >
+              Yes
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              disabled={isPending}
+              onClick={() => setDeleteConfirming(false)}
+            >
+              No
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+            disabled={isPending}
+            onClick={() => setDeleteConfirming(true)}
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Delete
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

@@ -1,11 +1,15 @@
 "use client";
 
 import {
+  Check,
   Loader2,
   MessageSquare,
+  Pencil,
   RefreshCw,
   Send,
   Sparkles,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
@@ -20,6 +24,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   createRulesFromDrafts,
@@ -63,6 +75,8 @@ export function RuleBuilderChatDialog({
   const [previewCounts, setPreviewCounts] = useState<
     Record<string, number | undefined>
   >({});
+  const [editingProposedKey, setEditingProposedKey] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState<RuleDraftInput | null>(null);
   const [isPending, startTransition] = useTransition();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +120,8 @@ export function RuleBuilderChatDialog({
       setProposedRules([]);
       setSelectedRules(new Set());
       setPreviewCounts({});
+      setEditingProposedKey(null);
+      setEditingDraft(null);
       setSearch("");
       setUnverifiedOnly(false);
       setErrorMsg("");
@@ -152,8 +168,17 @@ export function RuleBuilderChatDialog({
         ? json.proposedRules
         : [];
       if (rules.length > 0) {
-        setProposedRules(rules);
-        setSelectedRules(new Set(rules.map(ruleKey)));
+        setProposedRules((prev) => {
+          const existingKeys = new Set(prev.map(ruleKey));
+          return [...prev, ...rules.filter((r) => !existingKeys.has(ruleKey(r)))];
+        });
+        setSelectedRules((prev) => {
+          const next = new Set(prev);
+          for (const r of rules) {
+            if (!prev.has(ruleKey(r))) next.add(ruleKey(r));
+          }
+          return next;
+        });
         setPreviewCounts({});
       }
     } catch {
@@ -410,50 +435,218 @@ export function RuleBuilderChatDialog({
             ) : null}
 
             {proposedRules.length > 0 && (
-              <div className="rounded-md border border-border p-3 space-y-2">
-                <div className="text-sm font-medium">Proposed rules</div>
-                <div className="space-y-2 max-h-[140px] overflow-y-auto">
+              <div className="rounded-md border border-border bg-card p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Proposed rules</span>
+                    <span className="text-[10px] font-semibold tabular-nums bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                      {proposedRules.length}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({selectedRules.size} selected)
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      setProposedRules([]);
+                      setSelectedRules(new Set());
+                      setEditingProposedKey(null);
+                      setEditingDraft(null);
+                      setPreviewCounts({});
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Clear all
+                  </Button>
+                </div>
+                <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
                   {proposedRules.map((r) => {
                     const key = ruleKey(r);
                     const cat = byCategoryId.get(r.categoryId);
-                    const previewKey =
-                      r.patternType === "keyword"
-                        ? `${r.pattern}::${r.categoryId}`
-                        : `${r.pattern}::${r.categoryId}::${r.patternType}`;
-                    const count = previewCounts[previewKey];
+                    const count = previewCounts[key];
+                    const isEditing = editingProposedKey === key;
+
+                    if (isEditing && editingDraft) {
+                      const draftCat = byCategoryId.get(editingDraft.categoryId);
+                      return (
+                        <div
+                          key={key}
+                          className="rounded-md border border-primary/30 bg-primary/[0.03] ring-1 ring-primary/10 p-2 space-y-2 text-sm"
+                        >
+                          <div className="flex gap-1.5">
+                            <select
+                              value={editingDraft.patternType}
+                              onChange={(e) =>
+                                setEditingDraft((d) =>
+                                  d
+                                    ? {
+                                        ...d,
+                                        patternType: e.target
+                                          .value as RuleDraftInput["patternType"],
+                                      }
+                                    : d,
+                                )
+                              }
+                              className="h-7 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm shrink-0"
+                            >
+                              <option value="keyword">keyword</option>
+                              <option value="exact">exact</option>
+                              <option value="regex">regex</option>
+                            </select>
+                            <Input
+                              value={editingDraft.pattern}
+                              onChange={(e) =>
+                                setEditingDraft((d) =>
+                                  d ? { ...d, pattern: e.target.value } : d,
+                                )
+                              }
+                              className="h-7 text-xs font-mono flex-1 min-w-0"
+                              aria-label="Pattern"
+                            />
+                          </div>
+                          <Select
+                            value={String(editingDraft.categoryId)}
+                            onValueChange={(v) =>
+                              setEditingDraft((d) =>
+                                d ? { ...d, categoryId: Number(v) } : d,
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs" title={draftCat?.name}>
+                              <span className="truncate">
+                                {draftCat ? (
+                                  <CategoryNameParts
+                                    name={draftCat.name}
+                                    variant="select"
+                                  />
+                                ) : (
+                                  `#${editingDraft.categoryId}`
+                                )}
+                              </span>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <CategorySelectGrouped
+                                categories={categories.filter(
+                                  (c) => c.parentId !== null,
+                                )}
+                                mains={categories.filter(
+                                  (c) => c.parentId === null,
+                                )}
+                              />
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-1.5">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-xs text-emerald-600 hover:text-emerald-700"
+                              disabled={!editingDraft.pattern.trim()}
+                              onClick={() => {
+                                if (!editingDraft) return;
+                                const newKey = ruleKey(editingDraft);
+                                setProposedRules((prev) =>
+                                  prev.map((rule) =>
+                                    ruleKey(rule) === key ? editingDraft : rule,
+                                  ),
+                                );
+                                setSelectedRules((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(key)) {
+                                    next.delete(key);
+                                    next.add(newKey);
+                                  }
+                                  return next;
+                                });
+                                setPreviewCounts((prev) => {
+                                  const next = { ...prev };
+                                  delete next[key];
+                                  return next;
+                                });
+                                setEditingProposedKey(null);
+                                setEditingDraft(null);
+                              }}
+                            >
+                              <Check className="h-3 w-3 mr-1" />
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-xs text-muted-foreground"
+                              onClick={() => {
+                                setEditingProposedKey(null);
+                                setEditingDraft(null);
+                              }}
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div
                         key={key}
-                        className="flex items-start gap-2 text-sm border-b border-border/60 pb-2 last:border-0"
+                        className="group flex items-start gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted/40 transition-colors border-b border-border/40 last:border-0"
                       >
                         <input
                           type="checkbox"
                           checked={selectedRules.has(key)}
                           onChange={() => toggleRule(key)}
-                          className="mt-1 h-4 w-4 shrink-0 rounded border border-input"
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border border-input accent-primary cursor-pointer"
                         />
                         <div className="flex-1 min-w-0">
-                          <code className="text-xs bg-muted px-1 rounded">
-                            {r.patternType}
-                          </code>{" "}
-                          <span className="font-mono break-all">
-                            {r.pattern}
-                          </span>
-                          <div className="text-muted-foreground mt-0.5">
-                            →{" "}
-                            {cat ? (
-                              <CategoryNameParts name={cat.name} />
-                            ) : (
-                              `#${r.categoryId}`
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <code className="text-[10px] bg-muted px-1 py-0.5 rounded font-mono text-muted-foreground shrink-0">
+                              {r.patternType}
+                            </code>
+                            <span className="font-mono text-xs break-all">
+                              {r.pattern}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="text-xs text-muted-foreground">
+                              →{" "}
+                              {cat ? (
+                                <CategoryNameParts name={cat.name} />
+                              ) : (
+                                `#${r.categoryId}`
+                              )}
+                            </span>
+                            {count !== undefined && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                  count > 0
+                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {count} match{count === 1 ? "" : "es"}
+                              </span>
                             )}
                           </div>
-                          {count !== undefined && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {count} unverified match
-                              {count === 1 ? "" : "es"}
-                            </div>
-                          )}
                         </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 text-muted-foreground/0 group-hover:text-muted-foreground hover:text-foreground mt-0.5 transition-colors"
+                          onClick={() => {
+                            setEditingProposedKey(key);
+                            setEditingDraft({ ...r });
+                          }}
+                          aria-label="Edit rule"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
                       </div>
                     );
                   })}
