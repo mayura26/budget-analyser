@@ -309,6 +309,13 @@ export type MonthlyTotal = {
   net: number;
 };
 
+export type MonthlyNeedsWants = {
+  month: string; // YYYY-MM
+  income: number;
+  needs: number;
+  wants: number;
+};
+
 export type CategoryTotal = {
   categoryId: number | null;
   categoryName: string;

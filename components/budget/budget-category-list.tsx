@@ -560,7 +560,16 @@ export function BudgetCategoryList({
               (s, r) => s + r.targetAmount,
               0,
             );
-            const groupSpent = groupRows.reduce((s, r) => s + r.actualSpent, 0);
+            const rawGroupSpent = groupRows.reduce(
+              (s, r) => s + r.actualSpent,
+              0,
+            );
+            const isSavingsGroup = groupRows.some(
+              (r) => r.categoryKind === "savings",
+            );
+            const groupSpent = isSavingsGroup
+              ? Math.max(0, rawGroupSpent)
+              : rawGroupSpent;
 
             return (
               <div key={group} className="mt-2">

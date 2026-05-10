@@ -226,8 +226,8 @@ export function BudgetRule502030Strip({
           <p className="text-xs text-muted-foreground font-normal">
             Savings &ldquo;actual&rdquo; includes{" "}
             {formatCurrency(summary.implicitSurplusAsSavings, homeCurrency)}{" "}
-            unspent surplus for this closed month (money left after expenses and
-            tracked savings moves).
+            unallocated surplus (income left after expenses and tracked savings
+            moves).
           </p>
         ) : null}
         <div className="sm:hidden">

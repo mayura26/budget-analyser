@@ -1,21 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { and, gte, lte, sql } from "drizzle-orm";
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  PiggyBank,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
+import { Target } from "lucide-react";
 import Link from "next/link";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
 import { BudgetRule502030Compact } from "@/components/budget/budget-rule-502030-strip";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
+import { DashboardLineChart } from "@/components/dashboard/dashboard-line-chart";
 import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-picker";
-import { KPICard } from "@/components/layout/kpi-card";
+import { DashboardSummaryCard } from "@/components/dashboard/dashboard-summary-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -29,6 +22,7 @@ import {
 import { getHomeCurrency } from "@/lib/currency/home";
 import {
   getCategoryBreakdownInHomeCurrency,
+  getMonthlyNeedsWantsInHomeCurrency,
   getMonthlyTotalsInHomeCurrency,
 } from "@/lib/dashboard/home-currency-totals";
 import { db } from "@/lib/db";
@@ -241,6 +235,10 @@ export default async function DashboardPage({
     months,
     homeCurrency,
   );
+  const monthlyNeedsWants = await getMonthlyNeedsWantsInHomeCurrency(
+    months,
+    homeCurrency,
+  );
   const currentMonthData = monthlyTotals.find(
     (m) => m.month === selectedMonth,
   ) ?? {
@@ -285,47 +283,16 @@ export default async function DashboardPage({
         }
       />
 
-      {/* Primary KPIs — Income, Expenses, Net */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-        <KPICard
-          label="Income"
-          icon={ArrowUpCircle}
-          tone="income"
-          value={formatCurrency(currentMonthData.income, homeCurrency)}
-        />
-        <KPICard
-          label="Expenses"
-          icon={ArrowDownCircle}
-          tone="expense"
-          value={formatCurrency(currentMonthData.expenses, homeCurrency)}
-        />
-        <KPICard
-          label="Net"
-          icon={currentMonthData.net >= 0 ? TrendingUp : TrendingDown}
-          tone={currentMonthData.net >= 0 ? "net-positive" : "net-negative"}
-          value={`${currentMonthData.net >= 0 ? "+" : ""}${formatCurrency(Math.abs(currentMonthData.net), homeCurrency)}`}
-        />
-      </div>
-
-      {/* Secondary KPIs — Savings, Transactions */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <KPICard
-          compact
-          label="Savings"
-          icon={PiggyBank}
-          tone="neutral"
-          value={formatCurrency(currentMonthData.savings, homeCurrency)}
-          subtitle="Allocated to savings categories"
-        />
-        <KPICard
-          compact
-          label="Transactions"
-          icon={Wallet}
-          tone="neutral"
-          value={totalTransactions}
-          subtitle={`${accountCount} account${accountCount !== 1 ? "s" : ""}`}
-        />
-      </div>
+      {/* Summary card — Income, Expenses, Net, Savings, Transactions */}
+      <DashboardSummaryCard
+        income={currentMonthData.income}
+        expenses={currentMonthData.expenses}
+        net={currentMonthData.net}
+        savings={currentMonthData.savings}
+        transactionCount={totalTransactions}
+        accountCount={accountCount}
+        homeCurrency={homeCurrency}
+      />
 
       {/* Budget + 50/30/20 */}
       <DashboardBudgetSection selectedMonth={selectedMonth} />
@@ -335,7 +302,16 @@ export default async function DashboardPage({
         monthlyTotals={monthlyTotals}
         categoryExpenseTotals={expenseTotals}
         monthNet={currentMonthData.net}
-        monthSavings={currentMonthData.savings}
+        monthSavings={Math.max(
+          0,
+          currentMonthData.income - currentMonthData.expenses,
+        )}
+        homeCurrency={homeCurrency}
+      />
+
+      {/* Needs / Wants / Income line chart */}
+      <DashboardLineChart
+        monthlyNeedsWants={monthlyNeedsWants}
         homeCurrency={homeCurrency}
       />
     </div>
