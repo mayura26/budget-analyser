@@ -72,6 +72,11 @@ export function DashboardLineChart({
   const hasData = lineData.some(
     (d) => (d.Income ?? 0) > 0 || (d.Needs ?? 0) > 0 || (d.Wants ?? 0) > 0,
   );
+  const hasTargets =
+    (incomeTarget ?? 0) > 0 ||
+    (needsTarget ?? 0) > 0 ||
+    (wantsTarget ?? 0) > 0;
+  const showChart = hasData || hasTargets;
 
   return (
     <Card>
@@ -84,7 +89,7 @@ export function DashboardLineChart({
         </p>
       </CardHeader>
       <CardContent>
-        {!hasData ? (
+        {!showChart ? (
           <div className="flex h-48 items-center justify-center text-muted-foreground text-sm">
             No data for this month yet
           </div>
