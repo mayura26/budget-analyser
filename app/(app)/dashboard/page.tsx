@@ -165,14 +165,12 @@ function DashboardBudgetStatus({
   );
 }
 
-async function DashboardBudgetSection({
-  selectedMonth,
-}: {
-  selectedMonth: string;
-}) {
+async function loadBudgetData(
+  selectedMonth: string,
+  homeCurrency: ReturnType<typeof getHomeCurrency>,
+): Promise<{ rows: BudgetCategoryRow[]; summary: BudgetSummary } | null> {
   if (!hasBudgetTargets(selectedMonth)) return null;
 
-  const homeCurrency = getHomeCurrency();
   const allCats = db.select().from(categories).all() as Category[];
   const rows = await buildBudgetCategoryRows(
     selectedMonth,
@@ -194,7 +192,20 @@ async function DashboardBudgetSection({
     actualIncome,
     isMonthClosed(selectedMonth),
   );
+  return { rows, summary };
+}
 
+function DashboardBudgetSection({
+  selectedMonth,
+  rows,
+  summary,
+  homeCurrency,
+}: {
+  selectedMonth: string;
+  rows: BudgetCategoryRow[];
+  summary: BudgetSummary;
+  homeCurrency: ReturnType<typeof getHomeCurrency>;
+}) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <DashboardBudgetStatus
@@ -239,6 +250,7 @@ export default async function DashboardPage({
     selectedMonth,
     homeCurrency,
   );
+  const budgetData = await loadBudgetData(selectedMonth, homeCurrency);
   const currentMonthData = monthlyTotals.find(
     (m) => m.month === selectedMonth,
   ) ?? {
@@ -298,7 +310,14 @@ export default async function DashboardPage({
       />
 
       {/* Budget + 50/30/20 */}
-      <DashboardBudgetSection selectedMonth={selectedMonth} />
+      {budgetData && (
+        <DashboardBudgetSection
+          selectedMonth={selectedMonth}
+          rows={budgetData.rows}
+          summary={budgetData.summary}
+          homeCurrency={homeCurrency}
+        />
+      )}
 
       {/* Charts */}
       <DashboardCharts
@@ -313,7 +332,13 @@ export default async function DashboardPage({
       />
 
       {/* Needs / Wants / Income line chart */}
-      <DashboardLineChart daily={dailyNeedsWants} homeCurrency={homeCurrency} />
+      <DashboardLineChart
+        daily={dailyNeedsWants}
+        homeCurrency={homeCurrency}
+        incomeTarget={budgetData?.summary.expectedIncome}
+        needsTarget={budgetData?.summary.rule502030.needs.targetTotal}
+        wantsTarget={budgetData?.summary.rule502030.wants.targetTotal}
+      />
     </div>
   );
 }

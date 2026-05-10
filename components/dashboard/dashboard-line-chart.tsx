@@ -5,6 +5,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -51,9 +52,15 @@ function LineTooltip({
 export function DashboardLineChart({
   daily,
   homeCurrency,
+  incomeTarget,
+  needsTarget,
+  wantsTarget,
 }: {
   daily: DailyNeedsWants[];
   homeCurrency: SupportedCurrency;
+  incomeTarget?: number;
+  needsTarget?: number;
+  wantsTarget?: number;
 }) {
   const lineData = daily.map((d) => ({
     day: d.day,
@@ -63,8 +70,7 @@ export function DashboardLineChart({
   }));
 
   const hasData = lineData.some(
-    (d) =>
-      (d.Income ?? 0) > 0 || (d.Needs ?? 0) > 0 || (d.Wants ?? 0) > 0,
+    (d) => (d.Income ?? 0) > 0 || (d.Needs ?? 0) > 0 || (d.Wants ?? 0) > 0,
   );
 
   return (
@@ -115,6 +121,48 @@ export function DashboardLineChart({
               <Legend
                 wrapperStyle={{ fontSize: "0.8125rem", paddingTop: "12px" }}
               />
+              {incomeTarget !== undefined && incomeTarget > 0 ? (
+                <ReferenceLine
+                  y={incomeTarget}
+                  stroke="#22c55e"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.7}
+                  label={{
+                    value: "Income target",
+                    position: "insideTopLeft",
+                    fontSize: 10,
+                    fill: "#22c55e",
+                  }}
+                />
+              ) : null}
+              {needsTarget !== undefined && needsTarget > 0 ? (
+                <ReferenceLine
+                  y={needsTarget}
+                  stroke="#3b82f6"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.7}
+                  label={{
+                    value: "Needs target",
+                    position: "insideTopLeft",
+                    fontSize: 10,
+                    fill: "#3b82f6",
+                  }}
+                />
+              ) : null}
+              {wantsTarget !== undefined && wantsTarget > 0 ? (
+                <ReferenceLine
+                  y={wantsTarget}
+                  stroke="#f97316"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.7}
+                  label={{
+                    value: "Wants target",
+                    position: "insideTopLeft",
+                    fontSize: 10,
+                    fill: "#f97316",
+                  }}
+                />
+              ) : null}
               <Line
                 type="monotone"
                 dataKey="Income"
