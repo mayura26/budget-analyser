@@ -9,7 +9,7 @@ import { getMonthRange } from "@/lib/utils";
 import type {
   Category,
   CategoryTotal,
-  MonthlyNeedsWants,
+  DailyNeedsWants,
   MonthlyTotal,
 } from "@/types";
 
@@ -168,18 +168,15 @@ export async function getCategoryBreakdownInHomeCurrency(
   return { expenseTotals };
 }
 
-/** Monthly needs/wants/income breakdown, used for the dashboard line chart. */
-export async function getMonthlyNeedsWantsInHomeCurrency(
-  months: string[],
+/** Daily cumulative needs/wants/income for the selected month — dashboard line chart. */
+export async function getDailyNeedsWantsForMonth(
+  month: string,
   homeCurrency: SupportedCurrency,
-): Promise<MonthlyNeedsWants[]> {
-  if (months.length === 0) return [];
-
+): Promise<DailyNeedsWants[]> {
   const allCats = db.select().from(categories).all() as Category[];
   const mains = allCats.filter((c) => c.parentId === null);
   const mainById = new Map(mains.map((c) => [c.id, c]));
 
-  // Map: categoryId → ruleBucket ("needs" | "wants" | null) and type
   const catMeta = new Map<
     number,
     { ruleBucket: string | null; type: string }
@@ -192,8 +189,7 @@ export async function getMonthlyNeedsWantsInHomeCurrency(
     catMeta.set(cat.id, { ruleBucket: rb, type: cat.type });
   }
 
-  const firstStart = getMonthRange(months[0]).start;
-  const lastEnd = getMonthRange(months[months.length - 1]).end;
+  const { start, end } = getMonthRange(month);
 
   const rows = db
     .select({
@@ -208,8 +204,8 @@ export async function getMonthlyNeedsWantsInHomeCurrency(
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .where(
       and(
-        gte(transactions.date, firstStart),
-        lte(transactions.date, lastEnd),
+        gte(transactions.date, start),
+        lte(transactions.date, end),
         or(isNull(categories.type), ne(categories.type, "transfer")),
       ),
     )
@@ -224,17 +220,24 @@ export async function getMonthlyNeedsWantsInHomeCurrency(
     homeCurrency,
   );
 
-  const byMonth = new Map<
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T00:00:00`);
+  const daysInMonth =
+    Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+
+  const dailyDelta = new Map<
     string,
     { income: number; needs: number; wants: number }
   >();
-  for (const m of months) {
-    byMonth.set(m, { income: 0, needs: 0, wants: 0 });
+  for (let i = 0; i < daysInMonth; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    dailyDelta.set(iso, { income: 0, needs: 0, wants: 0 });
   }
 
   for (const row of rows) {
-    const mKey = row.date.slice(0, 7);
-    const bucket = byMonth.get(mKey);
+    const bucket = dailyDelta.get(row.date);
     if (!bucket) continue;
 
     const cur = parseAccountCurrency(row.currency, homeCurrency);
@@ -252,13 +255,25 @@ export async function getMonthlyNeedsWantsInHomeCurrency(
     }
   }
 
-  return months.map((m) => {
-    const b = byMonth.get(m) ?? { income: 0, needs: 0, wants: 0 };
-    return {
-      month: m,
-      income: Math.round(b.income * 100) / 100,
-      needs: Math.round(b.needs * 100) / 100,
-      wants: Math.round(b.wants * 100) / 100,
-    };
-  });
+  const result: DailyNeedsWants[] = [];
+  let cumIncome = 0;
+  let cumNeeds = 0;
+  let cumWants = 0;
+  for (let i = 0; i < daysInMonth; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const delta = dailyDelta.get(iso) ?? { income: 0, needs: 0, wants: 0 };
+    cumIncome += delta.income;
+    cumNeeds += delta.needs;
+    cumWants += delta.wants;
+    result.push({
+      date: iso,
+      day: d.getDate(),
+      income: Math.round(cumIncome * 100) / 100,
+      needs: Math.round(cumNeeds * 100) / 100,
+      wants: Math.round(cumWants * 100) / 100,
+    });
+  }
+  return result;
 }

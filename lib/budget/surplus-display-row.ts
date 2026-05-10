@@ -14,7 +14,7 @@ const SYNTHETIC_COLOR = "#059669";
 
 /**
  * Planned breathing room: scheduled expected income minus all expense and savings targets.
- * Actual: income basis minus expense outflows minus tracked savings (signed; live for open months).
+ * Actual: realised income minus expense outflows minus tracked savings (signed; live for open months).
  */
 export function buildSurplusDisplayRow(
   summary: BudgetSummary,
@@ -25,7 +25,7 @@ export function buildSurplusDisplayRow(
       summary.totalSavingsBudgeted,
   );
   const signedActual = roundMoney(
-    summary.incomeBasis - summary.totalSpent - summary.totalSavingsAllocated,
+    summary.actualIncome - summary.totalSpent - summary.totalSavingsAllocated,
   );
 
   return {

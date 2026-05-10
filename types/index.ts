@@ -309,10 +309,16 @@ export type MonthlyTotal = {
   net: number;
 };
 
-export type MonthlyNeedsWants = {
-  month: string; // YYYY-MM
+export type DailyNeedsWants = {
+  /** ISO date (YYYY-MM-DD) for the day. */
+  date: string;
+  /** Day-of-month (1..31) for chart x-axis. */
+  day: number;
+  /** Cumulative income through this day in the month. */
   income: number;
+  /** Cumulative needs spending through this day. */
   needs: number;
+  /** Cumulative wants spending through this day. */
   wants: number;
 };
 

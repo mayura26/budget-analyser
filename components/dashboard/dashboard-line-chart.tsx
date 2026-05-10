@@ -13,13 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
-import type { MonthlyNeedsWants } from "@/types";
-
-function formatMonthShort(monthStr: string) {
-  const [year, month] = monthStr.split("-");
-  const date = new Date(Number(year), Number(month) - 1, 1);
-  return date.toLocaleDateString("en-AU", { month: "short" });
-}
+import type { DailyNeedsWants } from "@/types";
 
 function LineTooltip({
   active,
@@ -29,13 +23,15 @@ function LineTooltip({
 }: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
-  label?: string;
+  label?: string | number;
   homeCurrency: SupportedCurrency;
 }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="chart-tooltip">
-      {label && <p className="chart-tooltip-label">{label}</p>}
+      {label !== undefined && (
+        <p className="chart-tooltip-label">Day {label}</p>
+      )}
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
           <span
@@ -53,17 +49,17 @@ function LineTooltip({
 }
 
 export function DashboardLineChart({
-  monthlyNeedsWants,
+  daily,
   homeCurrency,
 }: {
-  monthlyNeedsWants: MonthlyNeedsWants[];
+  daily: DailyNeedsWants[];
   homeCurrency: SupportedCurrency;
 }) {
-  const lineData = monthlyNeedsWants.map((m) => ({
-    month: formatMonthShort(m.month),
-    Income: m.income,
-    Needs: m.needs,
-    Wants: m.wants,
+  const lineData = daily.map((d) => ({
+    day: d.day,
+    Income: d.income,
+    Needs: d.needs,
+    Wants: d.wants,
   }));
 
   const hasData = lineData.some(
@@ -76,11 +72,14 @@ export function DashboardLineChart({
         <CardTitle className="text-base font-semibold">
           Needs, Wants &amp; Income
         </CardTitle>
+        <p className="text-xs text-muted-foreground font-normal">
+          Cumulative through the selected month.
+        </p>
       </CardHeader>
       <CardContent>
         {!hasData ? (
           <div className="flex h-48 items-center justify-center text-muted-foreground text-sm">
-            No data yet — import transactions to get started
+            No data for this month yet
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={240}>
@@ -94,7 +93,7 @@ export function DashboardLineChart({
                 vertical={false}
               />
               <XAxis
-                dataKey="month"
+                dataKey="day"
                 tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}

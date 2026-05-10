@@ -22,7 +22,7 @@ import {
 import { getHomeCurrency } from "@/lib/currency/home";
 import {
   getCategoryBreakdownInHomeCurrency,
-  getMonthlyNeedsWantsInHomeCurrency,
+  getDailyNeedsWantsForMonth,
   getMonthlyTotalsInHomeCurrency,
 } from "@/lib/dashboard/home-currency-totals";
 import { db } from "@/lib/db";
@@ -235,8 +235,8 @@ export default async function DashboardPage({
     months,
     homeCurrency,
   );
-  const monthlyNeedsWants = await getMonthlyNeedsWantsInHomeCurrency(
-    months,
+  const dailyNeedsWants = await getDailyNeedsWantsForMonth(
+    selectedMonth,
     homeCurrency,
   );
   const currentMonthData = monthlyTotals.find(
@@ -310,10 +310,7 @@ export default async function DashboardPage({
       />
 
       {/* Needs / Wants / Income line chart */}
-      <DashboardLineChart
-        monthlyNeedsWants={monthlyNeedsWants}
-        homeCurrency={homeCurrency}
-      />
+      <DashboardLineChart daily={dailyNeedsWants} homeCurrency={homeCurrency} />
     </div>
   );
 }
