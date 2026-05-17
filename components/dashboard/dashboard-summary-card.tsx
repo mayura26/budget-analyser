@@ -87,6 +87,7 @@ export function DashboardSummaryCard({
           <Stat
             label="Net"
             value={`${netPositive ? "+" : ""}${formatCurrency(Math.abs(net), homeCurrency)}`}
+            sub="After tracked savings"
             icon={netPositive ? TrendingUp : TrendingDown}
             iconClass={
               netPositive
@@ -109,7 +110,7 @@ export function DashboardSummaryCard({
           <Stat
             label="Savings"
             value={formatCurrency(savings, homeCurrency)}
-            sub="Income minus expenses"
+            sub="Tracked allocations"
             icon={PiggyBank}
             iconClass="text-purple-600 dark:text-purple-400"
           />

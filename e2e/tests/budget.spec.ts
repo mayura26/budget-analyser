@@ -1,4 +1,71 @@
-import { type Browser, expect, test } from "@playwright/test";
+import { type Browser, expect, type Page, test } from "@playwright/test";
+
+async function createBudgetTestAccount(page: Page) {
+  const accountName = `Budget Surplus ${Date.now()}`;
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add account" }).first().click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.locator('input[name="name"]').fill(accountName);
+  await dialog.getByRole("combobox").nth(1).click();
+  await page.getByRole("option", { name: "CommBank" }).click();
+  await dialog.getByRole("combobox").nth(2).click();
+  await page
+    .getByRole("option", { name: /Australian dollar \(AUD\)/i })
+    .click();
+  await dialog.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(accountName)).toBeVisible();
+
+  return accountName;
+}
+
+async function deleteBudgetTestAccount(page: Page, accountName: string) {
+  await page.goto("/accounts");
+  const card = page.locator(".rounded-lg").filter({ hasText: accountName });
+  if (
+    !(await card
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false))
+  ) {
+    return;
+  }
+  await card.first().locator("button:has(.lucide-trash-2)").click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await page.waitForSelector('[role="dialog"]', { state: "hidden" });
+}
+
+async function addManualSavingsTransaction({
+  page,
+  accountName,
+  date,
+  amount,
+}: {
+  page: Page;
+  accountName: string;
+  date: string;
+  amount: string;
+}) {
+  await page.goto("/transactions/new");
+  await page.locator('select[name="accountId"]').selectOption({
+    label: accountName,
+  });
+  await page.locator('input[name="date"]').fill(date);
+  await page.locator('input[name="description"]').fill("E2E surplus sweep");
+  await page.locator('input[name="amount"]').fill(amount);
+
+  const categoryOption = page
+    .locator('select[name="categoryId"] option')
+    .filter({ hasText: "Long-term savings" })
+    .first();
+  const categoryId = await categoryOption.getAttribute("value");
+  if (!categoryId) throw new Error("Long-term savings category not found");
+  await page.locator('select[name="categoryId"]').selectOption(categoryId);
+
+  await page.getByRole("button", { name: "Save transaction" }).click();
+  await page.waitForURL("/transactions");
+}
 
 async function cleanupSchedules(browser: Browser) {
   const context = await browser.newContext({
@@ -151,6 +218,31 @@ test.describe("Budget", () => {
     await expect(page.getByText(/Income surplus \(unallocated\)/)).toBeVisible({
       timeout: 10000,
     });
+  });
+
+  test("income surplus row shows a deficit state when savings are overallocated", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createBudgetTestAccount(page);
+
+    try {
+      await addManualSavingsTransaction({
+        page,
+        accountName,
+        date: `${month}-02`,
+        amount: "-5000",
+      });
+
+      await page.goto(`/budget?month=${month}`);
+      const surplusRow = page.getByTestId("budget-row-income-surplus");
+      await expect(surplusRow).toBeVisible({ timeout: 10000 });
+      await expect(surplusRow).toContainText("Deficit");
+      await expect(surplusRow).toContainText("$5,000.00");
+    } finally {
+      await deleteBudgetTestAccount(page, accountName);
+    }
   });
 
   test("closed past month shows realised vs scheduled income when budget exists", async ({

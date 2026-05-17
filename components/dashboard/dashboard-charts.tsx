@@ -114,7 +114,7 @@ export function DashboardCharts({
     month: formatMonthShort(m.month),
     Income: m.income,
     Expenses: m.expenses,
-    Savings: Math.max(0, m.income - m.expenses),
+    Savings: m.savings,
   }));
 
   const includeNetEffective = includeNet && monthNet > 0;

@@ -62,6 +62,47 @@ function savingsRemainingDisplay(
   );
 }
 
+function syntheticSurplusRemainingDisplay(
+  row: BudgetCategoryRow,
+  homeCurrency: SupportedCurrency,
+) {
+  if (row.actualSpent < -0.005) {
+    return (
+      <span className="text-red-600 dark:text-red-400">
+        Deficit {formatCurrency(Math.abs(row.actualSpent), homeCurrency)}
+      </span>
+    );
+  }
+
+  if (row.targetAmount > 0) {
+    const ahead = row.actualSpent - row.targetAmount;
+    if (ahead >= -0.005) {
+      return (
+        <span className="text-emerald-600 dark:text-emerald-400">
+          {ahead > 0.005 ? "+" : ""}
+          {formatCurrency(Math.max(0, ahead), homeCurrency)}
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-red-600 dark:text-red-400">
+        {formatCurrency(row.targetAmount - row.actualSpent, homeCurrency)}
+      </span>
+    );
+  }
+
+  if (row.actualSpent > 0.005) {
+    return (
+      <span className="text-emerald-600 dark:text-emerald-400">
+        +{formatCurrency(row.actualSpent, homeCurrency)}
+      </span>
+    );
+  }
+
+  return <span className="text-muted-foreground">&mdash;</span>;
+}
+
 const gridColsBase =
   "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
 const gridColsDrilldown =
@@ -125,6 +166,7 @@ function CategoryRow({
   return (
     <div className="rounded-md">
       <div
+        data-testid={isSynthetic ? "budget-row-income-surplus" : undefined}
         className={cn(
           "grid items-center gap-x-2 sm:gap-x-3 py-2 px-2 sm:px-3 hover:bg-muted/50 rounded-md transition-colors",
           gridClass,
@@ -319,7 +361,11 @@ function CategoryRow({
 
         {/* Progress bar */}
         <div className="hidden sm:block">
-          {isSynthetic && row.targetAmount > 0 ? (
+          {isSynthetic && row.actualSpent < -0.005 ? (
+            <div className="text-xs tabular-nums text-right text-red-600 dark:text-red-400">
+              Deficit
+            </div>
+          ) : isSynthetic && row.targetAmount > 0 ? (
             <div className="flex items-center gap-2">
               <BudgetProgressBar
                 spent={Math.max(0, row.actualSpent)}
@@ -362,7 +408,9 @@ function CategoryRow({
 
         {/* Remaining */}
         <div className="text-right text-sm tabular-nums">
-          {row.categoryKind === "savings" && row.targetAmount > 0 ? (
+          {isSynthetic ? (
+            syntheticSurplusRemainingDisplay(row, homeCurrency)
+          ) : row.categoryKind === "savings" && row.targetAmount > 0 ? (
             savingsRemainingDisplay(row, homeCurrency)
           ) : row.targetAmount > 0 ? (
             <span

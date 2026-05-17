@@ -300,10 +300,7 @@ export default async function DashboardPage({
         income={currentMonthData.income}
         expenses={currentMonthData.expenses}
         net={currentMonthData.net}
-        savings={Math.max(
-          0,
-          currentMonthData.income - currentMonthData.expenses,
-        )}
+        savings={currentMonthData.savings}
         transactionCount={totalTransactions}
         accountCount={accountCount}
         homeCurrency={homeCurrency}
@@ -324,10 +321,7 @@ export default async function DashboardPage({
         monthlyTotals={monthlyTotals}
         categoryExpenseTotals={expenseTotals}
         monthNet={currentMonthData.net}
-        monthSavings={Math.max(
-          0,
-          currentMonthData.income - currentMonthData.expenses,
-        )}
+        monthSavings={currentMonthData.savings}
         homeCurrency={homeCurrency}
       />
 

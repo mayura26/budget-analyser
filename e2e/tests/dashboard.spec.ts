@@ -1,6 +1,73 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 const DASHBOARD_PIE_ACCOUNT = "Dashboard Pie Test Account";
+
+async function createDashboardTestAccount(page: Page) {
+  const accountName = `Dashboard Summary ${Date.now()}`;
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add account" }).first().click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.locator('input[name="name"]').fill(accountName);
+  await dialog.getByRole("combobox").nth(1).click();
+  await page.getByRole("option", { name: "CommBank" }).click();
+  await dialog.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(accountName)).toBeVisible();
+
+  return accountName;
+}
+
+async function deleteDashboardTestAccount(page: Page, accountName: string) {
+  await page.goto("/accounts");
+  const card = page.locator(".rounded-lg").filter({ hasText: accountName });
+  if (
+    !(await card
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false))
+  ) {
+    return;
+  }
+  await card.first().locator("button:has(.lucide-trash-2)").click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await page.waitForSelector('[role="dialog"]', { state: "hidden" });
+}
+
+async function addManualDashboardTransaction({
+  page,
+  accountName,
+  date,
+  description,
+  amount,
+  categoryText,
+}: {
+  page: Page;
+  accountName: string;
+  date: string;
+  description: string;
+  amount: string;
+  categoryText: string | RegExp;
+}) {
+  await page.goto("/transactions/new");
+  await page.locator('select[name="accountId"]').selectOption({
+    label: accountName,
+  });
+  await page.locator('input[name="date"]').fill(date);
+  await page.locator('input[name="description"]').fill(description);
+  await page.locator('input[name="amount"]').fill(amount);
+
+  const categoryOption = page
+    .locator('select[name="categoryId"] option')
+    .filter({ hasText: categoryText })
+    .first();
+  const categoryId = await categoryOption.getAttribute("value");
+  if (!categoryId) throw new Error(`Category not found: ${categoryText}`);
+  await page.locator('select[name="categoryId"]').selectOption(categoryId);
+
+  await page.getByRole("button", { name: "Save transaction" }).click();
+  await page.waitForURL("/transactions");
+}
 
 test.describe("Dashboard", () => {
   test("page title renders", async ({ page }) => {
@@ -107,6 +174,45 @@ test.describe("Dashboard", () => {
     const slider = page.getByRole("slider", { name: /include net/i });
     await expect(slider).toBeVisible();
     await expect(slider).toHaveAttribute("data-disabled", "");
+  });
+
+  test("summary savings uses tracked allocations, not pre-savings surplus", async ({
+    page,
+  }) => {
+    await page.request.delete("/api/test-cleanup?transactions=1");
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+
+    try {
+      await addManualDashboardTransaction({
+        page,
+        accountName,
+        date: `${seedMonth}-01`,
+        description: "E2E salary",
+        amount: "1000",
+        categoryText: /^Income/,
+      });
+      await addManualDashboardTransaction({
+        page,
+        accountName,
+        date: `${seedMonth}-02`,
+        description: "E2E savings transfer",
+        amount: "-300",
+        categoryText: "Long-term savings",
+      });
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const summary = page.locator(".rounded-lg").filter({
+        hasText: "Tracked allocations",
+      });
+      await expect(summary.getByText("Savings", { exact: true })).toBeVisible();
+      await expect(summary.getByText("$300.00")).toBeVisible();
+      await expect(summary.getByText("After tracked savings")).toBeVisible();
+      await expect(summary.getByText("+$700.00")).toBeVisible();
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
   });
 
   test.describe("pie chart with positive net", () => {
