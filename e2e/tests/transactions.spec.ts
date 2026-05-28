@@ -182,7 +182,7 @@ test.describe("Transactions", () => {
     });
   });
 
-  test("create rule from transaction opens dialog pre-filled with description", async ({
+  test("create rule dialog shows description, token chips, and empty pattern", async ({
     page,
   }) => {
     await page.goto("/transactions");
@@ -193,8 +193,27 @@ test.describe("Transactions", () => {
     await firstRow.getByTestId("create-rule-from-transaction").click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+    // Description shown at top
+    await expect(dialog.locator(".font-mono.break-all")).toContainText(description.trim());
+    // Pattern starts empty
     const patternInput = dialog.getByTestId("create-rule-pattern");
-    await expect(patternInput).toHaveValue(description.trim());
+    await expect(patternInput).toHaveValue("");
+    // Token chips present (at least one)
+    await expect(dialog.locator("button.font-mono").first()).toBeVisible();
+  });
+
+  test("clicking token chip populates pattern field", async ({ page }) => {
+    await page.goto("/transactions");
+    await page.getByTestId("filter-account").click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+    const firstRow = page.locator("tbody tr").first();
+    await firstRow.getByTestId("create-rule-from-transaction").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const firstChip = dialog.locator("button.font-mono").first();
+    const chipText = await firstChip.innerText();
+    await firstChip.click();
+    await expect(dialog.getByTestId("create-rule-pattern")).toHaveValue(chipText);
   });
 
   test("bulk select all rows shows action bar", async ({ page }) => {

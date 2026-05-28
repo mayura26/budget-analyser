@@ -100,6 +100,7 @@ export default async function TransactionsPage({
       categoryConfirmed: transactions.categoryConfirmed,
       notes: transactions.notes,
       linkedTransactionId: transactions.linkedTransactionId,
+      normalised: transactions.normalised,
     })
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))

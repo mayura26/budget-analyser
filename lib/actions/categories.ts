@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -438,6 +438,53 @@ export async function createRulesFromDraftsAndApplyToUnverified(
       updated: applyResult.data.updated,
     },
   };
+}
+
+export type MatchingRuleInfo = {
+  ruleId: number;
+  pattern: string;
+  patternType: "regex" | "keyword" | "exact";
+  priority: number;
+  categoryId: number;
+  categoryName: string;
+  categoryColor: string;
+};
+
+export async function getMatchingRulesForTransaction(
+  normalised: string,
+): Promise<ActionResult<MatchingRuleInfo[]>> {
+  const allRules = db
+    .select({
+      id: categorisationRules.id,
+      pattern: categorisationRules.pattern,
+      patternType: categorisationRules.patternType,
+      priority: categorisationRules.priority,
+      categoryId: categorisationRules.categoryId,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+    })
+    .from(categorisationRules)
+    .leftJoin(categories, eq(categorisationRules.categoryId, categories.id))
+    .orderBy(desc(categorisationRules.priority))
+    .all();
+
+  const matches: MatchingRuleInfo[] = [];
+  for (const rule of allRules) {
+    const stub = ruleDraftStub(rule.pattern, rule.categoryId, rule.patternType);
+    if (matchRule(normalised, stub)) {
+      matches.push({
+        ruleId: rule.id,
+        pattern: rule.pattern,
+        patternType: rule.patternType,
+        priority: rule.priority,
+        categoryId: rule.categoryId,
+        categoryName: rule.categoryName ?? "",
+        categoryColor: rule.categoryColor ?? "#6366f1",
+      });
+    }
+  }
+
+  return { success: true, data: matches };
 }
 
 export type RulePreviewInput = {

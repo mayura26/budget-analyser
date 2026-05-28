@@ -79,6 +79,7 @@ type Row = {
   categoryConfirmed: boolean;
   notes: string | null;
   linkedTransactionId: number | null;
+  normalised: string;
   /** Same transaction amount converted to home currency (transaction date rate). */
   amountInHome: number;
 };
@@ -120,7 +121,7 @@ export function TransactionTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState(currentFilters.search ?? "");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [createRuleForDescription, setCreateRuleForDescription] = useState<string | null>(null);
+  const [createRuleFor, setCreateRuleFor] = useState<{ description: string; normalised: string } | null>(null);
 
   const updateFilter = useCallback(
     (key: string, value: string | undefined) => {
@@ -307,7 +308,8 @@ export function TransactionTable({
         <RowActionsCell
           transactionId={info.row.original.id}
           description={info.row.original.description}
-          onCreateRule={(desc) => setCreateRuleForDescription(desc)}
+          normalised={info.row.original.normalised}
+          onCreateRule={(description, normalised) => setCreateRuleFor({ description, normalised })}
         />
       ),
     }),
@@ -428,11 +430,12 @@ export function TransactionTable({
         <BulkActionBar
           selectedIds={table.getSelectedRowModel().rows.map((r) => r.original.id)}
           selectedDescriptions={table.getSelectedRowModel().rows.map((r) => r.original.description)}
+          selectedNormaliseds={table.getSelectedRowModel().rows.map((r) => r.original.normalised)}
           selectedHaveCategory={table.getSelectedRowModel().rows.every((r) => r.original.categoryId !== null)}
           categories={categories}
           categoryMains={categoryMains}
           onClearSelection={() => table.resetRowSelection()}
-          onCreateRule={(desc) => setCreateRuleForDescription(desc)}
+          onCreateRule={(description, normalised) => setCreateRuleFor({ description, normalised })}
         />
       )}
 
@@ -520,9 +523,10 @@ export function TransactionTable({
       </p>
 
       <CreateRuleDialog
-        open={createRuleForDescription !== null}
-        onClose={() => setCreateRuleForDescription(null)}
-        description={createRuleForDescription ?? ""}
+        open={createRuleFor !== null}
+        onClose={() => setCreateRuleFor(null)}
+        description={createRuleFor?.description ?? ""}
+        normalised={createRuleFor?.normalised ?? ""}
         categories={categories}
         categoryMains={categoryMains}
       />
@@ -759,11 +763,13 @@ function RowCheckbox({
 function RowActionsCell({
   transactionId,
   description,
+  normalised,
   onCreateRule,
 }: {
   transactionId: number;
   description: string;
-  onCreateRule: (desc: string) => void;
+  normalised: string;
+  onCreateRule: (desc: string, normalised: string) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
@@ -802,7 +808,7 @@ function RowActionsCell({
         type="button"
         aria-label="Create rule from transaction"
         data-testid="create-rule-from-transaction"
-        onClick={() => onCreateRule(description)}
+        onClick={() => onCreateRule(description, normalised)}
         className="p-1 rounded text-muted-foreground/0 group-hover:text-primary/40 hover:!text-primary hover:bg-primary/10 transition-colors"
       >
         <Sparkles className="h-3.5 w-3.5" />
@@ -823,6 +829,7 @@ function RowActionsCell({
 function BulkActionBar({
   selectedIds,
   selectedDescriptions,
+  selectedNormaliseds,
   selectedHaveCategory,
   categories,
   categoryMains,
@@ -831,11 +838,12 @@ function BulkActionBar({
 }: {
   selectedIds: number[];
   selectedDescriptions: string[];
+  selectedNormaliseds: string[];
   selectedHaveCategory: boolean;
   categories: Category[];
   categoryMains?: Category[];
   onClearSelection: () => void;
-  onCreateRule: (desc: string) => void;
+  onCreateRule: (desc: string, normalised: string) => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -930,7 +938,10 @@ function BulkActionBar({
         className="h-7 text-xs"
         disabled={isPending}
         onClick={() =>
-          onCreateRule(selectedIds.length === 1 ? (selectedDescriptions[0] ?? "") : "")
+          onCreateRule(
+            selectedIds.length === 1 ? (selectedDescriptions[0] ?? "") : "",
+            selectedIds.length === 1 ? (selectedNormaliseds[0] ?? "") : "",
+          )
         }
       >
         <Sparkles className="h-3 w-3 mr-1" />
