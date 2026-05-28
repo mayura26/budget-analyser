@@ -6,6 +6,21 @@
  * 4. Collapse whitespace
  */
 export function normaliseDescription(description: string): string {
+  return normaliseDescriptionCore(description, false);
+}
+
+/**
+ * Legacy dedupe normalisation kept for backwards-compatible fingerprint checks.
+ * This matches historical behavior where 5+ digit runs were stripped.
+ */
+export function normaliseDescriptionLegacy(description: string): string {
+  return normaliseDescriptionCore(description, true);
+}
+
+function normaliseDescriptionCore(
+  description: string,
+  stripLongDigitRuns: boolean,
+): string {
   let s = description.toUpperCase();
 
   // Strip trailing reference codes after " : " or " - "
@@ -17,6 +32,11 @@ export function normaliseDescription(description: string): string {
     /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2}\b/gi,
     "",
   );
+
+  if (stripLongDigitRuns) {
+    // Historical behavior: strip card/terminal/reference numbers.
+    s = s.replace(/\d{5,}/g, "");
+  }
 
   // Collapse whitespace
   s = s.replace(/\s+/g, " ").trim();

@@ -14,6 +14,7 @@ import {
 import { generateFingerprint } from "@/lib/import/fingerprint";
 import {
   normaliseDescription,
+  normaliseDescriptionLegacy,
   normaliseMerchant,
 } from "@/lib/import/normaliser";
 import {
@@ -186,7 +187,24 @@ async function buildImportPreview(
     };
   });
 
-  const fingerprints = previewRows.map((r) => r.fingerprint);
+  const legacyFingerprintsByPrimary = new Map<string, string>();
+  for (const row of previewRows) {
+    const legacyNormalised = normaliseDescriptionLegacy(row.description);
+    const legacyFingerprint = generateFingerprint(
+      accountId,
+      row.date,
+      row.amount,
+      legacyNormalised,
+    );
+    legacyFingerprintsByPrimary.set(row.fingerprint, legacyFingerprint);
+  }
+
+  const fingerprints = Array.from(
+    new Set([
+      ...previewRows.map((r) => r.fingerprint),
+      ...legacyFingerprintsByPrimary.values(),
+    ]),
+  );
   const existingChunks: string[] = [];
   const chunkSize = 500;
   for (let i = 0; i < fingerprints.length; i += chunkSize) {
@@ -201,7 +219,11 @@ async function buildImportPreview(
 
   const existingSet = new Set(existingChunks);
   for (const row of previewRows) {
-    if (existingSet.has(row.fingerprint)) {
+    const legacyFingerprint = legacyFingerprintsByPrimary.get(row.fingerprint);
+    if (
+      existingSet.has(row.fingerprint) ||
+      (legacyFingerprint !== undefined && existingSet.has(legacyFingerprint))
+    ) {
       row.status = "duplicate";
       row.isDuplicate = true;
     }

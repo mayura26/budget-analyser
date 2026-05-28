@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { test } from "node:test";
 import { generateFingerprint } from "./fingerprint";
-import { normaliseDescription } from "./normaliser";
+import { normaliseDescription, normaliseDescriptionLegacy } from "./normaliser";
 
 test("normaliseDescription preserves trailing numeric references", () => {
   const base = "DIRECT DEBIT 502574 AUSTRALIAN SALAR NSW";
@@ -42,4 +42,11 @@ test("fingerprints differ for same txn with different numeric suffixes", () => {
   assert.notStrictEqual(f1, f2);
   assert.notStrictEqual(f1, f3);
   assert.notStrictEqual(f2, f3);
+});
+
+test("legacy normaliser collapses trailing numeric references", () => {
+  const base = "DIRECT DEBIT 502574 AUSTRALIAN SALAR NSW";
+  const d1 = normaliseDescriptionLegacy(`${base}236507`);
+  const d2 = normaliseDescriptionLegacy(`${base}236506`);
+  assert.strictEqual(d1, d2);
 });
