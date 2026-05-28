@@ -1,10 +1,9 @@
 /**
  * Normalise a transaction description for deduplication and matching.
  * 1. Uppercase
- * 2. Strip card/terminal numbers (5+ digit sequences)
- * 3. Strip embedded date patterns (DD/MM, MMM DD)
- * 4. Strip trailing reference codes after ` : ` or ` - `
- * 5. Collapse whitespace
+ * 2. Strip embedded date patterns (DD/MM, MMM DD)
+ * 3. Strip trailing reference codes after ` : ` or ` - `
+ * 4. Collapse whitespace
  */
 export function normaliseDescription(description: string): string {
   let s = description.toUpperCase();
@@ -18,9 +17,6 @@ export function normaliseDescription(description: string): string {
     /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{1,2}\b/gi,
     "",
   );
-
-  // Strip card/terminal numbers (5+ consecutive digits)
-  s = s.replace(/\d{5,}/g, "");
 
   // Collapse whitespace
   s = s.replace(/\s+/g, " ").trim();
