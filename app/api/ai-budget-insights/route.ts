@@ -95,18 +95,42 @@ export async function POST(request: Request) {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const categoryLines = budgetedRows
-    .map((r) => {
-      const pct =
-        r.targetAmount > 0
-          ? Math.round((r.actualSpent / r.targetAmount) * 100)
-          : 0;
-      const prevSpend = prevSpendMap.get(r.categoryId) ?? 0;
-      return `- ${r.categoryName} (${r.parentName}): Target ${formatCurrency(r.targetAmount, homeCurrency)}, Spent ${formatCurrency(r.actualSpent, homeCurrency)} (${pct}%), Last month: ${formatCurrency(prevSpend, homeCurrency)}, 3mo avg: ${formatCurrency(r.avg3Month, homeCurrency)}, Scheduled recurring: ${formatCurrency(r.scheduledAmount, homeCurrency)}`;
+  // Group subcategory rows by parent group for higher-level analysis
+  const parentGroups = new Map<
+    string,
+    { rows: (typeof budgetedRows)[0][]; prevSpend: number }
+  >();
+  for (const r of budgetedRows) {
+    if (!parentGroups.has(r.parentName)) {
+      parentGroups.set(r.parentName, { rows: [], prevSpend: 0 });
+    }
+    const g = parentGroups.get(r.parentName)!;
+    g.rows.push(r);
+    g.prevSpend += prevSpendMap.get(r.categoryId) ?? 0;
+  }
+
+  const parentGroupLines = Array.from(parentGroups.entries())
+    .map(([parentName, { rows, prevSpend }]) => {
+      const groupTarget = rows.reduce((s, r) => s + r.targetAmount, 0);
+      const groupActual = rows.reduce((s, r) => s + r.actualSpent, 0);
+      const groupPct =
+        groupTarget > 0 ? Math.round((groupActual / groupTarget) * 100) : 0;
+      const bucket = rows[0]?.ruleBucket ?? null;
+      const bucketLabel = bucket ? ` (${bucket})` : "";
+      const subLines = rows
+        .map((r) => {
+          const pct =
+            r.targetAmount > 0
+              ? Math.round((r.actualSpent / r.targetAmount) * 100)
+              : 0;
+          return `${r.categoryName} ${formatCurrency(r.actualSpent, homeCurrency)} of ${formatCurrency(r.targetAmount, homeCurrency)} (${pct}%)`;
+        })
+        .join(", ");
+      return `- ${parentName}${bucketLabel}: Target ${formatCurrency(groupTarget, homeCurrency)}, Spent ${formatCurrency(groupActual, homeCurrency)} (${groupPct}%), Last month: ${formatCurrency(prevSpend, homeCurrency)}\n  Subcategories: ${subLines}`;
     })
     .join("\n");
 
-  const prompt = `You are a friendly, insightful personal finance advisor. Analyse this monthly budget data and provide actionable insights.
+  const prompt = `You are a friendly, insightful personal finance advisor. Analyse this monthly budget data and provide exactly 3 distilled insights.
 
 Today: ${today}
 Budget month: ${formatMonth(month)}
@@ -120,17 +144,20 @@ Overall:
 - Projected month-end spend: ${formatCurrency(summary.projectedSpend, homeCurrency)}
 - On track: ${summary.onTrack ? "Yes" : "No"}
 
-Category breakdown:
-${categoryLines}
+Spending by category group (subcategories shown as context):
+${parentGroupLines}
 
 Rules:
-- Return 3-6 insights as JSON: {"insights": [{"type": "warning"|"suggestion"|"win", "category": "category name or null for general", "message": "concise actionable message"}]}
-- "warning": categories trending over budget with projected overspend amounts
-- "suggestion": specific, actionable advice like "Reduce dining out by $X this week to stay on track" or "Your grocery budget has room -- consider reallocating $X to utilities"
-- "win": positive reinforcement for categories well under budget or improved vs last month
-- Be specific with dollar amounts and timeframes
-- Use encouraging, solution-oriented language (not "you overspent", but "to get back on track, try...")
-- Compare to previous month where relevant
+- Return EXACTLY 3 insights as JSON: {"insights": [{"type": "warning"|"suggestion"|"win", "category": "parent group name or null for general", "message": "concise actionable message"}]}
+- Insight 1: overall status — type "win" if on track overall, "warning" if over budget overall
+- Insights 2–3: the two most notable parent-group-level findings, chosen from:
+  - "warning": a parent group that is NET over budget (even if driven by one subcategory)
+  - "win": a parent group that is meaningfully under budget or improved vs last month
+  - "suggestion": a parent group with an interesting internal shift (e.g., more dining, less shopping — net balanced) worth noting
+- CRITICAL: do NOT flag a subcategory overspend if its parent group is net on-track or under budget — internal shifts within a balanced group are not warnings
+- Use the parent group name in the "category" field (e.g., "Enjoyment", "Special")
+- Quote net group dollar amounts; only mention a specific subcategory if it is the sole driver of a group-level issue
+- Be specific with dollar amounts; use encouraging, solution-oriented language
 - If spending is very low early in the month, note it's too early for firm projections
 - Only return the JSON object, no other text.`;
 
