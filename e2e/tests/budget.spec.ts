@@ -159,7 +159,7 @@ test.describe("Budget", () => {
     await expect(
       page
         .getByText("Set up your budget for")
-        .or(page.getByText("Expense budget")),
+        .or(page.getByTestId("summary-spending-progress")),
     ).toBeVisible({ timeout: 10000 });
     // Column headers
     await expect(
@@ -173,7 +173,7 @@ test.describe("Budget", () => {
   }) => {
     await page.goto("/budget");
     const hasBudget = await page
-      .getByText("Expense budget")
+      .getByTestId("summary-spending-progress")
       .isVisible({ timeout: 8000 })
       .catch(() => false);
     test.skip(!hasBudget, "Needs budget targets for the current month");
@@ -255,7 +255,7 @@ test.describe("Budget", () => {
     await page.goto(`/budget?month=${prevMonth}`);
 
     const hasExpenseBudget = await page
-      .getByText("Expense budget")
+      .getByTestId("summary-spending-progress")
       .isVisible({ timeout: 8000 })
       .catch(() => false);
     test.skip(!hasExpenseBudget, "Needs budget targets for the previous month");
@@ -271,8 +271,7 @@ test.describe("Budget", () => {
       timeout: 8000,
     });
 
-    await expect(page.getByText("Realised this month")).toBeVisible();
-    await expect(page.getByText("(scheduled)").first()).toBeVisible();
+    await expect(page.getByText(/Realised .*expected/)).toBeVisible();
   });
 
   test("closed month unlocks review page with quick and deep formats", async ({
@@ -631,7 +630,7 @@ test.describe("Budget", () => {
     await expect(
       page
         .getByText("Set up your budget for")
-        .or(page.getByText("Expense budget")),
+        .or(page.getByTestId("summary-spending-progress")),
     ).toBeVisible({ timeout: 10000 });
 
     await expect(

@@ -1,15 +1,14 @@
 "use client";
 
+import { ArrowUpCircle, Gauge, PiggyBank } from "lucide-react";
 import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Gauge,
-  PiggyBank,
-  Target,
-} from "lucide-react";
+  BudgetProgressBar,
+  getBudgetStatus,
+  statusTextClass,
+} from "@/components/budget/budget-progress-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { BudgetSummary } from "@/types";
 
 export function BudgetSummaryStrip({
@@ -37,9 +36,24 @@ export function BudgetSummaryStrip({
   const incomeVariance = summary.actualIncome - summary.expectedIncome;
   const incomeMatchesExpected = Math.abs(incomeVariance) < 0.01;
 
+  const spendStatus = getBudgetStatus(
+    summary.totalSpent,
+    summary.totalBudgeted,
+    "default",
+  );
+  const saveStatus = getBudgetStatus(
+    savingsIncludingSurplus,
+    summary.totalSavingsBudgeted,
+    "savings",
+  );
+
+  const expenseLeft = summary.totalBudgeted - summary.totalSpent;
+  const savingsAhead = savingsIncludingSurplus - summary.totalSavingsBudgeted;
+
   return (
-    <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-5">
-      <Card>
+    <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
+      {/* Income — left, compact */}
+      <Card className="lg:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {summary.monthClosed ? "Income" : "Expected Income"}
@@ -48,18 +62,15 @@ export function BudgetSummaryStrip({
             <ArrowUpCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
           </div>
         </CardHeader>
-        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6 space-y-1">
+        <CardContent className="px-3 pt-0 pb-3 sm:px-6 sm:pb-6 space-y-1">
           {summary.monthClosed ? (
             <>
               <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
                 {formatCurrency(summary.actualIncome, homeCurrency)}
               </p>
               <p className="text-xs text-muted-foreground">
-                Realised this month
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Expected {formatCurrency(summary.expectedIncome, homeCurrency)}{" "}
-                (scheduled)
+                Realised &middot; expected{" "}
+                {formatCurrency(summary.expectedIncome, homeCurrency)}
               </p>
               {incomeMatchesExpected ? (
                 <p className="text-xs text-muted-foreground">
@@ -67,11 +78,12 @@ export function BudgetSummaryStrip({
                 </p>
               ) : (
                 <p
-                  className={`text-xs font-medium ${
+                  className={cn(
+                    "text-xs font-medium",
                     incomeVariance > 0
                       ? "text-green-600 dark:text-green-400"
-                      : "text-amber-600 dark:text-amber-400"
-                  }`}
+                      : "text-amber-600 dark:text-amber-400",
+                  )}
                 >
                   {incomeVariance > 0
                     ? `+${formatCurrency(incomeVariance, homeCurrency)} over expected`
@@ -92,113 +104,148 @@ export function BudgetSummaryStrip({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Expense budget
-          </CardTitle>
-          <div className="h-9 w-9 rounded-full bg-blue-500/10 flex items-center justify-center">
-            <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          </div>
-        </CardHeader>
-        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
-          <p className="text-xl sm:text-2xl font-semibold">
-            {formatCurrency(summary.totalBudgeted, homeCurrency)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Needs &amp; wants targets only
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Savings goals
-          </CardTitle>
-          <div className="h-9 w-9 rounded-full bg-emerald-500/10 flex items-center justify-center">
-            <PiggyBank className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          </div>
-        </CardHeader>
-        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
-          <p className="text-xl sm:text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
-            {formatCurrency(savingsIncludingSurplus, homeCurrency)}
-            <span className="text-sm font-normal text-muted-foreground">
-              {" "}
-              / {formatCurrency(summary.totalSavingsBudgeted, homeCurrency)}
-            </span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {summary.implicitSurplusAsSavings > 0 ? (
-              <>
-                Includes{" "}
-                {formatCurrency(summary.implicitSurplusAsSavings, homeCurrency)}{" "}
-                unspent surplus (closed month).{" "}
-              </>
-            ) : null}
-            {summary.totalSavingsBudgeted > 0
-              ? `${pctSavings}% of savings targets`
-              : "No savings targets set"}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Spent (needs &amp; wants)
-          </CardTitle>
-          <div className="h-9 w-9 rounded-full bg-red-500/10 flex items-center justify-center">
-            <ArrowDownCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-          </div>
-        </CardHeader>
-        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
-          <p className="text-xl sm:text-2xl font-semibold text-red-600 dark:text-red-400">
-            {formatCurrency(summary.totalSpent, homeCurrency)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {pctExpenseUsed}% of expense budget used
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="col-span-2 lg:col-span-1">
-        <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Daily pace
-          </CardTitle>
-          <div
-            className={`h-9 w-9 rounded-full flex items-center justify-center ${
-              summary.onTrack ? "bg-green-500/10" : "bg-red-500/10"
-            }`}
-          >
-            <Gauge
-              className={`h-4 w-4 ${
-                summary.onTrack
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
-              }`}
+      {/* Progress — right, wide. Stacks Spending + Saving with goal-line bars. */}
+      <Card className="lg:col-span-2">
+        <CardContent className="p-3 sm:p-6 space-y-5">
+          {/* Spending */}
+          <div data-testid="summary-spending-progress">
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="h-7 w-7 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                  <Gauge className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                </div>
+                <span className="text-sm font-medium">Spending</span>
+              </div>
+              <div className="flex items-baseline gap-2 tabular-nums whitespace-nowrap text-sm">
+                <span className="text-foreground font-semibold">
+                  {formatCurrency(summary.totalSpent, homeCurrency)}
+                </span>
+                <span className="text-muted-foreground/60">/</span>
+                <span className="text-muted-foreground">
+                  {formatCurrency(summary.totalBudgeted, homeCurrency)}
+                </span>
+                <span
+                  className={cn(
+                    "ml-1 font-semibold",
+                    statusTextClass(spendStatus),
+                  )}
+                >
+                  {pctExpenseUsed}%
+                </span>
+              </div>
+            </div>
+            <BudgetProgressBar
+              spent={summary.totalSpent}
+              target={summary.totalBudgeted}
+              size="lg"
+              variant="default"
             />
+            <div className="flex items-center justify-between gap-3 mt-1.5 text-xs text-muted-foreground tabular-nums">
+              {summary.totalBudgeted > 0 ? (
+                <span>
+                  <span
+                    className={
+                      expenseLeft >= 0
+                        ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                        : "text-red-600 dark:text-red-400 font-medium"
+                    }
+                  >
+                    {expenseLeft >= 0 ? "" : "−"}
+                    {formatCurrency(Math.abs(expenseLeft), homeCurrency)}
+                  </span>{" "}
+                  {expenseLeft >= 0 ? "left" : "over"} &middot; needs &amp;
+                  wants
+                </span>
+              ) : (
+                <span>No expense budget set</span>
+              )}
+              {summary.totalBudgeted > 0 && summary.daysRemaining > 0 ? (
+                <span className="text-right">
+                  {formatCurrency(summary.dailyBurnRate, homeCurrency)}/day
+                  &middot;{" "}
+                  <span
+                    className={cn(
+                      "font-medium",
+                      summary.onTrack
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400",
+                    )}
+                  >
+                    {summary.onTrack ? "on track" : "over pace"}
+                  </span>{" "}
+                  &middot; {summary.daysRemaining}d left
+                </span>
+              ) : null}
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="px-3 pt-0 pb-2 sm:px-6 sm:pb-6">
-          <p
-            className={`text-xl sm:text-2xl font-semibold ${
-              summary.onTrack
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-600 dark:text-red-400"
-            }`}
-          >
-            {formatCurrency(summary.dailyBurnRate, homeCurrency)}
-            <span className="text-sm font-normal text-muted-foreground">
-              /day
-            </span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {summary.onTrack ? "On track" : "Over pace"} &middot;{" "}
-            {formatCurrency(summary.allowedDailyRate, homeCurrency)}/day allowed
-            &middot; {summary.daysRemaining}d left
-          </p>
+
+          {/* Saving */}
+          <div data-testid="summary-saving-progress">
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="h-7 w-7 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+                  <PiggyBank className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <span className="text-sm font-medium">Saving</span>
+              </div>
+              <div className="flex items-baseline gap-2 tabular-nums whitespace-nowrap text-sm">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                  {formatCurrency(savingsIncludingSurplus, homeCurrency)}
+                </span>
+                <span className="text-muted-foreground/60">/</span>
+                <span className="text-muted-foreground">
+                  {formatCurrency(summary.totalSavingsBudgeted, homeCurrency)}
+                </span>
+                <span
+                  className={cn(
+                    "ml-1 font-semibold",
+                    statusTextClass(saveStatus),
+                  )}
+                >
+                  {pctSavings}%
+                </span>
+              </div>
+            </div>
+            <BudgetProgressBar
+              spent={savingsIncludingSurplus}
+              target={summary.totalSavingsBudgeted}
+              size="lg"
+              variant="savings"
+            />
+            <div className="flex items-center justify-between gap-3 mt-1.5 text-xs text-muted-foreground tabular-nums">
+              {summary.totalSavingsBudgeted > 0 ? (
+                <span>
+                  {savingsAhead >= 0 ? (
+                    <>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                        +{formatCurrency(savingsAhead, homeCurrency)}
+                      </span>{" "}
+                      over goal
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-red-600 dark:text-red-400 font-medium">
+                        {formatCurrency(Math.abs(savingsAhead), homeCurrency)}
+                      </span>{" "}
+                      to goal
+                    </>
+                  )}
+                </span>
+              ) : (
+                <span>No savings targets set</span>
+              )}
+              {summary.implicitSurplusAsSavings > 0 ? (
+                <span className="text-right">
+                  Includes{" "}
+                  {formatCurrency(
+                    summary.implicitSurplusAsSavings,
+                    homeCurrency,
+                  )}{" "}
+                  surplus
+                </span>
+              ) : null}
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
