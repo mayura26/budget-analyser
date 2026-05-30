@@ -3,7 +3,11 @@
 import { AlertTriangle, ChevronDown, ChevronRight, Info } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useRef, useState, useTransition } from "react";
-import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
+import {
+  BudgetProgressBar,
+  getBudgetStatus,
+  statusTextClass,
+} from "@/components/budget/budget-progress-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Tooltip,
@@ -103,10 +107,37 @@ function syntheticSurplusRemainingDisplay(
   return <span className="text-muted-foreground">&mdash;</span>;
 }
 
+function renderRemaining(
+  row: BudgetCategoryRow,
+  homeCurrency: SupportedCurrency,
+) {
+  const isSynthetic = row.isSyntheticSurplus === true;
+  if (isSynthetic) return syntheticSurplusRemainingDisplay(row, homeCurrency);
+  if (row.categoryKind === "savings" && row.targetAmount > 0) {
+    return savingsRemainingDisplay(row, homeCurrency);
+  }
+  if (row.targetAmount > 0) {
+    const remaining = row.targetAmount - row.actualSpent;
+    return (
+      <span
+        className={
+          remaining >= 0
+            ? "text-emerald-600 dark:text-emerald-400"
+            : "text-red-600 dark:text-red-400"
+        }
+      >
+        {remaining >= 0 ? "" : "−"}
+        {formatCurrency(Math.abs(remaining), homeCurrency)}
+      </span>
+    );
+  }
+  return <span className="text-muted-foreground">&mdash;</span>;
+}
+
 const gridColsBase =
-  "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
+  "grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_1fr_minmax(14rem,18rem)_minmax(8rem,1fr)]";
 const gridColsDrilldown =
-  "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[auto_auto_1fr_7rem_7rem_minmax(6rem,1fr)_6rem]";
+  "grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_auto_1fr_minmax(14rem,18rem)_minmax(8rem,1fr)]";
 
 function CategoryRow({
   row,
@@ -148,11 +179,11 @@ function CategoryRow({
       : row.targetAmount < 0
         ? Math.round((row.actualSpent / row.targetAmount) * 100)
         : 0;
-  const remaining = row.targetAmount - row.actualSpent;
+  const barVariant: "default" | "savings" =
+    row.categoryKind === "savings" ? "savings" : "default";
+  const status = getBudgetStatus(barSpentForPct, row.targetAmount, barVariant);
   const pctLabelClass =
-    row.categoryKind === "savings" && row.targetAmount > 0 && pct > 100
-      ? "text-emerald-600 dark:text-emerald-400"
-      : "text-muted-foreground";
+    row.targetAmount > 0 ? statusTextClass(status) : "text-muted-foreground";
   const belowScheduled =
     row.targetAmount > 0 && row.targetAmount < row.scheduledAmount;
 
@@ -237,98 +268,9 @@ function CategoryRow({
           ) : null}
         </div>
 
-        {/* Target (editable) */}
-        <div className="text-right">
-          {isSynthetic ? (
-            <span
-              className={cn(
-                "text-sm tabular-nums px-1.5 py-0.5",
-                row.targetAmount < 0
-                  ? "text-red-600 dark:text-red-400"
-                  : row.targetAmount > 0
-                    ? "text-foreground"
-                    : "text-muted-foreground",
-              )}
-            >
-              {formatCurrency(row.targetAmount, homeCurrency)}
-            </span>
-          ) : isEditing && !readOnly ? (
-            <div className="relative">
-              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                {currencySymbol(homeCurrency)}
-              </span>
-              <input
-                ref={inputRef}
-                name={`target_${row.categoryId}`}
-                type="number"
-                step="10"
-                min="0"
-                defaultValue={row.targetAmount || ""}
-                className="w-full h-7 rounded border bg-background px-1.5 pl-4 text-right text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
-                onBlur={onBlur}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "Escape") {
-                    e.currentTarget.blur();
-                  }
-                }}
-              />
-              {(row.avg3Month > 0 || row.scheduledAmount > 0) && (
-                <div className="absolute top-full left-0 right-0 mt-0.5 text-[10px] text-muted-foreground whitespace-nowrap z-10 bg-popover rounded px-1 py-0.5 shadow-sm border">
-                  {row.avg3Month > 0 && (
-                    <span>
-                      Avg: {formatCurrency(row.avg3Month, homeCurrency)}/mo
-                    </span>
-                  )}
-                  {row.avg3Month > 0 && row.scheduledAmount > 0 && (
-                    <span> &middot; </span>
-                  )}
-                  {row.scheduledAmount > 0 && (
-                    <span>
-                      Recurring:{" "}
-                      {formatCurrency(row.scheduledAmount, homeCurrency)}/mo
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => !readOnly && onEdit(row.categoryId)}
-              className={cn(
-                "text-sm tabular-nums px-1.5 py-0.5 rounded transition-colors",
-                !readOnly && "hover:bg-muted cursor-pointer",
-                row.targetAmount === 0 && "text-muted-foreground",
-              )}
-              disabled={readOnly}
-            >
-              {row.targetAmount > 0 ? (
-                <span className="flex items-center gap-1 justify-end">
-                  {formatCurrency(row.targetAmount, homeCurrency)}
-                  {belowScheduled && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <AlertTriangle className="h-3 w-3 text-amber-500" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Target is below recurring scheduled amount (
-                          {formatCurrency(row.scheduledAmount, homeCurrency)}
-                          /mo)
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </span>
-              ) : (
-                <span className="italic">Set target</span>
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* Actual spent / allocated */}
-        <div className="text-right text-sm tabular-nums">
+        {/* Merged budget: spent / target · left */}
+        <div className="text-right text-sm tabular-nums whitespace-nowrap flex items-center justify-end gap-1.5">
+          {/* Spent */}
           {isSynthetic ? (
             <span
               className={
@@ -347,7 +289,7 @@ function CategoryRow({
               className={
                 row.categoryKind === "savings"
                   ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-red-600 dark:text-red-400"
+                  : "text-foreground"
               }
             >
               {formatCurrency(row.actualSpent, homeCurrency)}
@@ -357,6 +299,101 @@ function CategoryRow({
               {formatCurrency(0, homeCurrency)}
             </span>
           )}
+
+          <span className="text-muted-foreground/60">/</span>
+
+          {/* Target (editable for non-synthetic) */}
+          {isSynthetic ? (
+            <span
+              className={cn(
+                row.targetAmount < 0
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-muted-foreground",
+              )}
+            >
+              {formatCurrency(row.targetAmount, homeCurrency)}
+            </span>
+          ) : isEditing && !readOnly ? (
+            <span className="relative inline-block">
+              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                {currencySymbol(homeCurrency)}
+              </span>
+              <input
+                ref={inputRef}
+                name={`target_${row.categoryId}`}
+                type="number"
+                step="10"
+                min="0"
+                defaultValue={row.targetAmount || ""}
+                className="w-24 h-7 rounded border bg-background px-1.5 pl-5 text-right text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+                onBlur={onBlur}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape") {
+                    e.currentTarget.blur();
+                  }
+                }}
+              />
+              {(row.avg3Month > 0 || row.scheduledAmount > 0) && (
+                <span className="absolute top-full right-0 mt-0.5 text-[10px] text-muted-foreground whitespace-nowrap z-10 bg-popover rounded px-1 py-0.5 shadow-sm border">
+                  {row.avg3Month > 0 && (
+                    <span>
+                      Avg: {formatCurrency(row.avg3Month, homeCurrency)}/mo
+                    </span>
+                  )}
+                  {row.avg3Month > 0 && row.scheduledAmount > 0 && (
+                    <span> &middot; </span>
+                  )}
+                  {row.scheduledAmount > 0 && (
+                    <span>
+                      Recurring:{" "}
+                      {formatCurrency(row.scheduledAmount, homeCurrency)}/mo
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => !readOnly && onEdit(row.categoryId)}
+              className={cn(
+                "tabular-nums px-1 py-0.5 rounded transition-colors inline-flex items-center gap-1",
+                !readOnly && "hover:bg-muted cursor-pointer",
+                row.targetAmount === 0
+                  ? "text-muted-foreground"
+                  : "text-muted-foreground",
+              )}
+              disabled={readOnly}
+            >
+              {row.targetAmount > 0 ? (
+                <>
+                  {formatCurrency(row.targetAmount, homeCurrency)}
+                  {belowScheduled && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Target is below recurring scheduled amount (
+                          {formatCurrency(row.scheduledAmount, homeCurrency)}
+                          /mo)
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </>
+              ) : (
+                <span className="italic">Set target</span>
+              )}
+            </button>
+          )}
+
+          {/* Remaining — hidden on mobile to save room */}
+          <span className="hidden sm:inline text-muted-foreground/60">·</span>
+          <span className="hidden sm:inline min-w-[4.5rem] text-right">
+            {renderRemaining(row, homeCurrency)}
+          </span>
         </div>
 
         {/* Progress bar */}
@@ -365,36 +402,18 @@ function CategoryRow({
             <div className="text-xs tabular-nums text-right text-red-600 dark:text-red-400">
               Deficit
             </div>
-          ) : isSynthetic && row.targetAmount > 0 ? (
-            <div className="flex items-center gap-2">
-              <BudgetProgressBar
-                spent={Math.max(0, row.actualSpent)}
-                target={row.targetAmount}
-                className="flex-1"
-                variant="savings"
-              />
-              <span
-                className={cn(
-                  "text-xs tabular-nums w-8 text-right",
-                  pctLabelClass,
-                )}
-              >
-                {pct}%
-              </span>
-            </div>
-          ) : isSynthetic ? (
-            <div className="h-2" />
           ) : row.targetAmount > 0 ? (
             <div className="flex items-center gap-2">
               <BudgetProgressBar
-                spent={row.actualSpent}
+                spent={barSpentForPct}
                 target={row.targetAmount}
                 className="flex-1"
-                variant={row.categoryKind === "savings" ? "savings" : "default"}
+                variant={barVariant}
+                size="sm"
               />
               <span
                 className={cn(
-                  "text-xs tabular-nums w-8 text-right",
+                  "text-xs tabular-nums w-9 text-right",
                   pctLabelClass,
                 )}
               >
@@ -403,40 +422,6 @@ function CategoryRow({
             </div>
           ) : (
             <div className="h-2" />
-          )}
-        </div>
-
-        {/* Remaining */}
-        <div className="text-right text-sm tabular-nums">
-          {isSynthetic ? (
-            syntheticSurplusRemainingDisplay(row, homeCurrency)
-          ) : row.categoryKind === "savings" && row.targetAmount > 0 ? (
-            savingsRemainingDisplay(row, homeCurrency)
-          ) : row.targetAmount > 0 ? (
-            <span
-              className={
-                remaining >= 0
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
-              }
-            >
-              {remaining >= 0 ? "" : "-"}
-              {formatCurrency(Math.abs(remaining), homeCurrency)}
-            </span>
-          ) : isSynthetic &&
-            (row.targetAmount !== 0 || row.actualSpent !== 0) ? (
-            <span
-              className={
-                remaining >= 0
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
-              }
-            >
-              {remaining >= 0 ? "" : "−"}
-              {formatCurrency(Math.abs(remaining), homeCurrency)}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
           )}
         </div>
       </div>
@@ -596,10 +581,8 @@ export function BudgetCategoryList({
             {drilldownContext ? <div /> : null}
             <div />
             <div>Category</div>
-            <div className="text-right">Target</div>
-            <div className="text-right">Spent</div>
+            <div className="text-right">Budget</div>
             <div className="hidden sm:block">Progress</div>
-            <div className="text-right">Left</div>
           </div>
 
           {groups.map(({ group, rows: groupRows }) => {
@@ -619,29 +602,101 @@ export function BudgetCategoryList({
               ? Math.max(0, rawGroupSpent)
               : rawGroupSpent;
 
+            const groupVariant: "default" | "savings" = isSavingsGroup
+              ? "savings"
+              : "default";
+            const groupStatus = getBudgetStatus(
+              groupSpent,
+              groupBudgeted,
+              groupVariant,
+            );
+            const groupPct =
+              groupBudgeted > 0
+                ? Math.round((groupSpent / groupBudgeted) * 100)
+                : 0;
+            const groupRemaining = groupBudgeted - groupSpent;
+            const groupRemainingClass = isSavingsGroup
+              ? groupSpent - groupBudgeted >= -0.005
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400"
+              : groupRemaining >= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400";
+            const groupRemainingLabel = isSavingsGroup
+              ? groupSpent - groupBudgeted >= -0.005
+                ? `+${formatCurrency(Math.max(0, groupSpent - groupBudgeted), homeCurrency)}`
+                : formatCurrency(groupBudgeted - groupSpent, homeCurrency)
+              : `${groupRemaining >= 0 ? "" : "−"}${formatCurrency(Math.abs(groupRemaining), homeCurrency)}`;
             return (
               <div key={group} className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group)}
-                  className="flex items-center gap-2 w-full px-2 sm:px-3 py-1.5 text-sm font-semibold hover:bg-muted/50 rounded-md transition-colors"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <div
+                  className={cn(
+                    "grid items-center gap-x-2 sm:gap-x-3 px-2 sm:px-3 py-1.5 hover:bg-muted/50 rounded-md transition-colors",
+                    headerGrid,
                   )}
-                  <span title={group}>
-                    <span className="sm:hidden">
-                      {budgetCategoryShortTitle(group)}
+                >
+                  {drilldownContext ? <div /> : null}
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group)}
+                    className="col-span-2 flex items-center gap-2 text-sm font-semibold text-left min-w-0"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                    <span title={group} className="min-w-0 truncate">
+                      <span className="sm:hidden">
+                        {budgetCategoryShortTitle(group)}
+                      </span>
+                      <span className="hidden sm:inline">{group}</span>
                     </span>
-                    <span className="hidden sm:inline">{group}</span>
-                  </span>
-                  <span className="ml-auto text-xs font-normal text-muted-foreground tabular-nums">
-                    {formatCurrency(groupSpent, homeCurrency)} /{" "}
-                    {formatCurrency(groupBudgeted, homeCurrency)}
-                  </span>
-                </button>
+                  </button>
+                  <div className="text-right text-sm tabular-nums whitespace-nowrap flex items-center justify-end gap-1.5">
+                    <span className="text-foreground">
+                      {formatCurrency(groupSpent, homeCurrency)}
+                    </span>
+                    <span className="text-muted-foreground/60">/</span>
+                    <span className="text-muted-foreground">
+                      {formatCurrency(groupBudgeted, homeCurrency)}
+                    </span>
+                    <span className="hidden sm:inline text-muted-foreground/60">
+                      ·
+                    </span>
+                    <span
+                      className={cn(
+                        "hidden sm:inline min-w-[4.5rem] text-right",
+                        groupRemainingClass,
+                      )}
+                    >
+                      {groupRemainingLabel}
+                    </span>
+                  </div>
+                  <div className="hidden sm:block">
+                    {groupBudgeted > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <BudgetProgressBar
+                          spent={groupSpent}
+                          target={groupBudgeted}
+                          className="flex-1"
+                          variant={groupVariant}
+                          size="lg"
+                        />
+                        <span
+                          className={cn(
+                            "text-xs tabular-nums w-9 text-right font-medium",
+                            statusTextClass(groupStatus),
+                          )}
+                        >
+                          {groupPct}%
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="h-3" />
+                    )}
+                  </div>
+                </div>
 
                 {isExpanded && (
                   <div>

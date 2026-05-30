@@ -162,9 +162,10 @@ test.describe("Budget", () => {
         .or(page.getByText("Expense budget")),
     ).toBeVisible({ timeout: 10000 });
     // Column headers
-    await expect(page.getByText("Target").first()).toBeVisible();
-    await expect(page.getByText("Spent").first()).toBeVisible();
-    await expect(page.getByText("Left").first()).toBeVisible();
+    await expect(
+      page.getByText("Budget", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(page.getByText("Progress").first()).toBeVisible();
   });
 
   test("50/30/20 strip renders three mini grouped bar charts when budget exists", async ({
