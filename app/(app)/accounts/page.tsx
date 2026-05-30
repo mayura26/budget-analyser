@@ -21,6 +21,76 @@ import {
 } from "@/lib/db/schema";
 import type { AccountGroup } from "@/types";
 
+const IMPORT_FRESHNESS_CLASSES = {
+  fresh:
+    "border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200",
+  medium:
+    "border-amber-200 bg-amber-100 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200",
+  warning:
+    "border-orange-200 bg-orange-100 text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-200",
+  problem:
+    "border-red-200 bg-red-100 text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200",
+} as const;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function getImportFreshnessBadge(lastImportedAt: number | null): {
+  className: string;
+  label: string;
+  title?: string;
+} {
+  if (!lastImportedAt) {
+    return {
+      className: IMPORT_FRESHNESS_CLASSES.problem,
+      label: "Last import: Never imported",
+    };
+  }
+
+  const importedDate = new Date(lastImportedAt * 1000);
+  const dayDiff = Math.max(
+    0,
+    Math.floor(
+      (startOfLocalDay(new Date()).getTime() -
+        startOfLocalDay(importedDate).getTime()) /
+        MS_PER_DAY,
+    ),
+  );
+
+  if (dayDiff === 0) {
+    return {
+      className: IMPORT_FRESHNESS_CLASSES.fresh,
+      label: "Last import: Today",
+      title: importedDate.toLocaleString(),
+    };
+  }
+
+  if (dayDiff <= 7) {
+    return {
+      className: IMPORT_FRESHNESS_CLASSES.medium,
+      label: `Last import: ${dayDiff}d ago`,
+      title: importedDate.toLocaleString(),
+    };
+  }
+
+  if (dayDiff < 30) {
+    return {
+      className: IMPORT_FRESHNESS_CLASSES.warning,
+      label: `Last import: ${dayDiff}d ago`,
+      title: importedDate.toLocaleString(),
+    };
+  }
+
+  return {
+    className: IMPORT_FRESHNESS_CLASSES.problem,
+    label: "Last import: 30d+ ago",
+    title: importedDate.toLocaleString(),
+  };
+}
+
 export default function AccountsPage() {
   const defaultHomeCurrency = getHomeCurrency();
   const allProfiles = db.select().from(bankProfiles).all();
@@ -72,9 +142,7 @@ export default function AccountsPage() {
   }
 
   function AccountCard({ account }: { account: (typeof accountRows)[0] }) {
-    const lastImportText = account.lastImportedAt
-      ? new Date(account.lastImportedAt * 1000).toLocaleString()
-      : "Never imported";
+    const importFreshness = getImportFreshnessBadge(account.lastImportedAt);
     const latestTransactionText =
       account.latestTransactionDate ?? "No transactions yet";
 
@@ -114,7 +182,13 @@ export default function AccountsPage() {
             <p>
               {account.currency} · {account.transactionCount} transactions
             </p>
-            <p>Last import: {lastImportText}</p>
+            <Badge
+              variant="outline"
+              className={importFreshness.className}
+              title={importFreshness.title}
+            >
+              {importFreshness.label}
+            </Badge>
             <p>Latest transaction: {latestTransactionText}</p>
             {account.bankProfileName && (
               <Badge variant="secondary" className="text-xs">

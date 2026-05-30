@@ -160,9 +160,7 @@ test.describe("Import", () => {
     const accountCard = page.locator(".rounded-lg").filter({
       hasText: accountName,
     });
-    await expect(accountCard).toContainText(
-      /Last import:\s(?!Never imported).+/,
-    );
+    await expect(accountCard.getByText("Last import: Today")).toBeVisible();
     await expect(accountCard).toContainText(
       /Latest transaction:\s\d{4}-\d{2}-\d{2}/,
     );

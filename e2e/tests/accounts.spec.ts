@@ -37,7 +37,9 @@ test.describe("Accounts", () => {
     const testChequingCard = page.locator(".rounded-lg").filter({
       hasText: TEST_ACCOUNT_NAME,
     });
-    await expect(testChequingCard).toContainText("Last import: Never imported");
+    await expect(
+      testChequingCard.getByText("Last import: Never imported"),
+    ).toBeVisible();
     await expect(testChequingCard).toContainText(
       "Latest transaction: No transactions yet",
     );

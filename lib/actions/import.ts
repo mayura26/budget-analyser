@@ -638,6 +638,7 @@ export async function confirmImport(formData: FormData): Promise<
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
   revalidatePath("/import");
+  revalidatePath("/accounts");
 
   return {
     success: true,
