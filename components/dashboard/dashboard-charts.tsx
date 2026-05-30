@@ -30,6 +30,7 @@ import type { CategoryTotal, MonthlyTotal } from "@/types";
 
 const UNSPENT_SLICE_COLOR = "#10b981";
 const SAVINGS_PIE_COLOR = "#059669";
+const MONTHLY_AXIS_WIDTH = 72;
 
 type PieDatum = {
   name: string;
@@ -184,7 +185,7 @@ export function DashboardCharts({
             <ResponsiveContainer width="100%" height={240}>
               <BarChart
                 data={barData}
-                margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+                margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
                 barCategoryGap="30%"
                 barGap={2}
               >
@@ -206,7 +207,8 @@ export function DashboardCharts({
                   tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
-                  width={44}
+                  tickMargin={8}
+                  width={MONTHLY_AXIS_WIDTH}
                 />
                 <Tooltip
                   content={<ChartTooltip homeCurrency={homeCurrency} />}

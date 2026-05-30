@@ -124,6 +124,56 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
   });
 
+  test("monthly overview scale labels stay inside the chart", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+
+    try {
+      const seed = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName,
+          count: 1,
+          reset: true,
+          seedMonth,
+          addIncome: true,
+        },
+      });
+      expect(seed.ok()).toBeTruthy();
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const chartCard = page
+        .locator(".rounded-lg")
+        .filter({ hasText: "Monthly Overview" })
+        .first();
+      await expect(chartCard.getByText(/monthly overview/i)).toBeVisible({
+        timeout: 10000,
+      });
+      const tickLabels = chartCard.locator("svg text").filter({
+        hasText: "AUD",
+      });
+      await expect(tickLabels.first()).toContainText("AUD");
+
+      const ticks = await tickLabels.evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const tickRect = node.getBoundingClientRect();
+          const svgRect = node.closest("svg")?.getBoundingClientRect();
+          return {
+            text: node.textContent ?? "",
+            clipped: !svgRect || tickRect.left < svgRect.left,
+          };
+        }),
+      );
+
+      expect(ticks.length).toBeGreaterThan(0);
+      expect(ticks.filter((tick) => tick.clipped)).toEqual([]);
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
+  });
+
   test("50/30/20 compact widget renders alongside Budget Status when targets exist", async ({
     page,
   }) => {

@@ -15,6 +15,8 @@ import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 import type { MonthlyTotal } from "@/types";
 
+const MONTHLY_AXIS_WIDTH = 72;
+
 function formatMonthShort(monthStr: string) {
   const [year, month] = monthStr.split("-");
   const date = new Date(Number(year), Number(month) - 1, 1);
@@ -90,7 +92,7 @@ export function AnalyticsMonthlyChart({
           <ResponsiveContainer width="100%" height={240}>
             <BarChart
               data={barData}
-              margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+              margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
               barCategoryGap="30%"
               barGap={2}
             >
@@ -112,7 +114,8 @@ export function AnalyticsMonthlyChart({
                 tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
-                width={44}
+                tickMargin={8}
+                width={MONTHLY_AXIS_WIDTH}
               />
               <Tooltip
                 content={<MonthlyTooltip homeCurrency={homeCurrency} />}
