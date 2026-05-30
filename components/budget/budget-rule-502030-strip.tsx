@@ -2,192 +2,155 @@
 
 import Link from "next/link";
 import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  type BudgetStatus,
+  statusTextClass,
+} from "@/components/budget/budget-progress-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { BudgetRule502030Band, BudgetSummary } from "@/types";
 
-type BandKind = "Actual" | "Target" | "Guideline";
+const SCALE = 130;
+const GUIDE_LEFT_PCT = (100 / SCALE) * 100; // ~76.9%
 
-const BAR_BLUE = "#3b82f6";
-const BAR_GREEN = "#22c55e";
-const BAR_RED = "#ef4444";
-const BAR_PRIMARY = "var(--color-primary)";
-
-function actualColorFor(
+function getBand502030Status(
   bucket: "needs" | "wants" | "savings",
   band: BudgetRule502030Band,
-): string {
+): BudgetStatus {
+  if (band.guideline <= 0) return "under";
   if (bucket === "savings") {
-    return band.guideline > 0 && band.actualTotal >= band.guideline
-      ? BAR_GREEN
-      : BAR_PRIMARY;
+    if (band.actualTotal >= band.guideline) return "safe";
+    if (band.targetTotal > 0 && band.actualTotal >= band.targetTotal)
+      return "caution";
+    return "over";
   }
-  return band.guideline > 0 && band.actualTotal > band.guideline
-    ? BAR_RED
-    : BAR_PRIMARY;
+  if (band.targetTotal <= 0 || band.actualTotal <= band.targetTotal)
+    return "under";
+  if (band.actualTotal <= band.guideline) return "caution";
+  return "over";
 }
 
-function buildChartData(band: BudgetRule502030Band) {
-  return [
-    { kind: "Actual" as const, value: band.actualTotal },
-    { kind: "Target" as const, value: band.targetTotal },
-    { kind: "Guideline" as const, value: band.guideline },
-  ];
+function fillColorClass(status: BudgetStatus): string {
+  switch (status) {
+    case "under":
+    case "safe":
+      return "bg-emerald-500 dark:bg-emerald-400";
+    case "caution":
+      return "bg-amber-500 dark:bg-amber-400";
+    case "over":
+      return "bg-red-500 dark:bg-red-400";
+  }
 }
 
-function BandTooltip({
-  active,
-  payload,
-  homeCurrency,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload?: { kind: BandKind; value: number } }>;
-  homeCurrency: SupportedCurrency;
-}) {
-  if (!active || !payload?.length) return null;
-  const datum = payload[0]?.payload;
-  if (!datum) return null;
-  return (
-    <div className="chart-tooltip">
-      <p className="chart-tooltip-label">{datum.kind}</p>
-      <p className="font-semibold">
-        {formatCurrency(datum.value, homeCurrency)}
-      </p>
-    </div>
-  );
-}
-
-function BandMiniChart({
+function BandHorizontalBar({
   label,
   bucket,
   band,
   homeCurrency,
-  height = 140,
-  showAxis = true,
+  size = "lg",
 }: {
   label: string;
   bucket: "needs" | "wants" | "savings";
   band: BudgetRule502030Band;
   homeCurrency: SupportedCurrency;
-  height?: number;
-  showAxis?: boolean;
+  size?: "sm" | "lg";
 }) {
-  const data = buildChartData(band);
-  const actualFill = actualColorFor(bucket, band);
-  const colorByKind: Record<BandKind, string> = {
-    Actual: actualFill,
-    Target: BAR_BLUE,
-    Guideline: BAR_GREEN,
-  };
+  const status = getBand502030Status(bucket, band);
+  const fillPct =
+    band.guideline > 0
+      ? (Math.max(
+          0,
+          Math.min((band.actualTotal / band.guideline) * 100, SCALE),
+        ) /
+          SCALE) *
+        100
+      : 0;
 
-  const pctGuideline =
+  const targetRawPct =
+    band.targetTotal > 0 && band.guideline > 0
+      ? (Math.min((band.targetTotal / band.guideline) * 100, SCALE) / SCALE) *
+        100
+      : null;
+  const showTargetTick =
+    targetRawPct !== null &&
+    Math.abs((band.targetTotal - band.guideline) / band.guideline) > 0.05;
+
+  const pct =
     band.guideline > 0
       ? Math.round((band.actualTotal / band.guideline) * 100)
       : 0;
 
-  const isOverGuideline =
-    bucket !== "savings" &&
-    band.guideline > 0 &&
-    band.actualTotal > band.guideline;
+  const barH = size === "sm" ? 12 : 16;
 
   return (
-    <div className="space-y-1.5" data-testid={`rule-band-chart-${bucket}`}>
-      <div className="flex items-baseline justify-between gap-2">
+    <div data-testid={`rule-band-chart-${bucket}`}>
+      <div className="flex items-baseline justify-between mb-1.5">
         <span className="text-sm font-medium">{label}</span>
         <span
-          className={`text-xs tabular-nums ${
-            isOverGuideline
-              ? "text-red-600 dark:text-red-400 font-medium"
-              : "text-muted-foreground"
-          }`}
+          className={cn(
+            "text-xs tabular-nums font-medium",
+            statusTextClass(status),
+          )}
         >
-          {pctGuideline}% of guide
+          {pct}% of guide
         </span>
       </div>
-      <div style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={data}
-            margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
-            barCategoryGap="20%"
-          >
-            <XAxis
-              dataKey="kind"
-              tick={{
-                fontSize: 11,
-                fill: "var(--color-muted-foreground)",
-              }}
-              axisLine={false}
-              tickLine={false}
-              interval={0}
-            />
-            {showAxis ? (
-              <YAxis
-                tickFormatter={(v) =>
-                  Number(v) >= 1000
-                    ? `${Math.round(Number(v) / 1000)}k`
-                    : `${Math.round(Number(v))}`
-                }
-                tick={{
-                  fontSize: 10,
-                  fill: "var(--color-muted-foreground)",
-                }}
-                axisLine={false}
-                tickLine={false}
-                width={32}
-              />
-            ) : (
-              <YAxis hide />
-            )}
-            <Tooltip
-              content={<BandTooltip homeCurrency={homeCurrency} />}
-              cursor={{ fill: "var(--color-accent)" }}
-            />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-              {data.map((d) => (
-                <Cell key={d.kind} fill={colorByKind[d.kind]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      {showAxis ? (
-        <p className="text-xs tabular-nums text-muted-foreground">
-          Actual {formatCurrency(band.actualTotal, homeCurrency)} · Target{" "}
-          {formatCurrency(band.targetTotal, homeCurrency)} · Guide{" "}
-          {formatCurrency(band.guideline, homeCurrency)}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
-function ChartLegend() {
-  const items: Array<{ name: string; color: string }> = [
-    { name: "Actual", color: BAR_PRIMARY },
-    { name: "Target", color: BAR_BLUE },
-    { name: "Guideline", color: BAR_GREEN },
-  ];
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {items.map((it) => (
-        <span key={it.name} className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-2 w-2 rounded-sm"
-            style={{ background: it.color }}
+      <div className="relative overflow-hidden" style={{ height: barH }}>
+        {/* track */}
+        <div className="absolute inset-0 bg-muted rounded-full" />
+        {/* fill */}
+        <div
+          className={cn(
+            "absolute top-0 left-0 h-full rounded-full transition-all duration-500",
+            fillColorClass(status),
+          )}
+          style={{ width: `${fillPct}%` }}
+        />
+        {/* guideline tick */}
+        <div
+          className="absolute top-0 h-full w-0.5 bg-foreground/50"
+          style={{ left: `${GUIDE_LEFT_PCT}%` }}
+          aria-hidden
+        />
+        {/* target tick */}
+        {showTargetTick && targetRawPct !== null && (
+          <div
+            className="absolute top-0 h-full w-0.5 bg-foreground/25"
+            style={{ left: `${targetRawPct}%` }}
+            aria-hidden
           />
-          {it.name}
+        )}
+      </div>
+
+      {/* tick labels */}
+      <div className="relative mt-0.5" style={{ height: 14 }}>
+        <span
+          className="absolute text-[10px] text-muted-foreground -translate-x-1/2"
+          style={{ left: `${GUIDE_LEFT_PCT}%` }}
+        >
+          Guide
         </span>
-      ))}
+        {showTargetTick && targetRawPct !== null && (
+          <span
+            className="absolute text-[10px] text-muted-foreground -translate-x-1/2"
+            style={{ left: `${targetRawPct}%` }}
+          >
+            Target
+          </span>
+        )}
+      </div>
+
+      {/* numbers row — full strip only */}
+      {size === "lg" && (
+        <p className="text-xs tabular-nums text-muted-foreground mt-1">
+          {formatCurrency(band.actualTotal, homeCurrency)} actual &middot;{" "}
+          {band.targetTotal > 0
+            ? `${formatCurrency(band.targetTotal, homeCurrency)} budget · `
+            : ""}
+          {formatCurrency(band.guideline, homeCurrency)} guide
+        </p>
+      )}
     </div>
   );
 }
@@ -218,9 +181,6 @@ export function BudgetRule502030Strip({
               {basisNote}
             </p>
           </div>
-          <div className="hidden sm:block shrink-0 pt-1">
-            <ChartLegend />
-          </div>
         </div>
         {summary.implicitSurplusAsSavings > 0 ? (
           <p className="text-xs text-muted-foreground font-normal">
@@ -230,28 +190,28 @@ export function BudgetRule502030Strip({
             moves).
           </p>
         ) : null}
-        <div className="sm:hidden">
-          <ChartLegend />
-        </div>
       </CardHeader>
-      <CardContent className="grid gap-6 sm:grid-cols-3">
-        <BandMiniChart
+      <CardContent className="space-y-5">
+        <BandHorizontalBar
           label="Needs (~50%)"
           bucket="needs"
           band={r.needs}
           homeCurrency={homeCurrency}
+          size="lg"
         />
-        <BandMiniChart
+        <BandHorizontalBar
           label="Wants (~30%)"
           bucket="wants"
           band={r.wants}
           homeCurrency={homeCurrency}
+          size="lg"
         />
-        <BandMiniChart
+        <BandHorizontalBar
           label="Savings (~20%)"
           bucket="savings"
           band={r.savings}
           homeCurrency={homeCurrency}
+          size="lg"
         />
       </CardContent>
     </Card>
@@ -281,34 +241,28 @@ export function BudgetRule502030Compact({
           </Link>
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <BandMiniChart
-            label="Needs"
-            bucket="needs"
-            band={r.needs}
-            homeCurrency={homeCurrency}
-            height={88}
-            showAxis={false}
-          />
-          <BandMiniChart
-            label="Wants"
-            bucket="wants"
-            band={r.wants}
-            homeCurrency={homeCurrency}
-            height={88}
-            showAxis={false}
-          />
-          <BandMiniChart
-            label="Savings"
-            bucket="savings"
-            band={r.savings}
-            homeCurrency={homeCurrency}
-            height={88}
-            showAxis={false}
-          />
-        </div>
-        <ChartLegend />
+      <CardContent className="space-y-4">
+        <BandHorizontalBar
+          label="Needs"
+          bucket="needs"
+          band={r.needs}
+          homeCurrency={homeCurrency}
+          size="sm"
+        />
+        <BandHorizontalBar
+          label="Wants"
+          bucket="wants"
+          band={r.wants}
+          homeCurrency={homeCurrency}
+          size="sm"
+        />
+        <BandHorizontalBar
+          label="Savings"
+          bucket="savings"
+          band={r.savings}
+          homeCurrency={homeCurrency}
+          size="sm"
+        />
       </CardContent>
     </Card>
   );
