@@ -96,7 +96,26 @@ function BandHorizontalBar({
         </span>
       </div>
 
-      <div className="relative overflow-hidden" style={{ height: barH }}>
+      {/* Target marker — red chevron + label ABOVE the bar */}
+      <div className="relative" style={{ height: 16 }}>
+        {showTargetTick && targetRawPct !== null && (
+          <>
+            <span
+              className="absolute text-[10px] font-medium text-red-500 dark:text-red-400 -translate-x-1/2 top-0 leading-none"
+              style={{ left: `${targetRawPct}%` }}
+            >
+              Target
+            </span>
+            <span
+              className="absolute -translate-x-1/2 bottom-0 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-red-500 dark:border-t-red-400"
+              style={{ left: `${targetRawPct}%` }}
+              aria-hidden
+            />
+          </>
+        )}
+      </div>
+
+      <div className="relative" style={{ height: barH }}>
         {/* track */}
         <div className="absolute inset-0 bg-muted rounded-full" />
         {/* fill */}
@@ -107,38 +126,21 @@ function BandHorizontalBar({
           )}
           style={{ width: `${fillPct}%` }}
         />
-        {/* guideline tick */}
-        <div
-          className="absolute top-0 h-full w-0.5 bg-foreground/50"
+      </div>
+
+      {/* Guide marker — blue chevron + label BELOW the bar */}
+      <div className="relative" style={{ height: 16 }}>
+        <span
+          className="absolute -translate-x-1/2 top-0 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[5px] border-b-blue-500 dark:border-b-blue-400"
           style={{ left: `${GUIDE_LEFT_PCT}%` }}
           aria-hidden
         />
-        {/* target tick */}
-        {showTargetTick && targetRawPct !== null && (
-          <div
-            className="absolute top-0 h-full w-0.5 bg-foreground/25"
-            style={{ left: `${targetRawPct}%` }}
-            aria-hidden
-          />
-        )}
-      </div>
-
-      {/* tick labels */}
-      <div className="relative mt-0.5" style={{ height: 14 }}>
         <span
-          className="absolute text-[10px] text-muted-foreground -translate-x-1/2"
+          className="absolute text-[10px] font-medium text-blue-500 dark:text-blue-400 -translate-x-1/2 bottom-0 leading-none"
           style={{ left: `${GUIDE_LEFT_PCT}%` }}
         >
           Guide
         </span>
-        {showTargetTick && targetRawPct !== null && (
-          <span
-            className="absolute text-[10px] text-muted-foreground -translate-x-1/2"
-            style={{ left: `${targetRawPct}%` }}
-          >
-            Target
-          </span>
-        )}
       </div>
 
       {/* numbers row — full strip only */}
