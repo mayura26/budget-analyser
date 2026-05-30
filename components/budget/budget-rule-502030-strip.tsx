@@ -97,20 +97,26 @@ function BandHorizontalBar({
       </div>
 
       {/* Target marker — red chevron + label ABOVE the bar */}
-      <div className="relative" style={{ height: 16 }}>
+      <div className="relative mb-0.5" style={{ height: 20 }}>
         {showTargetTick && targetRawPct !== null && (
           <>
             <span
-              className="absolute text-[10px] font-medium text-red-500 dark:text-red-400 -translate-x-1/2 top-0 leading-none"
+              className="absolute text-[10px] font-semibold text-red-500 dark:text-red-400 -translate-x-1/2 top-0 leading-none whitespace-nowrap"
               style={{ left: `${targetRawPct}%` }}
             >
               Target
             </span>
-            <span
-              className="absolute -translate-x-1/2 bottom-0 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-red-500 dark:border-t-red-400"
+            <svg
+              className="absolute -translate-x-1/2 bottom-0 text-red-500 dark:text-red-400"
               style={{ left: `${targetRawPct}%` }}
+              width="12"
+              height="8"
+              viewBox="0 0 12 8"
               aria-hidden
-            />
+            >
+              <title>Target marker</title>
+              <path d="M0 0L6 8L12 0Z" fill="currentColor" />
+            </svg>
           </>
         )}
       </div>
@@ -129,14 +135,20 @@ function BandHorizontalBar({
       </div>
 
       {/* Guide marker — blue chevron + label BELOW the bar */}
-      <div className="relative" style={{ height: 16 }}>
-        <span
-          className="absolute -translate-x-1/2 top-0 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[5px] border-b-blue-500 dark:border-b-blue-400"
+      <div className="relative mt-0.5" style={{ height: 20 }}>
+        <svg
+          className="absolute -translate-x-1/2 top-0 text-blue-500 dark:text-blue-400"
           style={{ left: `${GUIDE_LEFT_PCT}%` }}
+          width="12"
+          height="8"
+          viewBox="0 0 12 8"
           aria-hidden
-        />
+        >
+          <title>Guide marker</title>
+          <path d="M0 8L6 0L12 8Z" fill="currentColor" />
+        </svg>
         <span
-          className="absolute text-[10px] font-medium text-blue-500 dark:text-blue-400 -translate-x-1/2 bottom-0 leading-none"
+          className="absolute text-[10px] font-semibold text-blue-500 dark:text-blue-400 -translate-x-1/2 bottom-0 leading-none whitespace-nowrap"
           style={{ left: `${GUIDE_LEFT_PCT}%` }}
         >
           Guide
