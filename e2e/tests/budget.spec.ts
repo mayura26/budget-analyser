@@ -290,8 +290,8 @@ test.describe("Budget", () => {
       expectedIncome: 3100,
       incomeVariance: -100,
       savingsRate: 36.7,
-      surplus: 1100,
-      taggedSavings: 0,
+      surplus: 800,
+      taggedSavings: 300,
       effectiveSavings: 1100,
       buckets: {
         needs: {
@@ -354,7 +354,8 @@ test.describe("Budget", () => {
                 bucketCommentary: {
                   needs: "Needs landed at 48.3%, just under target.",
                   wants: "Wants ran cool at 15%, well under the 30% guideline.",
-                  savings: "Savings cleared 36.7% thanks to the surplus.",
+                  savings:
+                    "Savings cleared 36.7% thanks to tagged savings and surplus.",
                 },
                 risks: [
                   {
@@ -463,6 +464,20 @@ test.describe("Budget", () => {
     // 50/30/20 verdict band shows three buckets and the actual-income note
     await expect(page.getByText("50 / 30 / 20 verdict")).toBeVisible();
     await expect(page.getByText(/Based on actual income/)).toBeVisible();
+    const surplusTile = page.locator(".rounded-xl").filter({
+      hasText: /Surplus.*savings/,
+    });
+    await expect(surplusTile.getByText("$800.00")).toBeVisible();
+    await expect(
+      surplusTile.getByText("On top of $300.00 tagged"),
+    ).toBeVisible();
+    const effectiveSavingsTile = page.locator(".rounded-xl").filter({
+      hasText: "Effective savings",
+    });
+    await expect(effectiveSavingsTile.getByText("$1,100.00")).toBeVisible();
+    await expect(
+      effectiveSavingsTile.getByText("36.7% of income"),
+    ).toBeVisible();
 
     // Regenerate button triggers a POST with regenerate=true
     const regenerateBefore = regenerateCalls;

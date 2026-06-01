@@ -10,6 +10,10 @@ import {
   isMonthClosed,
   saveMonthReview,
 } from "@/lib/budget/queries";
+import {
+  calculateReviewSavingsMetrics,
+  reviewSavingsMetricsMatch,
+} from "@/lib/budget/review-savings";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { categories, settings } from "@/lib/db/schema";
@@ -164,6 +168,34 @@ function asBucketCommentary(raw: unknown): {
   return out;
 }
 
+function hasCurrentSavingsMath(metrics: ReviewMetrics): boolean {
+  const values = [
+    metrics.actualIncome,
+    metrics.totalSpent,
+    metrics.taggedSavings,
+    metrics.surplus,
+    metrics.effectiveSavings,
+    metrics.savingsRate,
+  ];
+  if (!values.every(Number.isFinite)) return false;
+
+  const expected = calculateReviewSavingsMetrics({
+    actualIncome: metrics.actualIncome,
+    totalSpent: metrics.totalSpent,
+    taggedSavings: metrics.taggedSavings,
+  });
+
+  return reviewSavingsMetricsMatch(
+    {
+      taggedSavings: metrics.taggedSavings,
+      surplus: metrics.surplus,
+      effectiveSavings: metrics.effectiveSavings,
+      savingsRate: metrics.savingsRate,
+    },
+    expected,
+  );
+}
+
 export async function POST(request: Request) {
   let month: string;
   let format: ReviewFormat;
@@ -193,7 +225,7 @@ export async function POST(request: Request) {
       month,
       format,
     );
-    if (cached) {
+    if (cached && hasCurrentSavingsMath(cached.metrics)) {
       return NextResponse.json({
         format,
         metrics: cached.metrics,
@@ -292,12 +324,12 @@ export async function POST(request: Request) {
 
   // Use ACTUAL income as the basis for the review (not scheduled).
   const incomeForReview = actualIncome;
-  const surplus = Math.max(
-    0,
-    Math.round((incomeForReview - summary.totalSpent) * 100) / 100,
-  );
-  const taggedSavings = summary.totalSavingsAllocated;
-  const effectiveSavings = Math.round((taggedSavings + surplus) * 100) / 100;
+  const { surplus, taggedSavings, effectiveSavings, savingsRate } =
+    calculateReviewSavingsMetrics({
+      actualIncome: incomeForReview,
+      totalSpent: summary.totalSpent,
+      taggedSavings: summary.totalSavingsAllocated,
+    });
 
   const needsBand = summary.rule502030.needs;
   const wantsBand = summary.rule502030.wants;
@@ -326,11 +358,6 @@ export async function POST(request: Request) {
       actualPct: pctOf(savingsBand.actualTotal, incomeForReview),
     },
   };
-
-  const savingsRate =
-    incomeForReview > 0
-      ? Math.round((effectiveSavings / incomeForReview) * 1000) / 10
-      : 0;
 
   const incomeVariance =
     Math.round((actualIncome - scheduledIncome) * 100) / 100;
@@ -386,7 +413,7 @@ Total budgeted: ${formatCurrency(summary.totalBudgeted, homeCurrency)}
 Net variance vs budget: ${formatCurrency(metrics.netVariance, homeCurrency)}
 Surplus rolled into savings: ${formatCurrency(surplus, homeCurrency)}
 Tagged savings spend: ${formatCurrency(taggedSavings, homeCurrency)}
-Effective savings (tagged + surplus): ${formatCurrency(effectiveSavings, homeCurrency)} (${savingsRate}% of actual income)
+Effective savings (tagged savings + true surplus): ${formatCurrency(effectiveSavings, homeCurrency)} (${savingsRate}% of actual income)
 
 50/30/20 breakdown (% based on actual income):
 ${bucketLines}
@@ -395,7 +422,7 @@ Top category lines:
 ${metricLines}`;
 
   const sharedRules = `Rules:
-- Frame the review as a 50/30/20 review. Treat any leftover surplus as effective savings (it sweeps into the user's savings/investment account).
+- Frame the review as a 50/30/20 review. Treat only leftover surplus after expenses and tagged savings as additional effective savings.
 - Use ACTUAL income, not scheduled, for percentages. If actual differed materially from scheduled, call that out as its own point.
 - Every list item must be an object: { "bucket": "needs"|"wants"|"savings"|"overall", "text": "..." }.
 - Every recommendation/risk/action must name at least one specific category and a dollar amount, and tie back to the bucket's target percentage.
