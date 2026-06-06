@@ -17,7 +17,12 @@ import {
   subSeedSuppressionKey,
   suppressCategorySeedKey,
 } from "@/lib/db/category-seed-suppressions";
-import { categories, categorisationRules, transactions } from "@/lib/db/schema";
+import {
+  accounts,
+  categories,
+  categorisationRules,
+  transactions,
+} from "@/lib/db/schema";
 import type { ActionResult, RuleDraftInput } from "@/types";
 
 const bucketSchema = z.enum(["needs", "wants", "savings", "none"]).optional();
@@ -493,23 +498,59 @@ export type RulePreviewInput = {
   patternType?: "regex" | "keyword" | "exact";
 };
 
+export type RulePreviewMatch = {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  accountName: string;
+  accountCurrency: string;
+};
+
+export type RulePreviewResult = {
+  key: string;
+  count: number;
+  matches: RulePreviewMatch[];
+};
+
 export async function previewUnverifiedMatchesForRules(
   rules: RulePreviewInput[],
-): Promise<ActionResult<{ key: string; count: number }[]>> {
+): Promise<ActionResult<RulePreviewResult[]>> {
   if (rules.length === 0) return { success: true, data: [] };
 
   const rows = db
-    .select({ normalised: transactions.normalised })
+    .select({
+      id: transactions.id,
+      date: transactions.date,
+      description: transactions.description,
+      normalised: transactions.normalised,
+      amount: transactions.amount,
+      accountName: accounts.name,
+      accountCurrency: accounts.currency,
+    })
     .from(transactions)
+    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .where(eq(transactions.categoryConfirmed, false))
+    .orderBy(desc(transactions.date), desc(transactions.id))
     .all();
 
   const data = rules.map((r) => {
     const patternType = r.patternType ?? "keyword";
     const stub = ruleDraftStub(r.pattern, r.categoryId, patternType);
-    const count = rows.filter((row) => matchRule(row.normalised, stub)).length;
+    const matchedRows = rows.filter((row) => matchRule(row.normalised, stub));
     const key = `${r.pattern}::${r.categoryId}::${patternType}`;
-    return { key, count };
+    return {
+      key,
+      count: matchedRows.length,
+      matches: matchedRows.slice(0, 100).map((row) => ({
+        id: row.id,
+        date: row.date,
+        description: row.description,
+        amount: row.amount,
+        accountName: row.accountName ?? "Unknown",
+        accountCurrency: row.accountCurrency ?? "AUD",
+      })),
+    };
   });
 
   return { success: true, data };

@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CategoryNameParts } from "@/components/categories/category-name-parts";
 import { CategorySelectGrouped } from "@/components/categories/category-select-grouped";
@@ -14,21 +15,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectTrigger } from "@/components/ui/select";
 import {
   createRulesFromDrafts,
   createRulesFromDraftsAndApplyToUnverified,
   getMatchingRulesForTransaction,
-  previewUnverifiedMatchesForRules,
   type MatchingRuleInfo,
+  previewUnverifiedMatchesForRules,
+  type RulePreviewMatch,
 } from "@/lib/actions/categories";
 import { parseCategoryDisplayName } from "@/lib/categories/display-name";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Category } from "@/types";
 
 export function CreateRuleDialog({
@@ -47,15 +44,23 @@ export function CreateRuleDialog({
   categoryMains?: Category[];
 }) {
   const [pattern, setPattern] = useState("");
-  const [patternType, setPatternType] = useState<"keyword" | "exact" | "regex">("keyword");
+  const [patternType, setPatternType] = useState<"keyword" | "exact" | "regex">(
+    "keyword",
+  );
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [previewCount, setPreviewCount] = useState<number | undefined>(undefined);
+  const [previewCount, setPreviewCount] = useState<number | undefined>(
+    undefined,
+  );
+  const [previewMatches, setPreviewMatches] = useState<RulePreviewMatch[]>([]);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [matchingRules, setMatchingRules] = useState<MatchingRuleInfo[]>([]);
   const [loadingRules, setLoadingRules] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewRequestRef = useRef(0);
 
   // Reset and load matching rules whenever dialog opens
   useEffect(() => {
@@ -64,6 +69,9 @@ export function CreateRuleDialog({
     setPatternType("keyword");
     setCategoryId(null);
     setPreviewCount(undefined);
+    setPreviewMatches([]);
+    setPreviewExpanded(false);
+    setSelectedTokens([]);
     setError("");
     setMatchingRules([]);
 
@@ -77,8 +85,11 @@ export function CreateRuleDialog({
 
   // Auto-preview whenever pattern or category changes (debounced)
   useEffect(() => {
+    const requestId = ++previewRequestRef.current;
     if (!pattern.trim() || categoryId === null) {
       setPreviewCount(undefined);
+      setPreviewMatches([]);
+      setPreviewExpanded(false);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -86,8 +97,11 @@ export function CreateRuleDialog({
       previewUnverifiedMatchesForRules([
         { pattern: pattern.trim(), categoryId, patternType },
       ]).then((result) => {
+        if (requestId !== previewRequestRef.current) return;
         if (result.success && result.data.length > 0) {
           setPreviewCount(result.data[0].count);
+          setPreviewMatches(result.data[0].matches);
+          setPreviewExpanded(false);
         }
       });
     }, 300);
@@ -98,11 +112,29 @@ export function CreateRuleDialog({
 
   const mains = categoryMains ?? categories.filter((c) => c.parentId === null);
   const subs = categories.filter((c) => c.parentId !== null);
-  const selectedCat = categoryId ? categories.find((c) => c.id === categoryId) : null;
+  const selectedCat = categoryId
+    ? categories.find((c) => c.id === categoryId)
+    : null;
 
   const tokens = normalised
     ? [...new Set(normalised.split(/\s+/).filter((t) => t.length > 1))]
     : [];
+
+  function toggleToken(token: string) {
+    const nextSelected = selectedTokens.includes(token)
+      ? selectedTokens.filter((selected) => selected !== token)
+      : [...selectedTokens, token];
+    const nextPattern = tokens
+      .filter((candidate) => nextSelected.includes(candidate))
+      .join(" ");
+
+    setSelectedTokens(nextSelected);
+    setPattern(nextPattern);
+    setPatternType("keyword");
+    setPreviewCount(undefined);
+    setPreviewMatches([]);
+    setPreviewExpanded(false);
+  }
 
   function handleSave() {
     if (!pattern.trim() || categoryId === null) return;
@@ -142,7 +174,10 @@ export function CreateRuleDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md" aria-describedby="create-rule-desc">
+      <DialogContent
+        className="max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto"
+        aria-describedby="create-rule-desc"
+      >
         <DialogHeader>
           <DialogTitle>Create matching rule</DialogTitle>
           <DialogDescription id="create-rule-desc">
@@ -159,19 +194,20 @@ export function CreateRuleDialog({
           {/* Token chips */}
           {tokens.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">Click a token to use as pattern:</p>
+              <p className="text-xs text-muted-foreground">
+                Click keywords to build an ordered phrase:
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {tokens.map((token) => (
                   <button
                     key={token}
                     type="button"
-                    onClick={() => {
-                      setPattern(token);
-                      setPatternType("keyword");
-                      setPreviewCount(undefined);
-                    }}
+                    data-testid="create-rule-keyword"
+                    aria-pressed={selectedTokens.includes(token)}
+                    onClick={() => toggleToken(token)}
                     className={`px-2 py-0.5 rounded text-xs font-mono border transition-colors ${
-                      pattern === token && patternType === "keyword"
+                      selectedTokens.includes(token) &&
+                      patternType === "keyword"
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background border-border hover:border-primary/50 hover:bg-primary/5 text-foreground"
                     }`}
@@ -202,8 +238,13 @@ export function CreateRuleDialog({
                           : "bg-muted/40 border border-border"
                       }`}
                     >
-                      <span className="shrink-0 font-mono text-muted-foreground">{r.patternType}</span>
-                      <span className="font-mono flex-1 truncate" title={r.pattern}>
+                      <span className="shrink-0 font-mono text-muted-foreground">
+                        {r.patternType}
+                      </span>
+                      <span
+                        className="font-mono flex-1 truncate"
+                        title={r.pattern}
+                      >
                         &quot;{r.pattern}&quot;
                       </span>
                       <span className="text-muted-foreground shrink-0">→</span>
@@ -244,7 +285,10 @@ export function CreateRuleDialog({
                 value={patternType}
                 onChange={(e) => {
                   setPatternType(e.target.value as typeof patternType);
+                  setSelectedTokens([]);
                   setPreviewCount(undefined);
+                  setPreviewMatches([]);
+                  setPreviewExpanded(false);
                 }}
                 className="h-9 rounded-md border border-input bg-transparent px-2.5 text-sm shadow-sm shrink-0 focus:outline-none focus:ring-1 focus:ring-ring"
               >
@@ -258,7 +302,10 @@ export function CreateRuleDialog({
                 value={pattern}
                 onChange={(e) => {
                   setPattern(e.target.value);
+                  setSelectedTokens([]);
                   setPreviewCount(undefined);
+                  setPreviewMatches([]);
+                  setPreviewExpanded(false);
                 }}
                 placeholder="e.g. WOOLWORTHS"
                 className="font-mono flex-1"
@@ -277,6 +324,8 @@ export function CreateRuleDialog({
               onValueChange={(v) => {
                 setCategoryId(Number(v));
                 setPreviewCount(undefined);
+                setPreviewMatches([]);
+                setPreviewExpanded(false);
               }}
             >
               <SelectTrigger
@@ -285,9 +334,14 @@ export function CreateRuleDialog({
               >
                 <span className="truncate">
                   {selectedCat ? (
-                    <CategoryNameParts name={selectedCat.name} variant="select" />
+                    <CategoryNameParts
+                      name={selectedCat.name}
+                      variant="select"
+                    />
                   ) : (
-                    <span className="text-muted-foreground">Choose category…</span>
+                    <span className="text-muted-foreground">
+                      Choose category…
+                    </span>
                   )}
                 </span>
               </SelectTrigger>
@@ -297,22 +351,80 @@ export function CreateRuleDialog({
             </Select>
 
             {previewCount !== undefined && (
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="secondary"
-                  className={
-                    previewCount > 0
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-                      : "bg-muted text-muted-foreground border border-border"
-                  }
-                >
-                  {previewCount} unverified match{previewCount === 1 ? "" : "es"}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {previewCount > 0
-                    ? "would be re-categorised"
-                    : "no pending transactions match"}
-                </span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {previewCount > 0 ? (
+                    <button
+                      type="button"
+                      data-testid="create-rule-preview-toggle"
+                      aria-expanded={previewExpanded}
+                      onClick={() =>
+                        setPreviewExpanded((expanded) => !expanded)
+                      }
+                      className="inline-flex items-center gap-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Badge
+                        variant="secondary"
+                        className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+                      >
+                        {previewExpanded ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
+                        )}
+                        {previewCount} unverified match
+                        {previewCount === 1 ? "" : "es"}
+                      </Badge>
+                    </button>
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="bg-muted text-muted-foreground border border-border"
+                    >
+                      0 unverified matches
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {previewCount > 0
+                      ? "would be re-categorised"
+                      : "no pending transactions match"}
+                  </span>
+                </div>
+
+                {previewExpanded && previewMatches.length > 0 && (
+                  <div
+                    data-testid="create-rule-preview-list"
+                    className="max-h-52 overflow-y-auto rounded-md border border-border divide-y divide-border"
+                  >
+                    {previewMatches.map((match) => (
+                      <div key={match.id} className="px-2.5 py-2 text-xs">
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="font-medium break-words">
+                            {match.description}
+                          </span>
+                          <span className="shrink-0 tabular-nums">
+                            {formatCurrency(
+                              match.amount,
+                              match.accountCurrency,
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex items-center justify-between gap-3 text-muted-foreground">
+                          <span>{match.accountName}</span>
+                          <span className="shrink-0">
+                            {formatDate(match.date)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {previewCount > previewMatches.length && (
+                      <p className="px-2.5 py-2 text-xs text-muted-foreground">
+                        Showing the first {previewMatches.length} of{" "}
+                        {previewCount} matches.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -194,15 +194,21 @@ test.describe("Transactions", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     // Description shown at top
-    await expect(dialog.locator(".font-mono.break-all")).toContainText(description.trim());
+    await expect(dialog.locator(".font-mono.break-all")).toContainText(
+      description.trim(),
+    );
     // Pattern starts empty
     const patternInput = dialog.getByTestId("create-rule-pattern");
     await expect(patternInput).toHaveValue("");
     // Token chips present (at least one)
-    await expect(dialog.locator("button.font-mono").first()).toBeVisible();
+    await expect(
+      dialog.getByTestId("create-rule-keyword").first(),
+    ).toBeVisible();
   });
 
-  test("clicking token chip populates pattern field", async ({ page }) => {
+  test("keyword chips build and remove a phrase in transaction order", async ({
+    page,
+  }) => {
     await page.goto("/transactions");
     await page.getByTestId("filter-account").click();
     await page.getByRole("option", { name: "Import Test Account" }).click();
@@ -210,10 +216,95 @@ test.describe("Transactions", () => {
     await firstRow.getByTestId("create-rule-from-transaction").click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    const firstChip = dialog.locator("button.font-mono").first();
+    const chips = dialog.getByTestId("create-rule-keyword");
+    await expect(chips.nth(1)).toBeVisible();
+    const firstChip = chips.nth(0);
+    const secondChip = chips.nth(1);
     const chipText = await firstChip.innerText();
+    const secondChipText = await secondChip.innerText();
+
+    // Click in reverse order; the pattern still follows the source transaction.
+    await secondChip.click();
     await firstChip.click();
-    await expect(dialog.getByTestId("create-rule-pattern")).toHaveValue(chipText);
+    await expect(dialog.getByTestId("create-rule-pattern")).toHaveValue(
+      `${chipText} ${secondChipText}`,
+    );
+    await expect(firstChip).toHaveAttribute("aria-pressed", "true");
+    await expect(secondChip).toHaveAttribute("aria-pressed", "true");
+
+    await firstChip.click();
+    await expect(dialog.getByTestId("create-rule-pattern")).toHaveValue(
+      secondChipText,
+    );
+    await expect(firstChip).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("ordered phrase preview expands with adjacent unverified matches", async ({
+    page,
+  }) => {
+    const marker = `E2EORDER${Date.now()}`;
+    const matchingDescription = `${marker} UBER TRIP MATCH`;
+    const sourceDescription = `${marker} UBER TRIP PRIMARY`;
+    const gappedDescription = `${marker} UBER CITY TRIP NO MATCH`;
+    const transactionDate = "2026-06-05";
+    let accountName = "";
+
+    for (const [description, amount] of [
+      [matchingDescription, "-23.45"],
+      [gappedDescription, "-34.56"],
+      [sourceDescription, "-12.34"],
+    ]) {
+      await page.goto("/transactions/new");
+      accountName = await page
+        .locator("select#accountId option:checked")
+        .innerText();
+      await page.getByLabel("Date").fill(transactionDate);
+      await page.getByLabel("Description").fill(description);
+      await page.getByLabel("Amount (negative = expense)").fill(amount);
+      await page.getByRole("button", { name: "Save transaction" }).click();
+      await expect(page).toHaveURL("/transactions", { timeout: 15000 });
+    }
+
+    const sourceRow = page
+      .locator("tbody tr")
+      .filter({ hasText: sourceDescription });
+    await expect(sourceRow).toBeVisible();
+    await sourceRow.getByTestId("create-rule-from-transaction").click();
+
+    const dialog = page.getByRole("dialog");
+    const markerChip = dialog
+      .getByTestId("create-rule-keyword")
+      .filter({ hasText: marker });
+    const uberChip = dialog
+      .getByTestId("create-rule-keyword")
+      .filter({ hasText: "UBER" });
+    const tripChip = dialog
+      .getByTestId("create-rule-keyword")
+      .filter({ hasText: "TRIP" });
+
+    // Select out of order; the resulting phrase follows the transaction text.
+    await tripChip.click();
+    await markerChip.click();
+    await uberChip.click();
+    await expect(dialog.getByTestId("create-rule-pattern")).toHaveValue(
+      `${marker} UBER TRIP`,
+    );
+
+    await dialog.getByTestId("create-rule-category").click();
+    await page.getByRole("option", { name: "Groceries" }).click();
+
+    const previewToggle = dialog.getByTestId("create-rule-preview-toggle");
+    await expect(previewToggle).toContainText("2 unverified matches");
+    await previewToggle.click();
+
+    const previewList = dialog.getByTestId("create-rule-preview-list");
+    await expect(previewList).toContainText(sourceDescription);
+    await expect(previewList).toContainText(matchingDescription);
+    await expect(previewList).not.toContainText(gappedDescription);
+    await expect(previewList).toContainText(accountName);
+    await expect(previewList).toContainText("$12.34");
+    await expect(previewList).toContainText("$23.45");
+    await expect(previewList).toContainText("5 June 2026");
   });
 
   test("bulk select all rows shows action bar", async ({ page }) => {
@@ -224,7 +315,9 @@ test.describe("Transactions", () => {
     test.skip(rowCount === 0, "No transactions for bulk select test");
     await page.getByTestId("select-all-rows").click();
     await expect(page.getByTestId("bulk-action-bar")).toBeVisible();
-    await expect(page.getByTestId("bulk-action-bar")).toContainText(`${rowCount} selected`);
+    await expect(page.getByTestId("bulk-action-bar")).toContainText(
+      `${rowCount} selected`,
+    );
   });
 
   test("bulk select individual rows shows count in bar", async ({ page }) => {
@@ -236,9 +329,13 @@ test.describe("Transactions", () => {
     const checkboxes = page.getByTestId("select-row");
     await checkboxes.nth(0).click();
     await checkboxes.nth(1).click();
-    await expect(page.getByTestId("bulk-action-bar")).toContainText("2 selected");
+    await expect(page.getByTestId("bulk-action-bar")).toContainText(
+      "2 selected",
+    );
     await checkboxes.nth(0).click();
-    await expect(page.getByTestId("bulk-action-bar")).toContainText("1 selected");
+    await expect(page.getByTestId("bulk-action-bar")).toContainText(
+      "1 selected",
+    );
   });
 
   test("bulk clear selection hides bar", async ({ page }) => {
