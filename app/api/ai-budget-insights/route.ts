@@ -5,6 +5,7 @@ import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
   getActualIncomeForMonth,
+  getRemainingScheduledByCategory,
   getScheduledAmountsByCategory,
   isMonthClosed,
 } from "@/lib/budget/queries";
@@ -67,12 +68,17 @@ export async function POST(request: Request) {
   const rows = await buildBudgetCategoryRows(month, allCats, homeCurrency);
   const { income } = await getScheduledAmountsByCategory(month, homeCurrency);
   const actualIncome = await getActualIncomeForMonth(month, homeCurrency);
+  const scheduledRemaining = await getRemainingScheduledByCategory(
+    month,
+    homeCurrency,
+  );
   const summary = buildBudgetSummary(
     rows,
     month,
     income,
     actualIncome,
     isMonthClosed(month),
+    scheduledRemaining,
   );
 
   const budgetedRows = rows.filter((r) => r.targetAmount > 0);
@@ -98,23 +104,33 @@ export async function POST(request: Request) {
   // Group subcategory rows by parent group for higher-level analysis
   const parentGroups = new Map<
     string,
-    { rows: (typeof budgetedRows)[0][]; prevSpend: number }
+    {
+      rows: (typeof budgetedRows)[0][];
+      prevSpend: number;
+      schedRemaining: number;
+    }
   >();
   for (const r of budgetedRows) {
     if (!parentGroups.has(r.parentName)) {
-      parentGroups.set(r.parentName, { rows: [], prevSpend: 0 });
+      parentGroups.set(r.parentName, {
+        rows: [],
+        prevSpend: 0,
+        schedRemaining: 0,
+      });
     }
     const g = parentGroups.get(r.parentName)!;
     g.rows.push(r);
     g.prevSpend += prevSpendMap.get(r.categoryId) ?? 0;
+    g.schedRemaining += scheduledRemaining.get(r.categoryId) ?? 0;
   }
 
   const parentGroupLines = Array.from(parentGroups.entries())
-    .map(([parentName, { rows, prevSpend }]) => {
+    .map(([parentName, { rows, prevSpend, schedRemaining }]) => {
       const groupTarget = rows.reduce((s, r) => s + r.targetAmount, 0);
       const groupActual = rows.reduce((s, r) => s + r.actualSpent, 0);
       const groupPct =
         groupTarget > 0 ? Math.round((groupActual / groupTarget) * 100) : 0;
+      const groupProjected = groupActual + schedRemaining;
       const bucket = rows[0]?.ruleBucket ?? null;
       const bucketLabel = bucket ? ` (${bucket})` : "";
       const subLines = rows
@@ -126,7 +142,7 @@ export async function POST(request: Request) {
           return `${r.categoryName} ${formatCurrency(r.actualSpent, homeCurrency)} of ${formatCurrency(r.targetAmount, homeCurrency)} (${pct}%)`;
         })
         .join(", ");
-      return `- ${parentName}${bucketLabel}: Target ${formatCurrency(groupTarget, homeCurrency)}, Spent ${formatCurrency(groupActual, homeCurrency)} (${groupPct}%), Last month: ${formatCurrency(prevSpend, homeCurrency)}\n  Subcategories: ${subLines}`;
+      return `- ${parentName}${bucketLabel}: Target ${formatCurrency(groupTarget, homeCurrency)}, Spent ${formatCurrency(groupActual, homeCurrency)} (${groupPct}%), Last month: ${formatCurrency(prevSpend, homeCurrency)}, Still scheduled this month: ${formatCurrency(schedRemaining, homeCurrency)}, Projected: ${formatCurrency(groupProjected, homeCurrency)}\n  Subcategories: ${subLines}`;
     })
     .join("\n");
 
@@ -141,7 +157,8 @@ Overall:
 - Total budgeted: ${formatCurrency(summary.totalBudgeted, homeCurrency)}
 - Total spent: ${formatCurrency(summary.totalSpent, homeCurrency)} (${summary.totalBudgeted > 0 ? Math.round((summary.totalSpent / summary.totalBudgeted) * 100) : 0}%)
 - Daily burn rate: ${formatCurrency(summary.dailyBurnRate, homeCurrency)}/day (allowed: ${formatCurrency(summary.allowedDailyRate, homeCurrency)}/day)
-- Projected month-end spend: ${formatCurrency(summary.projectedSpend, homeCurrency)}
+- Scheduled bills still due this month: ${formatCurrency(summary.scheduledRemaining, homeCurrency)}
+- Projected month-end spend: ${formatCurrency(summary.projectedSpend, homeCurrency)} (already includes scheduled bills still due)
 - On track: ${summary.onTrack ? "Yes" : "No"}
 
 Spending by category group (subcategories shown as context):
@@ -158,7 +175,8 @@ Rules:
 - Use the parent group name in the "category" field (e.g., "Enjoyment", "Special")
 - Quote net group dollar amounts; only mention a specific subcategory if it is the sole driver of a group-level issue
 - Be specific with dollar amounts; use encouraging, solution-oriented language
-- If spending is very low early in the month, note it's too early for firm projections
+- Account for scheduled bills not yet paid: do NOT call a group "under budget" (or treat spent-so-far as final) when large scheduled payments are still due this month — judge on-track status from the schedule-aware Projected figures, not raw spending so far
+- If discretionary spending is genuinely low with few bills left to come, it's fine to note a positive buffer; only caveat that it's early if meaningful spend or scheduled bills remain
 - Only return the JSON object, no other text.`;
 
   const client = new OpenAI({ apiKey });

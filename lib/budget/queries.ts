@@ -38,6 +38,7 @@ import type {
   Category,
 } from "@/types";
 import { generateOccurrences } from "./generate";
+import { computeScheduleAwareProjection } from "./projection";
 import { ruleBucketForSubcategory } from "./rule-bucket";
 
 export function getBudgetTargetsForMonth(month: string): Budget[] {
@@ -428,8 +429,10 @@ export async function getMonthlySpendingByCategory(
 export async function getScheduledAmountsByCategory(
   month: string,
   homeCurrency: SupportedCurrency,
+  options?: { occurringAfter?: string },
 ): Promise<{ expenses: Map<number, number>; income: number }> {
   const { start, end } = getMonthRange(month);
+  const occurringAfter = options?.occurringAfter;
 
   const allCats = db.select().from(categories).all() as Category[];
   const catType = new Map(allCats.map((c) => [c.id, c.type]));
@@ -451,7 +454,11 @@ export async function getScheduledAmountsByCategory(
       : null,
   }));
 
-  const occurrences = generateOccurrences(schedulesWithColor, start, end);
+  const occurrences = generateOccurrences(
+    schedulesWithColor,
+    start,
+    end,
+  ).filter((o) => (occurringAfter ? o.date > occurringAfter : true));
 
   const keys = occurrences.map((o) => ({
     date: o.date,
@@ -485,6 +492,26 @@ export async function getScheduledAmountsByCategory(
   }
 
   return { expenses, income: roundMoney(income) };
+}
+
+/**
+ * Scheduled expense amounts (per category, home currency) for occurrences that have not
+ * yet happened — strictly after today. For past/closed months this is empty. Used to make
+ * the month-end projection account for lumpy bills (rent, utilities) not yet posted.
+ */
+export async function getRemainingScheduledByCategory(
+  month: string,
+  homeCurrency: SupportedCurrency,
+): Promise<Map<number, number>> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { expenses } = await getScheduledAmountsByCategory(
+    month,
+    homeCurrency,
+    {
+      occurringAfter: today,
+    },
+  );
+  return expenses;
 }
 
 export async function buildBudgetCategoryRows(
@@ -607,6 +634,7 @@ export function buildBudgetSummary(
   expectedIncome: number,
   incomeBasisFromActual: number,
   monthClosed: boolean,
+  scheduledRemainingByCategory: Map<number, number> = new Map(),
 ): BudgetSummary {
   const expenseRows = rows.filter((r) => r.categoryKind === "expense");
   const savingsRows = rows.filter((r) => r.categoryKind === "savings");
@@ -697,8 +725,25 @@ export function buildBudgetSummary(
   const daysRemaining = daysInMonth - daysElapsed;
   const dailyBurnRate = daysElapsed > 0 ? totalSpent / daysElapsed : 0;
   const allowedDailyRate = totalBudgeted > 0 ? totalBudgeted / daysInMonth : 0;
-  const projectedSpend =
-    daysElapsed > 0 ? dailyBurnRate * daysInMonth : totalSpent;
+
+  // Schedule-aware projection: extrapolate only the discretionary (non-scheduled)
+  // run-rate, then add scheduled bills still due this month. This stops lumpy bills
+  // (rent, utilities) that have not posted yet from making the month look under budget.
+  const scheduledFullMonth = expenseRows.reduce(
+    (s, r) => s + r.scheduledAmount,
+    0,
+  );
+  const scheduledRemaining = expenseRows.reduce(
+    (s, r) => s + (scheduledRemainingByCategory.get(r.categoryId) ?? 0),
+    0,
+  );
+  const projectedSpend = computeScheduleAwareProjection({
+    totalSpent,
+    scheduledFullMonth,
+    scheduledRemaining,
+    daysElapsed,
+    daysRemaining,
+  });
   const onTrack = totalBudgeted === 0 || projectedSpend <= totalBudgeted;
 
   return {
@@ -723,6 +768,7 @@ export function buildBudgetSummary(
     dailyBurnRate: roundMoney(dailyBurnRate),
     allowedDailyRate: roundMoney(allowedDailyRate),
     projectedSpend: roundMoney(projectedSpend),
+    scheduledRemaining: roundMoney(scheduledRemaining),
     onTrack,
   };
 }

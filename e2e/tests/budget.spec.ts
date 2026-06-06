@@ -1044,4 +1044,81 @@ test.describe("Budget", () => {
     await page.getByRole("button", { name: "Save settings" }).click();
     await expect(page.getByText("Settings saved")).toBeVisible();
   });
+
+  test("budget summary renders with a category-assigned bill still due this month", async ({
+    page,
+  }) => {
+    // The schedule-aware projection adds bills that have not posted yet. To exercise that
+    // path we need an expense schedule with an occurrence strictly after today, in the
+    // current month, assigned to a (expense) category so it lands in the projection.
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    test.skip(
+      now.getDate() >= lastDay.getDate(),
+      "today is the last day of the month — no future-dated bill possible this month",
+    );
+    const dueDate = `${lastDay.getFullYear()}-${String(
+      lastDay.getMonth() + 1,
+    ).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+
+    await page.goto("/budget");
+    await page.getByRole("tab", { name: "Schedules" }).click();
+    await page.getByRole("button", { name: "Add schedule" }).first().click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="name"]').fill("E2E Late Bill");
+    await dialog.locator('input[name="amount"]').fill("4000");
+    await dialog.locator('input[name="startDate"]').fill(dueDate);
+    // Assign a category so the bill is counted as an expense in the projection.
+    await dialog
+      .getByRole("combobox")
+      .filter({ hasText: "No category" })
+      .click();
+    await page
+      .getByRole("option", { name: /Groceries/ })
+      .first()
+      .click();
+    await dialog.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByText("E2E Late Bill")).toBeVisible();
+
+    try {
+      // Monthly budget summary must render cleanly with the new projection path active.
+      await page.goto("/budget");
+      await expect(
+        page
+          .getByText("Set up your budget for")
+          .or(page.getByTestId("summary-spending-progress")),
+      ).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
+
+      // When budget targets exist for the month, the pace badge is driven by the
+      // schedule-aware projection (which now includes this unpaid bill).
+      const paceBadge = page.getByText(/on track|over pace/);
+      if (
+        await paceBadge
+          .first()
+          .isVisible({ timeout: 2000 })
+          .catch(() => false)
+      ) {
+        await expect(paceBadge.first()).toBeVisible();
+      }
+    } finally {
+      // Remove the schedule we created so later runs start clean.
+      await page.goto("/budget");
+      await page.getByRole("tab", { name: "Schedules" }).click();
+      const card = page
+        .locator(".rounded-lg")
+        .filter({ hasText: "E2E Late Bill" });
+      if (
+        await card
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
+        await card.first().locator('button[aria-label="Delete"]').click();
+        await page.waitForTimeout(300);
+      }
+    }
+  });
 });

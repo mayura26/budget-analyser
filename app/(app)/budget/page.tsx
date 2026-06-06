@@ -20,6 +20,7 @@ import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
   getActualIncomeForMonth,
+  getRemainingScheduledByCategory,
   getScheduledAmountsByCategory,
   hasBudgetTargets,
   isMonthClosed,
@@ -147,12 +148,17 @@ export default async function BudgetPage({
     homeCurrency,
   );
   const monthClosed = isMonthClosed(selectedMonth);
+  const scheduledRemaining = await getRemainingScheduledByCategory(
+    selectedMonth,
+    homeCurrency,
+  );
   const budgetSummary = buildBudgetSummary(
     budgetRows,
     selectedMonth,
     expectedIncome,
     actualIncome,
     monthClosed,
+    scheduledRemaining,
   );
   const budgetDisplayRows = appendSurplusDisplayRows(budgetRows, budgetSummary);
   const previousMonth = addCalendarMonths(selectedMonth, -1);

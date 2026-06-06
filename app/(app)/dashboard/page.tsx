@@ -15,6 +15,7 @@ import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
   getActualIncomeForMonth,
+  getRemainingScheduledByCategory,
   getScheduledAmountsByCategory,
   hasBudgetTargets,
   isMonthClosed,
@@ -185,12 +186,17 @@ async function loadBudgetData(
     selectedMonth,
     homeCurrency,
   );
+  const scheduledRemaining = await getRemainingScheduledByCategory(
+    selectedMonth,
+    homeCurrency,
+  );
   const summary = buildBudgetSummary(
     rows,
     selectedMonth,
     income,
     actualIncome,
     isMonthClosed(selectedMonth),
+    scheduledRemaining,
   );
   return { rows, summary };
 }

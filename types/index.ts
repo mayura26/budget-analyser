@@ -260,6 +260,8 @@ export type BudgetSummary = {
   dailyBurnRate: number;
   allowedDailyRate: number;
   projectedSpend: number;
+  /** Scheduled expense bills still due this month (occurrences after today, home currency). */
+  scheduledRemaining: number;
   onTrack: boolean;
 };
 
