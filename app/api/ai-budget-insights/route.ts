@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { buildParentGroupLine } from "@/lib/budget/insights-context";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -125,25 +126,12 @@ export async function POST(request: Request) {
   }
 
   const parentGroupLines = Array.from(parentGroups.entries())
-    .map(([parentName, { rows, prevSpend, schedRemaining }]) => {
-      const groupTarget = rows.reduce((s, r) => s + r.targetAmount, 0);
-      const groupActual = rows.reduce((s, r) => s + r.actualSpent, 0);
-      const groupPct =
-        groupTarget > 0 ? Math.round((groupActual / groupTarget) * 100) : 0;
-      const groupProjected = groupActual + schedRemaining;
-      const bucket = rows[0]?.ruleBucket ?? null;
-      const bucketLabel = bucket ? ` (${bucket})` : "";
-      const subLines = rows
-        .map((r) => {
-          const pct =
-            r.targetAmount > 0
-              ? Math.round((r.actualSpent / r.targetAmount) * 100)
-              : 0;
-          return `${r.categoryName} ${formatCurrency(r.actualSpent, homeCurrency)} of ${formatCurrency(r.targetAmount, homeCurrency)} (${pct}%)`;
-        })
-        .join(", ");
-      return `- ${parentName}${bucketLabel}: Target ${formatCurrency(groupTarget, homeCurrency)}, Spent ${formatCurrency(groupActual, homeCurrency)} (${groupPct}%), Last month: ${formatCurrency(prevSpend, homeCurrency)}, Still scheduled this month: ${formatCurrency(schedRemaining, homeCurrency)}, Projected: ${formatCurrency(groupProjected, homeCurrency)}\n  Subcategories: ${subLines}`;
-    })
+    .map(([parentName, { rows, prevSpend, schedRemaining }]) =>
+      buildParentGroupLine(
+        { parentName, rows, prevSpend, schedRemaining },
+        homeCurrency,
+      ),
+    )
     .join("\n");
 
   const prompt = `You are a friendly, insightful personal finance advisor. Analyse this monthly budget data and provide exactly 3 distilled insights.
@@ -168,9 +156,11 @@ Rules:
 - Return EXACTLY 3 insights as JSON: {"insights": [{"type": "warning"|"suggestion"|"win", "category": "parent group name or null for general", "message": "concise actionable message"}]}
 - Insight 1: overall status — type "win" if on track overall, "warning" if over budget overall
 - Insights 2–3: the two most notable parent-group-level findings, chosen from:
-  - "warning": a parent group that is NET over budget (even if driven by one subcategory)
+  - "warning": an expense/needs/wants parent group that is NET over budget (even if driven by one subcategory)
   - "win": a parent group that is meaningfully under budget or improved vs last month
   - "suggestion": a parent group with an interesting internal shift (e.g., more dining, less shopping — net balanced) worth noting
+- CRITICAL — savings are INVERSE of spending: a parent group marked "(savings ...)" measures money saved/invested against a savings PLAN. Exceeding the savings target is a WIN (the user saved/invested more than planned) — NEVER classify a savings group over its target as a "warning" or "over budget". For savings, the only concern is falling SHORT of the plan.
+- Savings is EXCLUDED from the overall spend totals and on-track figure above, so an over-target savings group does NOT eat into the overall buffer — never frame it as overspending.
 - CRITICAL: do NOT flag a subcategory overspend if its parent group is net on-track or under budget — internal shifts within a balanced group are not warnings
 - Use the parent group name in the "category" field (e.g., "Enjoyment", "Special")
 - Quote net group dollar amounts; only mention a specific subcategory if it is the sole driver of a group-level issue
