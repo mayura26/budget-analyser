@@ -203,6 +203,15 @@ export type BudgetMonthStatus = {
 
 export type BudgetCategoryKind = "expense" | "savings";
 
+export type BudgetScheduledBreakdown = {
+  scheduleId: number;
+  name: string;
+  frequency: ScheduledTransaction["frequency"];
+  dates: string[];
+  occurrenceCount: number;
+  amount: number;
+};
+
 export type BudgetCategoryRow = {
   categoryId: number;
   categoryName: string;
@@ -211,6 +220,7 @@ export type BudgetCategoryRow = {
   targetAmount: number;
   actualSpent: number;
   scheduledAmount: number;
+  scheduledBreakdown: BudgetScheduledBreakdown[];
   avg3Month: number;
   categoryKind: BudgetCategoryKind;
   /** Resolved from parent main for 50/30/20 (null if not in a bucket). */

@@ -1,4 +1,5 @@
-import { type Browser, expect, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+import Database from "better-sqlite3";
 
 async function createBudgetTestAccount(page: Page) {
   const accountName = `Budget Surplus ${Date.now()}`;
@@ -67,43 +68,60 @@ async function addManualSavingsTransaction({
   await page.waitForURL("/transactions");
 }
 
-async function cleanupSchedules(browser: Browser) {
-  const context = await browser.newContext({
-    storageState: "e2e/.auth/user.json",
+async function setBudgetTargetForCategory({
+  page,
+  categoryName,
+  amount,
+}: {
+  page: Page;
+  categoryName: RegExp;
+  amount: string;
+}) {
+  await page.goto("/budget", { waitUntil: "commit" });
+  const row = page
+    .getByTestId("budget-category-row")
+    .filter({ hasText: categoryName })
+    .first();
+  await expect(row).toBeVisible({ timeout: 10000 });
+
+  await row.getByRole("button", { name: /Edit target for/i }).click();
+  const input = row.locator('input[name^="target_"][type="number"]');
+  await expect(input).toBeVisible();
+  await input.fill(amount);
+  await input.press("Enter");
+
+  await expect(
+    row.getByRole("button", { name: /Edit target for/i }),
+  ).toBeVisible({
+    timeout: 10000,
   });
-  const page = await context.newPage();
-  // Navigate to budget page, retrying if dev error overlay blocks
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await page.goto("/budget");
-    await page.waitForTimeout(500);
-    // Dismiss any Next.js dev error overlay
-    await page.evaluate(() => {
-      for (const el of document.querySelectorAll("nextjs-portal")) {
-        el.remove();
-      }
-    });
-    const tab = page.getByRole("tab", { name: "Schedules" });
-    if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tab.click();
-      break;
-    }
-    // If tab not visible, try reloading
-    await page.reload();
-  }
-  await page.waitForTimeout(500);
-  // Delete all existing scheduled transactions
-  let count = await page.locator('button[aria-label="Delete"]').count();
-  while (count > 0) {
-    await page.locator('button[aria-label="Delete"]').first().click();
+}
+
+async function deleteScheduleIfVisible(page: Page, scheduleName: string) {
+  await page.goto("/budget", { waitUntil: "commit" });
+  await page.getByRole("tab", { name: "Schedules" }).click();
+  const card = page.locator(".rounded-lg").filter({ hasText: scheduleName });
+  if (
+    await card
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false)
+  ) {
+    await card.first().locator('button[aria-label="Delete"]').click();
     await page.waitForTimeout(300);
-    count = await page.locator('button[aria-label="Delete"]').count();
   }
-  await context.close();
+}
+
+function cleanupSchedules() {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+  sqlite.prepare("DELETE FROM scheduled_transactions").run();
+  sqlite.close();
 }
 
 test.describe("Budget", () => {
-  test.beforeAll(async ({ browser }) => {
-    await cleanupSchedules(browser);
+  test.beforeAll(() => {
+    cleanupSchedules();
   });
 
   test("page renders with heading", async ({ page }) => {
@@ -1119,6 +1137,64 @@ test.describe("Budget", () => {
         await card.first().locator('button[aria-label="Delete"]').click();
         await page.waitForTimeout(300);
       }
+    }
+  });
+
+  test("recurring scheduled costs popover explains budget warning", async ({
+    page,
+  }) => {
+    const scheduleName = `E2E Recurring Breakdown ${Date.now()}`;
+
+    await page.goto("/budget", { waitUntil: "commit" });
+    await page.getByRole("tab", { name: "Schedules" }).click();
+    await page.getByRole("button", { name: "Add schedule" }).first().click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="name"]').fill(scheduleName);
+    await dialog.locator('input[name="amount"]').fill("420.09");
+    await dialog
+      .getByRole("combobox")
+      .filter({ hasText: "No category" })
+      .click();
+    await page
+      .getByRole("option", { name: /Groceries/ })
+      .first()
+      .click();
+    await dialog.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByText(scheduleName)).toBeVisible();
+
+    try {
+      await setBudgetTargetForCategory({
+        page,
+        categoryName: /Groceries/,
+        amount: "300",
+      });
+
+      const groceryRow = page
+        .getByTestId("budget-category-row")
+        .filter({ hasText: /Groceries/ })
+        .first();
+      const trigger = groceryRow.getByRole("button", {
+        name: /Show recurring scheduled costs for/i,
+      });
+      await expect(trigger).toBeVisible({ timeout: 10000 });
+      await trigger.click();
+
+      await expect(page.getByText("Recurring scheduled costs")).toBeVisible();
+      await expect(page.getByText(scheduleName)).toBeVisible();
+      await expect(page.getByText("Recurring")).toBeVisible();
+      await expect(page.getByText("Shortfall")).toBeVisible();
+      await expect(page.getByText("$420.09")).toBeVisible();
+      await expect(page.getByText("$120.09")).toBeVisible();
+      await expect(page.getByText("Monthly")).toBeVisible();
+    } finally {
+      await setBudgetTargetForCategory({
+        page,
+        categoryName: /Groceries/,
+        amount: "0",
+      });
+      await deleteScheduleIfVisible(page, scheduleName);
     }
   });
 });

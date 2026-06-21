@@ -34,6 +34,7 @@ import type {
   BudgetGenerateAnalyticsRow,
   BudgetMonthStatus,
   BudgetRule502030Band,
+  BudgetScheduledBreakdown,
   BudgetSummary,
   Category,
 } from "@/types";
@@ -430,7 +431,11 @@ export async function getScheduledAmountsByCategory(
   month: string,
   homeCurrency: SupportedCurrency,
   options?: { occurringAfter?: string },
-): Promise<{ expenses: Map<number, number>; income: number }> {
+): Promise<{
+  expenses: Map<number, number>;
+  income: number;
+  breakdown: Map<number, BudgetScheduledBreakdown[]>;
+}> {
   const { start, end } = getMonthRange(month);
   const occurringAfter = options?.occurringAfter;
 
@@ -439,6 +444,7 @@ export async function getScheduledAmountsByCategory(
   const categoryColorMap = new Map(allCats.map((c) => [c.id, c.color]));
 
   const rawSchedules = db.select().from(scheduledTransactions).all();
+  const scheduleById = new Map(rawSchedules.map((s) => [s.id, s]));
   const accountRows = db.select().from(accounts).all();
   const accountCurrency = new Map(
     accountRows.map((a) => [
@@ -470,6 +476,10 @@ export async function getScheduledAmountsByCategory(
   await prefetchRatesToHome(db, keys, homeCurrency);
 
   const expenses = new Map<number, number>();
+  const breakdownDraft = new Map<
+    number,
+    Map<number, BudgetScheduledBreakdown>
+  >();
   let income = 0;
 
   for (const occ of occurrences) {
@@ -483,17 +493,61 @@ export async function getScheduledAmountsByCategory(
     } else if (occ.categoryId != null) {
       const t = catType.get(occ.categoryId);
       if (t === "expense" || t === "savings") {
+        const amount = Math.abs(conv);
         expenses.set(
           occ.categoryId,
-          (expenses.get(occ.categoryId) ?? 0) + Math.abs(conv),
+          (expenses.get(occ.categoryId) ?? 0) + amount,
         );
+
+        let categoryBreakdown = breakdownDraft.get(occ.categoryId);
+        if (!categoryBreakdown) {
+          categoryBreakdown = new Map();
+          breakdownDraft.set(occ.categoryId, categoryBreakdown);
+        }
+
+        const schedule = scheduleById.get(occ.scheduleId);
+        const existing = categoryBreakdown.get(occ.scheduleId);
+        if (existing) {
+          existing.dates.push(occ.date);
+          existing.occurrenceCount += 1;
+          existing.amount += amount;
+        } else {
+          categoryBreakdown.set(occ.scheduleId, {
+            scheduleId: occ.scheduleId,
+            name: occ.name,
+            frequency: schedule?.frequency ?? "monthly",
+            dates: [occ.date],
+            occurrenceCount: 1,
+            amount,
+          });
+        }
       }
     }
   }
 
-  return { expenses, income: roundMoney(income) };
-}
+  const breakdown = new Map<number, BudgetScheduledBreakdown[]>();
+  for (const [categoryId, bySchedule] of breakdownDraft) {
+    breakdown.set(
+      categoryId,
+      [...bySchedule.values()]
+        .map((item) => ({
+          ...item,
+          dates: [...item.dates].sort(),
+          amount: roundMoney(item.amount),
+        }))
+        .sort((a, b) => {
+          const dateCmp = (a.dates[0] ?? "").localeCompare(b.dates[0] ?? "");
+          return dateCmp !== 0 ? dateCmp : a.name.localeCompare(b.name);
+        }),
+    );
+  }
 
+  for (const [categoryId, amount] of expenses) {
+    expenses.set(categoryId, roundMoney(amount));
+  }
+
+  return { expenses, income: roundMoney(income), breakdown };
+}
 /**
  * Scheduled expense amounts (per category, home currency) for occurrences that have not
  * yet happened — strictly after today. For past/closed months this is empty. Used to make
@@ -524,10 +578,8 @@ export async function buildBudgetCategoryRows(
 
   const actual = await getActualSpendingByCategory(month, homeCurrency);
   const averages = await getHistoricalAverages(month, homeCurrency);
-  const { expenses: scheduled } = await getScheduledAmountsByCategory(
-    month,
-    homeCurrency,
-  );
+  const { expenses: scheduled, breakdown: scheduledBreakdown } =
+    await getScheduledAmountsByCategory(month, homeCurrency);
 
   const mains = allCategories.filter((c) => c.parentId === null);
   const mainGroups = new Map(mains.map((c) => [c.id, c.name]));
@@ -557,6 +609,7 @@ export async function buildBudgetCategoryRows(
         targetAmount: targetMap.get(cat.id) ?? 0,
         actualSpent: actual.get(cat.id) ?? 0,
         scheduledAmount: scheduled.get(cat.id) ?? 0,
+        scheduledBreakdown: scheduledBreakdown.get(cat.id) ?? [],
         avg3Month: averages.get(cat.id) ?? 0,
         categoryKind: kindFor(cat.type),
         ruleBucket: rb,

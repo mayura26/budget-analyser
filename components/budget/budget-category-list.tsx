@@ -10,6 +10,11 @@ import {
 } from "@/components/budget/budget-progress-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -134,6 +139,129 @@ function renderRemaining(
   return <span className="text-muted-foreground">&mdash;</span>;
 }
 
+function formatScheduleDate(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function formatScheduleDates(dates: string[]) {
+  const visible = dates.slice(0, 3).map(formatScheduleDate).join(", ");
+  const extra = dates.length > 3 ? ` +${dates.length - 3} more` : "";
+  return `${visible}${extra}`;
+}
+
+function scheduleFrequencyLabel(
+  frequency: BudgetCategoryRow["scheduledBreakdown"][number]["frequency"],
+) {
+  switch (frequency) {
+    case "weekly":
+      return "Weekly";
+    case "fortnightly":
+      return "Fortnightly";
+    case "monthly":
+      return "Monthly";
+    case "quarterly":
+      return "Quarterly";
+    case "yearly":
+      return "Yearly";
+  }
+}
+
+function RecurringSchedulePopover({
+  row,
+  homeCurrency,
+}: {
+  row: BudgetCategoryRow;
+  homeCurrency: SupportedCurrency;
+}) {
+  const shortfall = Math.max(0, row.scheduledAmount - row.targetAmount);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="rounded-sm p-0.5 text-amber-500 transition-colors hover:bg-amber-500/10 hover:text-amber-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`Show recurring scheduled costs for ${row.categoryName}`}
+          data-testid={`recurring-breakdown-trigger-${row.categoryId}`}
+        >
+          <AlertTriangle className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[min(20rem,calc(100vw-2rem))] p-0"
+        align="end"
+      >
+        <div className="border-b bg-muted/40 px-3 py-2">
+          <p className="text-sm font-semibold tracking-tight">
+            Recurring scheduled costs
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground truncate">
+            {row.categoryName}
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 border-b px-3 py-2 text-xs">
+          <div>
+            <p className="text-muted-foreground">Target</p>
+            <p className="font-mono tabular-nums text-foreground">
+              {formatCurrency(row.targetAmount, homeCurrency)}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Recurring</p>
+            <p className="font-mono tabular-nums text-foreground">
+              {formatCurrency(row.scheduledAmount, homeCurrency)}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Shortfall</p>
+            <p className="font-mono tabular-nums text-amber-600 dark:text-amber-400">
+              {formatCurrency(shortfall, homeCurrency)}
+            </p>
+          </div>
+        </div>
+        <div className="max-h-72 overflow-y-auto px-3 py-2.5">
+          {row.scheduledBreakdown.length > 0 ? (
+            <div className="space-y-2">
+              {row.scheduledBreakdown.map((item) => (
+                <div
+                  key={item.scheduleId}
+                  className="rounded-md border bg-background px-2.5 py-2"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {item.name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {scheduleFrequencyLabel(item.frequency)}
+                        {item.occurrenceCount > 1
+                          ? `, ${item.occurrenceCount}x this month`
+                          : ""}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-mono text-sm tabular-nums">
+                      {formatCurrency(item.amount, homeCurrency)}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatScheduleDates(item.dates)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No schedule details available.
+            </p>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 const gridColsBase =
   "grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_1fr_minmax(14rem,18rem)_minmax(8rem,1fr)]";
 const gridColsDrilldown =
@@ -195,7 +323,11 @@ function CategoryRow({
   const gridClass = drilldownContext ? gridColsDrilldown : gridColsBase;
 
   return (
-    <div className="rounded-md">
+    <div
+      className="rounded-md"
+      data-testid={isSynthetic ? undefined : "budget-category-row"}
+      data-category-name={isSynthetic ? undefined : row.categoryName}
+    >
       <div
         data-testid={isSynthetic ? "budget-row-income-surplus" : undefined}
         className={cn(
@@ -352,43 +484,41 @@ function CategoryRow({
                 </span>
               )}
             </span>
+          ) : row.targetAmount > 0 ? (
+            <span className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => !readOnly && onEdit(row.categoryId)}
+                aria-label={`Edit target for ${row.categoryName}`}
+                className={cn(
+                  "tabular-nums px-1 py-0.5 rounded transition-colors text-muted-foreground",
+                  !readOnly && "hover:bg-muted cursor-pointer",
+                )}
+                disabled={readOnly}
+              >
+                {formatCurrency(row.targetAmount, homeCurrency)}
+              </button>
+              {belowScheduled && (
+                <RecurringSchedulePopover
+                  row={row}
+                  homeCurrency={homeCurrency}
+                />
+              )}
+            </span>
           ) : (
             <button
               type="button"
               onClick={() => !readOnly && onEdit(row.categoryId)}
+              aria-label={`Edit target for ${row.categoryName}`}
               className={cn(
-                "tabular-nums px-1 py-0.5 rounded transition-colors inline-flex items-center gap-1",
+                "tabular-nums px-1 py-0.5 rounded transition-colors text-muted-foreground italic",
                 !readOnly && "hover:bg-muted cursor-pointer",
-                row.targetAmount === 0
-                  ? "text-muted-foreground"
-                  : "text-muted-foreground",
               )}
               disabled={readOnly}
             >
-              {row.targetAmount > 0 ? (
-                <>
-                  {formatCurrency(row.targetAmount, homeCurrency)}
-                  {belowScheduled && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <AlertTriangle className="h-3 w-3 text-amber-500" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Target is below recurring scheduled amount (
-                          {formatCurrency(row.scheduledAmount, homeCurrency)}
-                          /mo)
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </>
-              ) : (
-                <span className="italic">Set target</span>
-              )}
+              Set target
             </button>
           )}
-
           {/* Remaining — hidden on mobile to save room */}
           <span className="hidden sm:inline text-muted-foreground/60">·</span>
           <span className="hidden sm:inline min-w-[4.5rem] text-right">

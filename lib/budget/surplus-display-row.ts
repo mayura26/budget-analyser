@@ -36,6 +36,7 @@ export function buildSurplusDisplayRow(
     targetAmount: plannedTarget,
     actualSpent: signedActual,
     scheduledAmount: 0,
+    scheduledBreakdown: [],
     avg3Month: 0,
     categoryKind: "savings",
     ruleBucket: null,

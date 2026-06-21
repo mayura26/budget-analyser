@@ -13,6 +13,7 @@ function row(
     parentName: "Group",
     color: "#000",
     scheduledAmount: 0,
+    scheduledBreakdown: [],
     avg3Month: 0,
     categoryKind: bucket === "savings" ? "savings" : "expense",
     ruleBucket: bucket,
