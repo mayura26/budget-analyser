@@ -119,6 +119,147 @@ function cleanupSchedules() {
   sqlite.close();
 }
 
+function currentBudgetTestMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+type NearGuideSeed = {
+  month: string;
+  scheduleId: number;
+  budgetId: number;
+  previousBudgetAmount: number | null;
+  parentCategoryId: number;
+  previousParentBudgetRuleBucket: string | null;
+};
+
+function seedNearGuideNeedsTarget(): NearGuideSeed {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    const category = sqlite
+      .prepare(
+        `SELECT
+           c.id,
+           parent.id AS parentCategoryId,
+           parent.budget_rule_bucket AS parentBudgetRuleBucket
+         FROM categories c
+         INNER JOIN categories parent ON parent.id = c.parent_id
+         WHERE c.type = 'expense'
+           AND parent.name IN ('Essentials', 'Living Costs')
+         ORDER BY CASE parent.name WHEN 'Essentials' THEN 0 ELSE 1 END, c.id
+         LIMIT 1`,
+      )
+      .get() as
+      | {
+          id: number;
+          parentCategoryId: number;
+          parentBudgetRuleBucket: string | null;
+        }
+      | undefined;
+
+    if (!category) {
+      throw new Error(
+        "No Needs expense category found for 50/30/20 marker test",
+      );
+    }
+
+    sqlite
+      .prepare(
+        "UPDATE categories SET budget_rule_bucket = 'needs' WHERE id = ?",
+      )
+      .run(category.parentCategoryId);
+
+    const month = currentBudgetTestMonth();
+    const startDate = `${month}-01`;
+    const schedule = sqlite
+      .prepare(
+        `INSERT INTO scheduled_transactions
+           (name, amount, frequency, start_date, is_active, created_at, updated_at)
+         VALUES (?, 20000, 'monthly', ?, 1, unixepoch(), unixepoch())`,
+      )
+      .run(`E2E near-guide income ${Date.now()}`, startDate);
+
+    const existingBudget = sqlite
+      .prepare(
+        `SELECT id, target_amount AS targetAmount
+         FROM budgets
+         WHERE month = ? AND category_id = ?`,
+      )
+      .get(month, category.id) as
+      | { id: number; targetAmount: number }
+      | undefined;
+
+    if (existingBudget) {
+      sqlite
+        .prepare(
+          `UPDATE budgets
+           SET target_amount = 9800, updated_at = unixepoch()
+           WHERE id = ?`,
+        )
+        .run(existingBudget.id);
+
+      return {
+        month,
+        scheduleId: Number(schedule.lastInsertRowid),
+        budgetId: existingBudget.id,
+        previousBudgetAmount: existingBudget.targetAmount,
+        parentCategoryId: category.parentCategoryId,
+        previousParentBudgetRuleBucket: category.parentBudgetRuleBucket,
+      };
+    }
+
+    const budget = sqlite
+      .prepare(
+        `INSERT INTO budgets
+           (month, category_id, target_amount, created_at, updated_at)
+         VALUES (?, ?, 9800, unixepoch(), unixepoch())`,
+      )
+      .run(month, category.id);
+
+    return {
+      month,
+      scheduleId: Number(schedule.lastInsertRowid),
+      budgetId: Number(budget.lastInsertRowid),
+      previousBudgetAmount: null,
+      parentCategoryId: category.parentCategoryId,
+      previousParentBudgetRuleBucket: category.parentBudgetRuleBucket,
+    };
+  } finally {
+    sqlite.close();
+  }
+}
+
+function cleanupNearGuideNeedsTarget(seed: NearGuideSeed) {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    sqlite
+      .prepare("DELETE FROM scheduled_transactions WHERE id = ?")
+      .run(seed.scheduleId);
+
+    if (seed.previousBudgetAmount === null) {
+      sqlite.prepare("DELETE FROM budgets WHERE id = ?").run(seed.budgetId);
+    } else {
+      sqlite
+        .prepare(
+          `UPDATE budgets
+           SET target_amount = ?, updated_at = unixepoch()
+           WHERE id = ?`,
+        )
+        .run(seed.previousBudgetAmount, seed.budgetId);
+    }
+
+    sqlite
+      .prepare("UPDATE categories SET budget_rule_bucket = ? WHERE id = ?")
+      .run(seed.previousParentBudgetRuleBucket, seed.parentCategoryId);
+  } finally {
+    sqlite.close();
+  }
+}
+
 test.describe("Budget", () => {
   test.beforeAll(() => {
     cleanupSchedules();
@@ -200,6 +341,23 @@ test.describe("Budget", () => {
     await expect(page.getByTestId("rule-band-chart-needs")).toBeVisible();
     await expect(page.getByTestId("rule-band-chart-wants")).toBeVisible();
     await expect(page.getByTestId("rule-band-chart-savings")).toBeVisible();
+  });
+
+  test("shows target marker when target is close to guide", async ({
+    page,
+  }) => {
+    const seed = seedNearGuideNeedsTarget();
+
+    try {
+      await page.goto(`/budget?month=${seed.month}`, { waitUntil: "commit" });
+
+      await expect(page.getByText("50 / 30 / 20 guideline")).toBeVisible();
+      await expect(page.getByTestId("rule-band-chart-needs")).toBeVisible();
+      await expect(page.getByTestId("rule-band-target-needs")).toBeVisible();
+      await expect(page.getByTestId("rule-band-guide-needs")).toBeVisible();
+    } finally {
+      cleanupNearGuideNeedsTarget(seed);
+    }
   });
 
   test("past month monthly budget tab loads; optional transaction drill-down", async ({

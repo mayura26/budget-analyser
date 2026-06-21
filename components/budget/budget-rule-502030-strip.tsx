@@ -71,9 +71,7 @@ function BandHorizontalBar({
       ? (Math.min((band.targetTotal / band.guideline) * 100, SCALE) / SCALE) *
         100
       : null;
-  const showTargetTick =
-    targetRawPct !== null &&
-    Math.abs((band.targetTotal - band.guideline) / band.guideline) > 0.05;
+  const showTargetTick = targetRawPct !== null;
 
   const pct =
     band.guideline > 0
@@ -103,6 +101,7 @@ function BandHorizontalBar({
             <span
               className="absolute text-[10px] font-semibold text-red-500 dark:text-red-400 -translate-x-1/2 top-0 leading-none whitespace-nowrap"
               style={{ left: `${targetRawPct}%` }}
+              data-testid={`rule-band-target-${bucket}`}
             >
               Target
             </span>
@@ -150,6 +149,7 @@ function BandHorizontalBar({
         <span
           className="absolute text-[10px] font-semibold text-blue-500 dark:text-blue-400 -translate-x-1/2 bottom-0 leading-none whitespace-nowrap"
           style={{ left: `${GUIDE_LEFT_PCT}%` }}
+          data-testid={`rule-band-guide-${bucket}`}
         >
           Guide
         </span>
