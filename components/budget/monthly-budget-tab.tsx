@@ -264,6 +264,7 @@ export function MonthlyBudgetTab({
         open={showGenerateDialog}
         onClose={() => setShowGenerateDialog(false)}
         homeCurrency={homeCurrency}
+        summary={summary}
       />
     </div>
   );

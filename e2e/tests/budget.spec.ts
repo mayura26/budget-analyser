@@ -286,7 +286,7 @@ test.describe("Budget", () => {
     await expect(page.getByText("Set up your budget for")).toBeVisible();
   });
 
-  test("generate budget dialog opens with analytics columns and selection controls", async ({
+  test("generate budget dialog opens with context totals and target comparisons", async ({
     page,
   }) => {
     await page.goto("/budget");
@@ -294,15 +294,35 @@ test.describe("Budget", () => {
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Generate Budget")).toBeVisible();
-    await expect(dialog.getByText("Last Target")).toBeVisible();
-    await expect(dialog.getByText("Last Spent")).toBeVisible();
-    await expect(dialog.getByText("3M Avg")).toBeVisible();
-    await expect(dialog.getByText("Expected")).toBeVisible();
+
+    const contextBar = dialog.getByTestId("generate-budget-context-bar");
+    await expect(contextBar).toContainText("50 / 30 / 20");
+    await expect(contextBar).toContainText("Expenses");
+    await expect(contextBar).toContainText("Savings");
+    await expect(contextBar).toContainText("Income basis");
+
+    const groupSummary = dialog
+      .getByTestId("generate-budget-group-summary")
+      .first();
+    await expect(groupSummary).toContainText("Proposed");
+    await expect(groupSummary).toContainText("Current");
+    await expect(groupSummary).toContainText("Last spent");
+    await expect(groupSummary).toContainText("3M avg");
+    await expect(groupSummary).toContainText("Prev target");
+
     await expect(
-      dialog.getByRole("columnheader", { name: "New target" }).first(),
+      dialog.getByText("Previous month target").first(),
     ).toBeVisible();
+    await expect(dialog.getByText("Last spent").first()).toBeVisible();
+    await expect(dialog.getByText("3M avg").first()).toBeVisible();
+    await expect(dialog.getByText("Expected").first()).toBeVisible();
     await expect(
-      dialog.getByRole("columnheader", { name: "Direction" }).first(),
+      dialog.getByRole("columnheader", { name: "Target change" }).first(),
+    ).toBeVisible();
+    await expect(dialog.getByText("Current").first()).toBeVisible();
+    await expect(dialog.getByText("New").first()).toBeVisible();
+    await expect(
+      dialog.getByText(/New target|No change|[+-]\$/).first(),
     ).toBeVisible();
     await expect(
       dialog.getByRole("button", { name: "Select all" }),

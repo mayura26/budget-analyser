@@ -32,9 +32,11 @@ import {
 } from "@/lib/actions/budget-targets";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { budgetCategoryShortTitle, cn, formatCurrency } from "@/lib/utils";
-import type { BudgetGenerateRecommendationRow } from "@/types";
+import type { BudgetGenerateRecommendationRow, BudgetSummary } from "@/types";
 
 type Direction = "increase" | "decrease" | "keep" | "new";
+
+const SAVINGS_PARENT_NAME = "Savings & Investing";
 
 function getDirection(
   row: BudgetGenerateRecommendationRow,
@@ -44,13 +46,6 @@ function getDirection(
   if (amount > row.currentMonthTarget) return "increase";
   if (amount < row.currentMonthTarget) return "decrease";
   return "keep";
-}
-
-function directionLabel(direction: Direction): string {
-  if (direction === "increase") return "Increase";
-  if (direction === "decrease") return "Decrease";
-  if (direction === "keep") return "Keep";
-  return "New";
 }
 
 function directionClasses(direction: Direction): string {
@@ -66,16 +61,82 @@ function directionClasses(direction: Direction): string {
   return "bg-violet-500/10 border-violet-500/30 text-violet-700 dark:text-violet-300";
 }
 
+function isSavingsRecommendation(
+  row: BudgetGenerateRecommendationRow,
+): boolean {
+  return row.parentName === SAVINGS_PARENT_NAME;
+}
+
+function changeLabel(
+  row: BudgetGenerateRecommendationRow,
+  amount: number,
+  homeCurrency: SupportedCurrency,
+): string {
+  if (row.currentMonthTarget <= 0) {
+    return amount > 0 ? "New target" : "No target";
+  }
+
+  const delta = amount - row.currentMonthTarget;
+  if (Math.abs(delta) < 0.01) return "No change";
+
+  const sign = delta > 0 ? "+" : "-";
+  return `${sign}${formatCurrency(Math.abs(delta), homeCurrency)}`;
+}
+
+function changeAriaLabel(
+  row: BudgetGenerateRecommendationRow,
+  amount: number,
+  homeCurrency: SupportedCurrency,
+): string {
+  const current = formatCurrency(row.currentMonthTarget, homeCurrency);
+  const next = formatCurrency(amount, homeCurrency);
+  const label = changeLabel(row, amount, homeCurrency);
+  return `${row.categoryName} target, current ${current}, new ${next}, ${label}`;
+}
+
+function BudgetContextMetric({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "spend" | "save" | "guide";
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-md border bg-card/70 px-3 py-2",
+        tone === "spend" && "border-red-500/20 bg-red-500/5",
+        tone === "save" && "border-emerald-500/20 bg-emerald-500/5",
+        tone === "guide" && "border-blue-500/20 bg-blue-500/5",
+      )}
+    >
+      <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
 export function GenerateBudgetDialog({
   month,
   open,
   onClose,
   homeCurrency,
+  summary,
 }: {
   month: string;
   open: boolean;
   onClose: () => void;
   homeCurrency: SupportedCurrency;
+  summary: BudgetSummary;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -139,6 +200,24 @@ export function GenerateBudgetDialog({
     [rows, selectedIds, amounts],
   );
 
+  const selectedMix = useMemo(
+    () =>
+      rows.reduce(
+        (totals, row) => {
+          if (!selectedIds.has(row.categoryId)) return totals;
+          const amount = amounts.get(row.categoryId) ?? row.recommendedTarget;
+          if (isSavingsRecommendation(row)) {
+            totals.savings += amount;
+          } else {
+            totals.expenses += amount;
+          }
+          return totals;
+        },
+        { expenses: 0, savings: 0 },
+      ),
+    [rows, selectedIds, amounts],
+  );
+
   const groupedRows = useMemo(() => {
     const groups = new Map<string, BudgetGenerateRecommendationRow[]>();
     for (const row of rows) {
@@ -160,18 +239,20 @@ export function GenerateBudgetDialog({
   const increaseCount = useMemo(
     () =>
       rows.filter((row) => {
+        if (!selectedIds.has(row.categoryId)) return false;
         const amount = amounts.get(row.categoryId) ?? row.recommendedTarget;
         return getDirection(row, amount) === "increase";
       }).length,
-    [rows, amounts],
+    [rows, selectedIds, amounts],
   );
   const decreaseCount = useMemo(
     () =>
       rows.filter((row) => {
+        if (!selectedIds.has(row.categoryId)) return false;
         const amount = amounts.get(row.categoryId) ?? row.recommendedTarget;
         return getDirection(row, amount) === "decrease";
       }).length,
-    [rows, amounts],
+    [rows, selectedIds, amounts],
   );
 
   function toggleSelected(categoryId: number) {
@@ -257,6 +338,35 @@ export function GenerateBudgetDialog({
               <p className="text-sm text-muted-foreground">{overallNotes}</p>
             </div>
 
+            <div
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
+              data-testid="generate-budget-context-bar"
+            >
+              <BudgetContextMetric
+                label="50 / 30 / 20"
+                value={`Needs ${formatCurrency(summary.rule502030.needs.targetTotal, homeCurrency)}`}
+                detail={`Wants ${formatCurrency(summary.rule502030.wants.targetTotal, homeCurrency)} / Savings ${formatCurrency(summary.rule502030.savings.targetTotal, homeCurrency)}`}
+                tone="guide"
+              />
+              <BudgetContextMetric
+                label="Expenses"
+                value={`${formatCurrency(selectedMix.expenses, homeCurrency)} proposed`}
+                detail={`Current ${formatCurrency(summary.totalBudgeted, homeCurrency)}`}
+                tone="spend"
+              />
+              <BudgetContextMetric
+                label="Savings"
+                value={`${formatCurrency(selectedMix.savings, homeCurrency)} proposed`}
+                detail={`Current ${formatCurrency(summary.totalSavingsBudgeted, homeCurrency)}`}
+                tone="save"
+              />
+              <BudgetContextMetric
+                label="Income basis"
+                value={formatCurrency(summary.incomeBasis, homeCurrency)}
+                detail="Used for guideline splits"
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="rounded-lg border bg-card/80 p-3">
                 <p className="text-xs text-muted-foreground">
@@ -308,6 +418,22 @@ export function GenerateBudgetDialog({
                     sum + (amounts.get(row.categoryId) ?? row.recommendedTarget)
                   );
                 }, 0);
+                const groupCurrentTotal = group.rows.reduce(
+                  (sum, row) => sum + row.currentMonthTarget,
+                  0,
+                );
+                const groupLastSpentTotal = group.rows.reduce(
+                  (sum, row) => sum + row.lastMonthSpent,
+                  0,
+                );
+                const groupAverageTotal = group.rows.reduce(
+                  (sum, row) => sum + row.avg3Month,
+                  0,
+                );
+                const groupLastTargetTotal = group.rows.reduce(
+                  (sum, row) => sum + row.lastMonthTarget,
+                  0,
+                );
                 const isExpanded = expandedGroups.has(group.group);
 
                 return (
@@ -315,20 +441,56 @@ export function GenerateBudgetDialog({
                     <button
                       type="button"
                       onClick={() => toggleGroup(group.group)}
-                      className="w-full flex items-center justify-between px-2 sm:px-3 py-2 text-sm font-semibold hover:bg-muted/50 rounded-md transition-colors bg-muted/20"
+                      className="w-full flex flex-col gap-2 px-2 py-2 text-left text-sm hover:bg-muted/50 rounded-md transition-colors bg-muted/20 sm:px-3"
+                      data-testid="generate-budget-group-summary"
                     >
-                      <div className="flex items-center gap-2">
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <p className="font-semibold">{group.group}</p>
+                      <div className="flex w-full items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <p className="truncate font-semibold">
+                            {group.group}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm text-muted-foreground tabular-nums">
+                          {groupSelected.length}/{group.rows.length} selected
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground tabular-nums">
-                        {groupSelected.length}/{group.rows.length} selected ·{" "}
-                        {formatCurrency(groupTotal, homeCurrency)}
-                      </p>
+                      <div className="grid w-full grid-cols-2 gap-1 text-[11px] font-normal text-muted-foreground tabular-nums sm:grid-cols-5">
+                        <span>
+                          Proposed{" "}
+                          <strong className="font-semibold text-foreground">
+                            {formatCurrency(groupTotal, homeCurrency)}
+                          </strong>
+                        </span>
+                        <span>
+                          Current{" "}
+                          <strong className="font-semibold text-foreground">
+                            {formatCurrency(groupCurrentTotal, homeCurrency)}
+                          </strong>
+                        </span>
+                        <span>
+                          Last spent{" "}
+                          <strong className="font-semibold text-foreground">
+                            {formatCurrency(groupLastSpentTotal, homeCurrency)}
+                          </strong>
+                        </span>
+                        <span>
+                          3M avg{" "}
+                          <strong className="font-semibold text-foreground">
+                            {formatCurrency(groupAverageTotal, homeCurrency)}
+                          </strong>
+                        </span>
+                        <span>
+                          Prev target{" "}
+                          <strong className="font-semibold text-foreground">
+                            {formatCurrency(groupLastTargetTotal, homeCurrency)}
+                          </strong>
+                        </span>
+                      </div>
                     </button>
 
                     {isExpanded && (
@@ -340,11 +502,8 @@ export function GenerateBudgetDialog({
                             <TableHead className="min-w-[260px]">
                               Signals
                             </TableHead>
-                            <TableHead className="text-right">
-                              New target
-                            </TableHead>
-                            <TableHead className="text-right">
-                              Direction
+                            <TableHead className="min-w-[260px] text-right">
+                              Target change
                             </TableHead>
                           </TableRow>
                         </TableHeader>
@@ -355,6 +514,12 @@ export function GenerateBudgetDialog({
                               amounts.get(row.categoryId) ??
                               row.recommendedTarget;
                             const direction = getDirection(row, currentAmount);
+                            const deltaLabel = changeLabel(
+                              row,
+                              currentAmount,
+                              homeCurrency,
+                            );
+                            const inputId = `generated-target-${row.categoryId}`;
                             return (
                               <TableRow key={row.categoryId}>
                                 <TableCell>
@@ -394,7 +559,7 @@ export function GenerateBudgetDialog({
                                 <TableCell>
                                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:text-sm">
                                     <span className="text-muted-foreground">
-                                      Last target
+                                      Previous month target
                                     </span>
                                     <span className="text-right tabular-nums">
                                       {formatCurrency(
@@ -432,30 +597,60 @@ export function GenerateBudgetDialog({
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    step={10}
-                                    value={currentAmount}
-                                    onChange={(event) =>
-                                      setAmount(
-                                        row.categoryId,
-                                        event.target.value,
-                                      )
-                                    }
-                                    className="h-8 w-24 sm:w-28 ml-auto text-right"
-                                  />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "justify-center min-w-16 sm:min-w-20",
-                                      directionClasses(direction),
-                                    )}
-                                  >
-                                    {directionLabel(direction)}
-                                  </Badge>
+                                  <div className="flex flex-col items-end gap-1.5">
+                                    <div className="flex items-end justify-end gap-2">
+                                      <div>
+                                        <p className="text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
+                                          Current
+                                        </p>
+                                        <p className="rounded-md border bg-muted/30 px-2 py-1 text-sm font-semibold tabular-nums">
+                                          {formatCurrency(
+                                            row.currentMonthTarget,
+                                            homeCurrency,
+                                          )}
+                                        </p>
+                                      </div>
+                                      <span className="pb-1.5 text-xs text-muted-foreground">
+                                        -&gt;
+                                      </span>
+                                      <label
+                                        htmlFor={inputId}
+                                        className="block"
+                                      >
+                                        <span className="block text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
+                                          New
+                                        </span>
+                                        <Input
+                                          id={inputId}
+                                          aria-label={changeAriaLabel(
+                                            row,
+                                            currentAmount,
+                                            homeCurrency,
+                                          )}
+                                          type="number"
+                                          min={0}
+                                          step={10}
+                                          value={currentAmount}
+                                          onChange={(event) =>
+                                            setAmount(
+                                              row.categoryId,
+                                              event.target.value,
+                                            )
+                                          }
+                                          className="h-8 w-24 text-right sm:w-28"
+                                        />
+                                      </label>
+                                    </div>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "justify-center min-w-20",
+                                        directionClasses(direction),
+                                      )}
+                                    >
+                                      {deltaLabel}
+                                    </Badge>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             );
