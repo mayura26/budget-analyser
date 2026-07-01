@@ -63,6 +63,8 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
       sourceCurrencyColumn: "Source currency",
       targetAmountColumn: "Target amount (after fees)",
       targetCurrencyColumn: "Target currency",
+      sourceTimeZone: "UTC",
+      targetTimeZone: "Australia/Sydney",
     }),
     isSystem: true,
   },

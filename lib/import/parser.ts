@@ -48,6 +48,10 @@ export type ColumnMapping = {
    * e.g. Amex card payments appear negative in CSV but should match bank debits for linking.
    */
   descriptionCreditSubstrings?: string[];
+  /** Interpret source timestamps in this timezone before deriving the stored local date. */
+  sourceTimeZone?: string;
+  /** Calendar timezone used for the stored YYYY-MM-DD date. */
+  targetTimeZone?: string;
 };
 
 export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
@@ -77,6 +81,8 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
         descriptionInColumn?: string;
         descriptionOutColumn?: string;
         descriptionCreditSubstrings?: string[];
+        sourceTimeZone?: string;
+        targetTimeZone?: string;
       };
       if (typeof parsed.hasHeader === "boolean") {
         hasHeader = parsed.hasHeader;
@@ -118,6 +124,8 @@ export function profileToColumnMapping(profile: BankProfile): ColumnMapping {
           parsed.descriptionCreditSubstrings.length > 0
             ? parsed.descriptionCreditSubstrings
             : undefined,
+        sourceTimeZone: parsed.sourceTimeZone,
+        targetTimeZone: parsed.targetTimeZone,
       };
     } catch {
       // Ignore invalid JSON and fall back to header-based parsing.
@@ -183,8 +191,8 @@ export function parseCSV(
 
       if (!dateRaw || !desc) continue;
 
-      const date = parseDateToISO(dateRaw, mapping.dateFormat);
-      if (!date) {
+      const parsedDate = parseMappedDate(dateRaw, mapping);
+      if (!parsedDate) {
         errors.push(`Invalid date "${dateRaw}" in row ${i + 1}`);
         continue;
       }
@@ -216,9 +224,11 @@ export function parseCSV(
       amount = creditAmountIfDescriptionMatches(amount, desc, mapping);
 
       rows.push({
-        date,
+        date: parsedDate.date,
         description: desc,
         amount,
+        sourceTimestampUtc: parsedDate.sourceTimestampUtc,
+        legacyDate: parsedDate.legacyDate,
         rawRow: Object.fromEntries(
           row.map((value, idx) => [`col${idx}`, value]),
         ),
@@ -255,8 +265,8 @@ export function parseCSV(
 
     if (!dateRaw || !desc) continue;
 
-    const date = parseDateToISO(dateRaw, mapping.dateFormat);
-    if (!date) {
+    const parsedDate = parseMappedDate(dateRaw, mapping);
+    if (!parsedDate) {
       errors.push(`Invalid date "${dateRaw}" in row ${i + 1}`);
       continue;
     }
@@ -307,10 +317,12 @@ export function parseCSV(
     }
 
     rows.push({
-      date,
+      date: parsedDate.date,
       description: desc,
       amount,
       currency,
+      sourceTimestampUtc: parsedDate.sourceTimestampUtc,
+      legacyDate: parsedDate.legacyDate,
       rawRow: row,
       merchant,
       accountReference,
@@ -319,6 +331,97 @@ export function parseCSV(
   }
 
   return { rows, headers, errors };
+}
+
+function parseMappedDate(
+  dateRaw: string,
+  mapping: ColumnMapping,
+): { date: string; sourceTimestampUtc?: string; legacyDate?: string } | null {
+  if (
+    mapping.dateFormat === "YYYY-MM-DD HH:mm" &&
+    mapping.sourceTimeZone?.toUpperCase() === "UTC"
+  ) {
+    const utcInstant = parseUtcTimestamp(dateRaw);
+    if (!utcInstant) return null;
+    const targetTimeZone = mapping.targetTimeZone?.trim() || "Australia/Sydney";
+    const date = formatDateInTimeZone(utcInstant, targetTimeZone);
+    if (!date) return null;
+    const legacyDate = parseDateToISO(dateRaw, mapping.dateFormat) ?? undefined;
+    return {
+      date,
+      sourceTimestampUtc: utcInstant.toISOString(),
+      legacyDate: legacyDate && legacyDate !== date ? legacyDate : undefined,
+    };
+  }
+
+  const date = parseDateToISO(dateRaw, mapping.dateFormat);
+  return date ? { date } : null;
+}
+
+function parseUtcTimestamp(dateRaw: string): Date | null {
+  const match = dateRaw
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (!match) return null;
+
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  const hour = Number.parseInt(match[4] ?? "0", 10);
+  const minute = Number.parseInt(match[5] ?? "0", 10);
+  const second = Number.parseInt(match[6] ?? "0", 10);
+  if (
+    Number.isNaN(year) ||
+    Number.isNaN(month) ||
+    Number.isNaN(day) ||
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    Number.isNaN(second) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59 ||
+    second < 0 ||
+    second > 59
+  ) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    date.getUTCHours() !== hour ||
+    date.getUTCMinutes() !== minute ||
+    date.getUTCSeconds() !== second
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function formatDateInTimeZone(date: Date, timeZone: string): string | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-AU", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const value = (type: string) => parts.find((p) => p.type === type)?.value;
+    const year = value("year");
+    const month = value("month");
+    const day = value("day");
+    if (!year || !month || !day) return null;
+    return `${year}-${month}-${day}`;
+  } catch {
+    return null;
+  }
 }
 
 function normaliseAmount(raw: string): string {

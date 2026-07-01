@@ -62,6 +62,7 @@ export type Transaction = {
   amount: number; // negative=debit, positive=credit
   originalAmount: number | null;
   originalCurrency: string | null;
+  sourceTimestampUtc: string | null;
   categoryId: number | null;
   categorySource: "rule" | "ai" | "manual" | null;
   confidence: number | null;
@@ -116,6 +117,9 @@ export type ParsedRow = {
   description: string;
   amount: number;
   currency?: string;
+  sourceTimestampUtc?: string;
+  /** Previous parser-derived date, used only to match legacy imports during repair/dedupe. */
+  legacyDate?: string;
   rawRow: Record<string, string>;
   merchant?: string;
   accountReference?: string;
@@ -142,6 +146,7 @@ export type PreviewRow = ParsedRow & {
   status: PreviewRowStatus;
   isDuplicate: boolean;
   mergeTargetId?: number;
+  duplicateMatchFingerprint?: string;
 };
 
 export type ActionResult<T = void> =

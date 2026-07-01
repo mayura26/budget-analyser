@@ -176,6 +176,7 @@ export const transactions = sqliteTable(
     amount: real("amount").notNull(), // negative=debit, positive=credit
     originalAmount: real("original_amount"),
     originalCurrency: text("original_currency"),
+    sourceTimestampUtc: text("source_timestamp_utc"),
     categoryId: integer("category_id").references(() => categories.id, {
       onDelete: "set null",
     }),

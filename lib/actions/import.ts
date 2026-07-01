@@ -52,6 +52,28 @@ function amountWithinTolerance(a: number, b: number): boolean {
   return Math.abs(a - b) / denom <= MERGE_AMOUNT_TOLERANCE;
 }
 
+function candidateFingerprintsForRow(
+  accountId: number,
+  row: PreviewRow,
+): string[] {
+  const dates = new Set([row.date]);
+  if (row.legacyDate) dates.add(row.legacyDate);
+
+  const normalisedValues = new Set([row.normalised]);
+  const legacyNormalised = normaliseDescriptionLegacy(row.description);
+  if (legacyNormalised) normalisedValues.add(legacyNormalised);
+
+  const candidates = new Set<string>();
+  for (const date of dates) {
+    for (const normalised of normalisedValues) {
+      candidates.add(
+        generateFingerprint(accountId, date, row.amount, normalised),
+      );
+    }
+  }
+  return [...candidates];
+}
+
 const PreviewSchema = z.object({
   accountId: z.coerce.number(),
   bankProfileId: z.coerce.number(),
@@ -187,23 +209,16 @@ async function buildImportPreview(
     };
   });
 
-  const legacyFingerprintsByPrimary = new Map<string, string>();
+  const candidateFingerprintsByPrimary = new Map<string, string[]>();
   for (const row of previewRows) {
-    const legacyNormalised = normaliseDescriptionLegacy(row.description);
-    const legacyFingerprint = generateFingerprint(
-      accountId,
-      row.date,
-      row.amount,
-      legacyNormalised,
+    candidateFingerprintsByPrimary.set(
+      row.fingerprint,
+      candidateFingerprintsForRow(accountId, row),
     );
-    legacyFingerprintsByPrimary.set(row.fingerprint, legacyFingerprint);
   }
 
   const fingerprints = Array.from(
-    new Set([
-      ...previewRows.map((r) => r.fingerprint),
-      ...legacyFingerprintsByPrimary.values(),
-    ]),
+    new Set([...candidateFingerprintsByPrimary.values()].flat()),
   );
   const existingChunks: string[] = [];
   const chunkSize = 500;
@@ -212,20 +227,28 @@ async function buildImportPreview(
     const existing = db
       .select({ fingerprint: transactions.fingerprint })
       .from(transactions)
-      .where(inArray(transactions.fingerprint, chunk))
+      .where(
+        and(
+          eq(transactions.accountId, accountId),
+          inArray(transactions.fingerprint, chunk),
+        ),
+      )
       .all();
     existingChunks.push(...existing.map((e) => e.fingerprint));
   }
 
   const existingSet = new Set(existingChunks);
   for (const row of previewRows) {
-    const legacyFingerprint = legacyFingerprintsByPrimary.get(row.fingerprint);
-    if (
-      existingSet.has(row.fingerprint) ||
-      (legacyFingerprint !== undefined && existingSet.has(legacyFingerprint))
-    ) {
+    const candidates = candidateFingerprintsByPrimary.get(row.fingerprint) ?? [
+      row.fingerprint,
+    ];
+    const match = candidates.find((fingerprint) =>
+      existingSet.has(fingerprint),
+    );
+    if (match) {
       row.status = "duplicate";
       row.isDuplicate = true;
+      row.duplicateMatchFingerprint = match;
     }
   }
 
@@ -531,6 +554,7 @@ export async function confirmImport(formData: FormData): Promise<
             amount: row.amount,
             originalAmount: row.amount,
             originalCurrency: row.currency ?? account.currency,
+            sourceTimestampUtc: row.sourceTimestampUtc ?? null,
             merchant: row.merchant ?? null,
             accountReference: row.accountReference ?? null,
             pending: false,
@@ -555,6 +579,7 @@ export async function confirmImport(formData: FormData): Promise<
             amount: row.amount,
             originalAmount: row.amount,
             originalCurrency: row.currency ?? account.currency,
+            sourceTimestampUtc: row.sourceTimestampUtc ?? null,
             merchant: row.merchant ?? null,
             accountReference: row.accountReference ?? null,
             pending: false,
@@ -588,6 +613,7 @@ export async function confirmImport(formData: FormData): Promise<
             amount: row.amount,
             originalAmount: row.amount,
             originalCurrency: row.currency ?? account.currency,
+            sourceTimestampUtc: row.sourceTimestampUtc ?? null,
             merchant: row.merchant ?? null,
             accountReference: row.accountReference ?? null,
             pending: row.pending === true,
@@ -608,11 +634,14 @@ export async function confirmImport(formData: FormData): Promise<
           .update(transactions)
           .set({
             importBatchId: batch.id,
+            fingerprint: row.fingerprint,
+            date: row.date,
             description: row.description,
             normalised: row.normalised,
             amount: row.amount,
             originalAmount: row.amount,
             originalCurrency: row.currency ?? account.currency,
+            sourceTimestampUtc: row.sourceTimestampUtc ?? null,
             merchant: row.merchant ?? null,
             accountReference: row.accountReference ?? null,
             updatedAt: now,
@@ -620,7 +649,10 @@ export async function confirmImport(formData: FormData): Promise<
           .where(
             and(
               eq(transactions.accountId, accountId),
-              eq(transactions.fingerprint, row.fingerprint),
+              eq(
+                transactions.fingerprint,
+                row.duplicateMatchFingerprint ?? row.fingerprint,
+              ),
             ),
           )
           .returning({ id: transactions.id })

@@ -382,11 +382,11 @@ test.describe("Import", () => {
     await expect(page.locator("tbody tr")).toHaveCount(2);
     await expect(page.getByText("BALANCE_TRANSACTION")).toHaveCount(0);
     // Money in: description uses Source name (not Target / recipient label).
-    await expect(
-      page
-        .locator("tbody tr")
-        .filter({ hasText: "Kanthavel Mayura Vivekananda" }),
-    ).toContainText("+");
+    const wiseMoneyInRow = page
+      .locator("tbody tr")
+      .filter({ hasText: "Kanthavel Mayura Vivekananda" });
+    await expect(wiseMoneyInRow).toContainText("+");
+    await expect(wiseMoneyInRow).toContainText("4 Apr 2026");
     await expect(
       page.locator("tbody tr").filter({ hasText: "TransferWise" }),
     ).toContainText("-");
