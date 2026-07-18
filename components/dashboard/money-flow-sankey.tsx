@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 
@@ -24,13 +24,13 @@ type FlowNode = {
   color: string;
 };
 
-const H = 300;
-const TOP_PAD = 20;
-const BOT_PAD = 20;
-const NODE_GAP = 2; // surface gap between stacked fills (dataviz mark spec)
-const BAR_W = 14;
-const LEFT_LABEL_W = 70;
-const RIGHT_LABEL_W = 112;
+const BAR_W = 10;
+const LEFT_X = 5; // source bar sits flush left — income lives in the header
+const RIGHT_LABEL_W = 100;
+const TOP_PAD = 8;
+const BOT_PAD = 8;
+const NODE_GAP = 1.5;
+const MIN_ROW = 30; // min vertical room per label so small slices stay legible
 
 /** Cubic-bezier flow ribbon between a left slice and a right node of equal height. */
 function ribbonPath(
@@ -54,8 +54,6 @@ export function MoneyFlowSankey({
   other,
   savings,
   net,
-  transactionCount,
-  accountCount,
   homeCurrency,
 }: {
   income: number;
@@ -64,8 +62,6 @@ export function MoneyFlowSankey({
   other: number;
   savings: number;
   net: number;
-  transactionCount: number;
-  accountCount: number;
   homeCurrency: SupportedCurrency;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -82,36 +78,19 @@ export function MoneyFlowSankey({
     return () => observer.disconnect();
   }, []);
 
-  const meta = (
-    <p className="text-xs text-muted-foreground mt-3">
-      {transactionCount} transaction{transactionCount !== 1 ? "s" : ""} &middot;{" "}
-      {accountCount} account{accountCount !== 1 ? "s" : ""}
-    </p>
-  );
-
-  const header = (
-    <CardHeader>
-      <CardTitle className="text-base font-semibold">Money flow</CardTitle>
-      <p className="text-xs text-muted-foreground font-normal">
-        How this month&rsquo;s income was split.
-      </p>
-    </CardHeader>
-  );
+  const overspent = net < 0;
 
   if (income <= 0) {
     return (
       <Card data-testid="money-flow">
-        {header}
-        <CardContent>
-          <div className="flex h-48 items-center justify-center text-muted-foreground text-sm">
+        <CardContent className="px-4 py-6">
+          <div className="flex h-20 items-center justify-center text-muted-foreground text-sm">
             No income recorded this month yet
           </div>
         </CardContent>
       </Card>
     );
   }
-
-  const overspent = net < 0;
 
   const uses: FlowNode[] = [
     { key: "needs", label: "Needs", value: needs, color: COLORS.needs },
@@ -126,14 +105,15 @@ export function MoneyFlowSankey({
   const total = uses.reduce((sum, n) => sum + n.value, 0) || income;
   const pctOfIncome = (v: number) => Math.round((v / income) * 100);
 
-  const W = Math.max(width, 280);
-  const leftBarX = LEFT_LABEL_W + 6;
+  const W = Math.max(width, 260);
+  const ribbonL = LEFT_X + BAR_W;
   const rightBarX = W - RIGHT_LABEL_W - BAR_W;
-  const plotH = H - TOP_PAD - BOT_PAD;
-  // Ribbons tile continuously on the left; right nodes carry the surface gaps.
+  // Height scales with node count so labels always have room, but stays compact.
+  const plotH = Math.max(uses.length * MIN_ROW, 110);
+  const H = plotH + TOP_PAD + BOT_PAD;
   const scale = (plotH - NODE_GAP * Math.max(uses.length - 1, 0)) / total;
 
-  // Left source bar: income (green) on top, plus a red shortfall segment when overspent.
+  // Left source bar: income (green) on top, red shortfall segment when overspent.
   const incomeH = income * scale;
   const shortfallH = overspent ? Math.abs(net) * scale : 0;
 
@@ -146,15 +126,36 @@ export function MoneyFlowSankey({
     const leftY = cursorL;
     cursorR += h + NODE_GAP;
     cursorL += h;
-    return { ...n, h, rightY, leftY };
+    return { ...n, h, rightY, leftY, labelYc: rightY + h / 2 };
   });
 
-  const xLeftEdge = leftBarX + BAR_W;
+  // Spread labels vertically so tiny slices don't collide.
+  let prev = -Infinity;
+  for (const n of laidOut) {
+    if (n.labelYc < prev + MIN_ROW) n.labelYc = prev + MIN_ROW;
+    prev = n.labelYc;
+  }
 
   return (
     <Card data-testid="money-flow">
-      {header}
-      <CardContent>
+      <CardHeader className="flex flex-row items-baseline gap-2 space-y-0 p-4 pb-2">
+        <span className="text-xs text-muted-foreground">Income</span>
+        <span
+          className="text-sm font-bold tabular-nums"
+          style={{ color: COLORS.income }}
+        >
+          {formatCurrency(income, homeCurrency)}
+        </span>
+        {overspent && (
+          <span
+            className="text-[11px] font-semibold tabular-nums"
+            style={{ color: COLORS.shortfall }}
+          >
+            Over {formatCurrency(Math.abs(net), homeCurrency)}
+          </span>
+        )}
+      </CardHeader>
+      <CardContent className="px-4 pb-3 pt-0">
         <div ref={containerRef} className="w-full">
           {width > 0 && (
             <svg
@@ -171,7 +172,7 @@ export function MoneyFlowSankey({
                 <path
                   key={n.key}
                   className="flow-ribbon"
-                  d={ribbonPath(xLeftEdge, n.leftY, rightBarX, n.rightY, n.h)}
+                  d={ribbonPath(ribbonL, n.leftY, rightBarX, n.rightY, n.h)}
                   fill={n.color}
                   fillOpacity={0.3}
                 >
@@ -181,109 +182,64 @@ export function MoneyFlowSankey({
                 </path>
               ))}
 
-              {/* Left source bar */}
+              {/* Left source bar (income + optional shortfall) */}
               <rect
-                x={leftBarX}
+                x={LEFT_X}
                 y={TOP_PAD}
                 width={BAR_W}
                 height={incomeH}
-                rx={3}
+                rx={2}
                 fill={COLORS.income}
               />
               {overspent && (
                 <rect
-                  x={leftBarX}
+                  x={LEFT_X}
                   y={TOP_PAD + incomeH}
                   width={BAR_W}
                   height={shortfallH}
-                  rx={3}
+                  rx={2}
                   fill={COLORS.shortfall}
                 />
               )}
 
-              {/* Income label (right-aligned, centered on the income segment) */}
-              <text
-                x={leftBarX - 6}
-                y={TOP_PAD + incomeH / 2 - 3}
-                textAnchor="end"
-                fontSize={11}
-                fill="var(--color-muted-foreground)"
-              >
-                Income
-              </text>
-              <text
-                x={leftBarX - 6}
-                y={TOP_PAD + incomeH / 2 + 11}
-                textAnchor="end"
-                fontSize={12.5}
-                fontWeight={700}
-                fill={COLORS.income}
-              >
-                {formatCurrency(income, homeCurrency)}
-              </text>
-
-              {/* Shortfall label */}
-              {overspent && (
-                <>
-                  <text
-                    x={leftBarX - 6}
-                    y={TOP_PAD + incomeH + shortfallH / 2 - 3}
-                    textAnchor="end"
-                    fontSize={11}
-                    fill="var(--color-muted-foreground)"
-                  >
-                    Shortfall
-                  </text>
-                  <text
-                    x={leftBarX - 6}
-                    y={TOP_PAD + incomeH + shortfallH / 2 + 11}
-                    textAnchor="end"
-                    fontSize={12.5}
-                    fontWeight={700}
-                    fill={COLORS.shortfall}
-                  >
-                    {formatCurrency(Math.abs(net), homeCurrency)}
-                  </text>
-                </>
-              )}
-
               {/* Right nodes + labels */}
-              {laidOut.map((n) => {
-                const yc = n.rightY + n.h / 2;
-                return (
-                  <g key={n.key} data-testid={`flow-node-${n.key}`}>
-                    <rect
-                      x={rightBarX}
-                      y={n.rightY}
-                      width={BAR_W}
-                      height={Math.max(n.h, 1)}
-                      rx={3}
-                      fill={n.color}
-                    />
-                    <text
-                      x={rightBarX + BAR_W + 6}
-                      y={yc - 3}
-                      fontSize={12}
-                      fill="var(--color-muted-foreground)"
-                    >
-                      {n.label} &middot; {pctOfIncome(n.value)}%
-                    </text>
-                    <text
-                      x={rightBarX + BAR_W + 6}
-                      y={yc + 11}
-                      fontSize={12.5}
-                      fontWeight={700}
-                      fill={n.color}
-                    >
+              {laidOut.map((n) => (
+                <g key={n.key} data-testid={`flow-node-${n.key}`}>
+                  <rect
+                    x={rightBarX}
+                    y={n.rightY}
+                    width={BAR_W}
+                    height={Math.max(n.h, 2)}
+                    rx={2}
+                    fill={n.color}
+                  />
+                  <text
+                    x={rightBarX + BAR_W + 5}
+                    y={n.labelYc - 2}
+                    fontSize={11}
+                    fontWeight={600}
+                    fill="var(--color-foreground)"
+                  >
+                    {n.label}
+                  </text>
+                  <text
+                    x={rightBarX + BAR_W + 5}
+                    y={n.labelYc + 10}
+                    fontSize={11}
+                  >
+                    <tspan fontWeight={700} fill={n.color}>
                       {formatCurrency(n.value, homeCurrency)}
-                    </text>
-                  </g>
-                );
-              })}
+                    </tspan>
+                    <tspan fill="var(--color-muted-foreground)">
+                      {" "}
+                      &middot; {pctOfIncome(n.value)}%
+                    </tspan>
+                  </text>
+                </g>
+              ))}
             </svg>
           )}
         </div>
-        {meta}
       </CardContent>
     </Card>
   );

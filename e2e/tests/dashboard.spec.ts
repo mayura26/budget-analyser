@@ -95,7 +95,7 @@ test.describe("Dashboard", () => {
   test("money flow and trend charts render", async ({ page }) => {
     await page.goto("/dashboard");
     // Money-flow graphic replaces the old summary tiles.
-    await expect(page.getByText("Money flow", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("money-flow")).toBeVisible();
     // Stacked expenses-vs-income trend chart.
     await expect(
       page.getByText("Expenses vs Income", { exact: true }),
