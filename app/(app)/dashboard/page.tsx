@@ -8,7 +8,7 @@ import { BudgetRule502030Compact } from "@/components/budget/budget-rule-502030-
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 import { DashboardLineChart } from "@/components/dashboard/dashboard-line-chart";
 import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-picker";
-import { DashboardSummaryCard } from "@/components/dashboard/dashboard-summary-card";
+import { MoneyFlowSankey } from "@/components/dashboard/money-flow-sankey";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,6 +25,7 @@ import {
   getCategoryBreakdownInHomeCurrency,
   getDailyNeedsWantsForMonth,
   getMonthlyTotalsInHomeCurrency,
+  getRuleBucketTotalsForMonth,
 } from "@/lib/dashboard/home-currency-totals";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
@@ -267,6 +268,16 @@ export default async function DashboardPage({
     net: 0,
   };
 
+  // Full-month needs/wants split for the money-flow graphic. Uses the whole month
+  // (not the today-capped daily series) so it reconciles with the expense total:
+  // "Other" = expenses with no 50/30/20 bucket.
+  const { needs: monthNeeds, wants: monthWants } =
+    await getRuleBucketTotalsForMonth(selectedMonth, homeCurrency);
+  const otherExpenses = Math.max(
+    0,
+    currentMonthData.expenses - monthNeeds - monthWants,
+  );
+
   const monthOptions = enumerateMonthsInclusive(minMonth, maxMonth);
 
   const { expenseTotals } = await getCategoryBreakdownInHomeCurrency(
@@ -301,12 +312,14 @@ export default async function DashboardPage({
         }
       />
 
-      {/* Summary card — Income, Expenses, Net, Savings, Transactions */}
-      <DashboardSummaryCard
+      {/* Money flow — income splitting into needs / wants / savings / net */}
+      <MoneyFlowSankey
         income={currentMonthData.income}
-        expenses={currentMonthData.expenses}
-        net={currentMonthData.net}
+        needs={monthNeeds}
+        wants={monthWants}
+        other={otherExpenses}
         savings={currentMonthData.savings}
+        net={currentMonthData.net}
         transactionCount={totalTransactions}
         accountCount={accountCount}
         homeCurrency={homeCurrency}
