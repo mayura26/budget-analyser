@@ -92,27 +92,14 @@ test.describe("Dashboard", () => {
     await expect(page.getByLabel("Next month")).toBeVisible();
   });
 
-  test("five summary cards present", async ({ page }) => {
+  test("money flow and trend charts render", async ({ page }) => {
     await page.goto("/dashboard");
-    for (const label of [
-      "Income",
-      "Expenses",
-      "Savings",
-      "Net",
-      "Transactions",
-    ]) {
-      await expect(page.getByText(label).first()).toBeVisible();
-    }
-  });
-
-  test("currency-formatted values in income card", async ({ page }) => {
-    await page.goto("/dashboard");
-    // Income card shows a formatted currency value (even if $0.00)
-    const incomeCard = page
-      .locator(".rounded-lg")
-      .filter({ hasText: "Income" })
-      .first();
-    await expect(incomeCard.getByText(/\$[\d,.]+/)).toBeVisible();
+    // Money-flow graphic replaces the old summary tiles.
+    await expect(page.getByText("Money flow", { exact: true })).toBeVisible();
+    // Stacked expenses-vs-income trend chart.
+    await expect(
+      page.getByText("Expenses vs Income", { exact: true }),
+    ).toBeVisible();
   });
 
   test("charts section renders", async ({ page }) => {
@@ -226,7 +213,7 @@ test.describe("Dashboard", () => {
     await expect(slider).toHaveAttribute("data-disabled", "");
   });
 
-  test("summary savings uses tracked allocations, not pre-savings surplus", async ({
+  test("money flow splits income into tracked savings and net", async ({
     page,
   }) => {
     await page.request.delete("/api/test-cleanup?transactions=1");
@@ -253,13 +240,16 @@ test.describe("Dashboard", () => {
       });
 
       await page.goto(`/dashboard?month=${seedMonth}`);
-      const summary = page.locator(".rounded-lg").filter({
-        hasText: "Tracked allocations",
-      });
-      await expect(summary.getByText("Savings", { exact: true })).toBeVisible();
-      await expect(summary.getByText("$300.00")).toBeVisible();
-      await expect(summary.getByText("After tracked savings")).toBeVisible();
-      await expect(summary.getByText("+$700.00")).toBeVisible();
+      const flow = page.getByTestId("money-flow");
+      await expect(flow).toBeVisible();
+      // Income $1,000 → Savings $300 (30%) + Net $700 (70%).
+      await expect(flow.getByText("$1,000.00")).toBeVisible();
+      const savings = page.getByTestId("flow-node-savings");
+      await expect(savings.getByText("$300.00")).toBeVisible();
+      await expect(savings.getByText(/Savings\b/)).toBeVisible();
+      const net = page.getByTestId("flow-node-net");
+      await expect(net.getByText("$700.00")).toBeVisible();
+      await expect(net.getByText(/Net\b/)).toBeVisible();
     } finally {
       await deleteDashboardTestAccount(page, accountName);
     }

@@ -281,3 +281,78 @@ export async function getDailyNeedsWantsForMonth(
   }
   return result;
 }
+
+/**
+ * Full-month Needs / Wants expense totals in home currency (no "today" cutoff, unlike
+ * {@link getDailyNeedsWantsForMonth}). Computed the same way as the expense total in
+ * {@link getMonthlyTotalsInHomeCurrency}, so `expenses - needs - wants` is a consistent
+ * "Other" (expenses with no 50/30/20 bucket) — used by the dashboard money-flow graphic.
+ */
+export async function getRuleBucketTotalsForMonth(
+  month: string,
+  homeCurrency: SupportedCurrency,
+): Promise<{ needs: number; wants: number }> {
+  const allCats = db.select().from(categories).all() as Category[];
+  const mains = allCats.filter((c) => c.parentId === null);
+  const mainById = new Map(mains.map((c) => [c.id, c]));
+
+  const catMeta = new Map<
+    number,
+    { ruleBucket: string | null; type: string }
+  >();
+  for (const cat of allCats) {
+    const parentMain =
+      cat.parentId != null ? mainById.get(cat.parentId) : undefined;
+    const rb =
+      cat.parentId === null ? null : ruleBucketForSubcategory(parentMain);
+    catMeta.set(cat.id, { ruleBucket: rb, type: cat.type });
+  }
+
+  const { start, end } = getMonthRange(month);
+  const rows = db
+    .select({
+      amount: transactions.amount,
+      date: transactions.date,
+      currency: accounts.currency,
+      categoryId: transactions.categoryId,
+      categoryType: categories.type,
+    })
+    .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        gte(transactions.date, start),
+        lte(transactions.date, end),
+        or(isNull(categories.type), ne(categories.type, "transfer")),
+      ),
+    )
+    .all();
+
+  await prefetchRatesToHome(
+    db,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.currency, homeCurrency),
+    })),
+    homeCurrency,
+  );
+
+  let needs = 0;
+  let wants = 0;
+  for (const row of rows) {
+    const cur = parseAccountCurrency(row.currency, homeCurrency);
+    const v = convertToHome(db, row.amount, cur, homeCurrency, row.date);
+    const meta = row.categoryId != null ? catMeta.get(row.categoryId) : null;
+    const catType = meta?.type ?? row.categoryType;
+    const ruleBucket = meta?.ruleBucket ?? null;
+    if (catType !== "expense") continue;
+    if (ruleBucket === "needs") needs += Math.max(0, -v);
+    else if (ruleBucket === "wants") wants += Math.max(0, -v);
+  }
+
+  return {
+    needs: Math.round(needs * 100) / 100,
+    wants: Math.round(wants * 100) / 100,
+  };
+}
