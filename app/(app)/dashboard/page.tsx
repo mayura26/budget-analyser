@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { and, gte, lte, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { Target } from "lucide-react";
 import Link from "next/link";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
@@ -28,7 +28,7 @@ import {
   getRuleBucketTotalsForMonth,
 } from "@/lib/dashboard/home-currency-totals";
 import { db } from "@/lib/db";
-import { accounts, categories, transactions } from "@/lib/db/schema";
+import { categories, transactions } from "@/lib/db/schema";
 import {
   enumerateMonthsInclusive,
   formatCurrency,
@@ -286,17 +286,6 @@ export default async function DashboardPage({
     homeCurrency,
   );
 
-  const totalTransactions =
-    db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(transactions)
-      .where(and(gte(transactions.date, start), lte(transactions.date, end)))
-      .get()?.count ?? 0;
-
-  const accountCount =
-    db.select({ count: sql<number>`COUNT(*)` }).from(accounts).get()?.count ??
-    0;
-
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <PageHeader
@@ -320,8 +309,6 @@ export default async function DashboardPage({
         other={otherExpenses}
         savings={currentMonthData.savings}
         net={currentMonthData.net}
-        transactionCount={totalTransactions}
-        accountCount={accountCount}
         homeCurrency={homeCurrency}
       />
 

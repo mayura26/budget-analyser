@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 
@@ -54,8 +54,6 @@ export function MoneyFlowSankey({
   other,
   savings,
   net,
-  transactionCount,
-  accountCount,
   homeCurrency,
 }: {
   income: number;
@@ -64,8 +62,6 @@ export function MoneyFlowSankey({
   other: number;
   savings: number;
   net: number;
-  transactionCount: number;
-  accountCount: number;
   homeCurrency: SupportedCurrency;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,39 +80,11 @@ export function MoneyFlowSankey({
 
   const overspent = net < 0;
 
-  const header = (
-    <CardHeader className="flex flex-row items-baseline justify-between gap-2 space-y-0 p-4 pb-2">
-      <CardTitle className="text-sm font-medium">Money flow</CardTitle>
-      {income > 0 && (
-        <div className="text-right leading-tight">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            Income{" "}
-          </span>
-          <span
-            className="text-sm font-bold tabular-nums"
-            style={{ color: COLORS.income }}
-          >
-            {formatCurrency(income, homeCurrency)}
-          </span>
-          {overspent && (
-            <span
-              className="ml-1.5 text-[11px] font-semibold tabular-nums"
-              style={{ color: COLORS.shortfall }}
-            >
-              Over {formatCurrency(Math.abs(net), homeCurrency)}
-            </span>
-          )}
-        </div>
-      )}
-    </CardHeader>
-  );
-
   if (income <= 0) {
     return (
       <Card data-testid="money-flow">
-        {header}
-        <CardContent className="px-4 pb-4 pt-0">
-          <div className="flex h-24 items-center justify-center text-muted-foreground text-sm">
+        <CardContent className="px-4 py-6">
+          <div className="flex h-20 items-center justify-center text-muted-foreground text-sm">
             No income recorded this month yet
           </div>
         </CardContent>
@@ -170,7 +138,23 @@ export function MoneyFlowSankey({
 
   return (
     <Card data-testid="money-flow">
-      {header}
+      <CardHeader className="flex flex-row items-baseline gap-2 space-y-0 p-4 pb-2">
+        <span className="text-xs text-muted-foreground">Income</span>
+        <span
+          className="text-sm font-bold tabular-nums"
+          style={{ color: COLORS.income }}
+        >
+          {formatCurrency(income, homeCurrency)}
+        </span>
+        {overspent && (
+          <span
+            className="text-[11px] font-semibold tabular-nums"
+            style={{ color: COLORS.shortfall }}
+          >
+            Over {formatCurrency(Math.abs(net), homeCurrency)}
+          </span>
+        )}
+      </CardHeader>
       <CardContent className="px-4 pb-3 pt-0">
         <div ref={containerRef} className="w-full">
           {width > 0 && (
@@ -256,10 +240,6 @@ export function MoneyFlowSankey({
             </svg>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1.5">
-          {transactionCount} transaction{transactionCount !== 1 ? "s" : ""}{" "}
-          &middot; {accountCount} account{accountCount !== 1 ? "s" : ""}
-        </p>
       </CardContent>
     </Card>
   );
