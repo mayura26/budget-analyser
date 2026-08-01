@@ -356,6 +356,16 @@ export type AccountCashflowRow = {
   net: number;
 };
 
+export type TopMerchantSpend = {
+  merchant: string;
+  total: number;
+  count: number;
+  average: number;
+  shareOfWants: number;
+  categoryName: string | null;
+  flagReasons: ("frequent" | "high_spend" | "high_average")[];
+};
+
 /**
  * Single line for analytics category drill-down (home-currency).
  * For spending/savings drill-down, `converted` is a positive magnitude; for income, it may be signed.

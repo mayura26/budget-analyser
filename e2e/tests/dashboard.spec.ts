@@ -111,6 +111,36 @@ test.describe("Dashboard", () => {
     await expect(page.getByText(/something went wrong/i)).not.toBeVisible();
   });
 
+  test("flags repeated wants merchants", async ({ page }) => {
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+
+    try {
+      const seed = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName,
+          count: 6,
+          reset: true,
+          seedMonth,
+          categoryName: "Activities (dining, events, hobbies)",
+          merchant: "McDonalds",
+          description: "E2E McDonalds dashboard",
+          amount: -400,
+        },
+      });
+      expect(seed.ok()).toBeTruthy();
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const card = page.getByTestId("top-merchants-card");
+      await expect(card.getByText("Top spend merchants")).toBeVisible();
+      await expect(card.getByText("McDonalds")).toBeVisible();
+      await expect(card.getByText(/6x.*avg/)).toBeVisible();
+      await expect(card.getByText("Frequent")).toBeVisible();
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
+  });
   test("monthly overview scale labels stay inside the chart", async ({
     page,
   }) => {

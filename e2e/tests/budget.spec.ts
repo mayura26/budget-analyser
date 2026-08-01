@@ -529,6 +529,17 @@ test.describe("Budget", () => {
         },
       ],
       categoriesOverTarget: 1,
+      topWantsMerchants: [
+        {
+          merchant: "McDonalds",
+          total: 180,
+          count: 9,
+          average: 20,
+          shareOfWants: 40,
+          categoryName: "Activities (dining, events, hobbies)",
+          flagReasons: ["frequent", "high_spend"],
+        },
+      ],
     });
 
     await page.route("**/api/ai-budget-review", async (route) => {
@@ -652,6 +663,10 @@ test.describe("Budget", () => {
 
     // Category variance chart shows full long category labels (Y-axis space)
     await expect(page.getByText("Category variance")).toBeVisible();
+    await expect(page.getByText("Top spend merchants")).toBeVisible();
+    await expect(page.getByText("McDonalds")).toBeVisible();
+    await expect(page.getByText(/9x.*avg/)).toBeVisible();
+    await expect(page.getByText("Frequent")).toBeVisible();
     // Category variance chart shows lean names (before parenthetical)
     await expect(
       page.locator(".recharts-wrapper").getByText("Takeout", { exact: true }),
@@ -688,6 +703,100 @@ test.describe("Budget", () => {
     await expect(page.getByText("Variance drivers")).toBeVisible();
   });
 
+  test("review report shows wants merchant concentration", async ({ page }) => {
+    const month = "2026-01";
+    const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+    const sqlite = new Database(dbPath);
+    sqlite
+      .prepare(
+        `INSERT INTO budget_month_status (month, is_closed, closed_at, created_at, updated_at)
+         VALUES (?, 1, unixepoch(), unixepoch(), unixepoch())
+         ON CONFLICT(month) DO UPDATE SET is_closed = 1, closed_at = unixepoch(), updated_at = unixepoch()`,
+      )
+      .run(month);
+    sqlite.close();
+
+    await page.route("**/api/ai-budget-review", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          format: "digest",
+          metrics: {
+            month,
+            monthLabel: "January 2026",
+            totalBudgeted: 2000,
+            totalSpent: 1900,
+            projectedSpend: 1900,
+            netVariance: -100,
+            onTrack: true,
+            actualIncome: 3000,
+            expectedIncome: 3000,
+            incomeVariance: 0,
+            savingsRate: 36.7,
+            surplus: 800,
+            taggedSavings: 300,
+            effectiveSavings: 1100,
+            buckets: {
+              needs: {
+                targetAmount: 1500,
+                actualAmount: 1450,
+                guidelineAmount: 1500,
+                targetPct: 50,
+                actualPct: 48.3,
+              },
+              wants: {
+                targetAmount: 500,
+                actualAmount: 450,
+                guidelineAmount: 900,
+                targetPct: 30,
+                actualPct: 15,
+              },
+              savings: {
+                targetAmount: 0,
+                actualAmount: 1100,
+                guidelineAmount: 600,
+                targetPct: 20,
+                actualPct: 36.7,
+              },
+            },
+            topOverspend: [],
+            topUnderspend: [],
+            categoriesOverTarget: 0,
+            topWantsMerchants: [
+              {
+                merchant: "McDonalds",
+                total: 180,
+                count: 9,
+                average: 20,
+                shareOfWants: 40,
+                categoryName: "Activities (dining, events, hobbies)",
+                flagReasons: ["frequent", "high_spend"],
+              },
+            ],
+          },
+          review: {
+            headline: "Strong finish for the month.",
+            bucketCommentary: { needs: "", wants: "", savings: "" },
+            risks: [],
+            wins: [],
+            actions: [],
+          },
+          cached: false,
+          model: "gpt-4o-mini",
+          generatedAt: Math.floor(Date.now() / 1000),
+        }),
+      });
+    });
+
+    await page.goto(`/budget/review?month=${month}`);
+    const card = page.getByTestId("top-merchants-card");
+    await expect(card.getByText("Top spend merchants")).toBeVisible();
+    await expect(card.getByText("McDonalds")).toBeVisible();
+    await expect(card.getByText(/9x.*avg/)).toBeVisible();
+    await expect(card.getByText("Frequent")).toBeVisible();
+    await expect(card.getByText("High spend")).toBeVisible();
+  });
   test("share button opens dialog and reveals a public read-only link", async ({
     page,
     context,

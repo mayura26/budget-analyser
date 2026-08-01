@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { sql } from "drizzle-orm";
 import { Target } from "lucide-react";
 import Link from "next/link";
+import { TopMerchantsCard } from "@/components/analytics/top-merchants-card";
 import { BudgetProgressBar } from "@/components/budget/budget-progress-bar";
 import { BudgetRule502030Compact } from "@/components/budget/budget-rule-502030-strip";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
@@ -11,6 +12,7 @@ import { DashboardMonthPicker } from "@/components/dashboard/dashboard-month-pic
 import { MoneyFlowSankey } from "@/components/dashboard/money-flow-sankey";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getTopWantsMerchantsForRange } from "@/lib/analytics/queries";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -285,6 +287,11 @@ export default async function DashboardPage({
     end,
     homeCurrency,
   );
+  const topWantsMerchants = await getTopWantsMerchantsForRange(
+    start,
+    end,
+    homeCurrency,
+  );
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -321,6 +328,11 @@ export default async function DashboardPage({
           homeCurrency={homeCurrency}
         />
       )}
+
+      <TopMerchantsCard
+        merchants={topWantsMerchants}
+        homeCurrency={homeCurrency}
+      />
 
       {/* Charts */}
       <DashboardCharts

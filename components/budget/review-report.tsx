@@ -22,10 +22,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { TopMerchantsCard } from "@/components/analytics/top-merchants-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { cn, formatCurrency } from "@/lib/utils";
+import type { TopMerchantSpend } from "@/types";
 
 export type ReviewFormat = "digest" | "deep";
 export type Bucket = "needs" | "wants" | "savings" | "overall";
@@ -67,6 +69,7 @@ export type ReviewMetrics = {
     message: string;
   }[];
   categoriesOverTarget: number;
+  topWantsMerchants?: TopMerchantSpend[];
 };
 
 export type ListItemTag = { bucket: Bucket; text: string };
@@ -579,6 +582,7 @@ export const ReviewReport = forwardRef<
       : "executiveSummary" in data.review
         ? data.review.executiveSummary
         : "";
+  const topWantsMerchants = data.metrics.topWantsMerchants ?? [];
 
   return (
     <div ref={ref} className="space-y-6 bg-background p-1">
@@ -682,6 +686,13 @@ export const ReviewReport = forwardRef<
       </div>
 
       <VarianceChart metrics={data.metrics} homeCurrency={homeCurrency} />
+
+      {topWantsMerchants.length > 0 && (
+        <TopMerchantsCard
+          merchants={topWantsMerchants}
+          homeCurrency={homeCurrency}
+        />
+      )}
 
       {data.format === "digest" && "headline" in data.review && (
         <div className="grid gap-3 md:grid-cols-3">

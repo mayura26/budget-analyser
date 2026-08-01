@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { getTopWantsMerchantsForRange } from "@/lib/analytics/queries";
 import {
   buildBudgetCategoryRows,
   buildBudgetSummary,
@@ -21,8 +22,8 @@ import {
   isOpenAIReasoningChatModel,
   openAIModelOnlySupportsDefaultTemperature,
 } from "@/lib/openai/model-params";
-import { formatCurrency, formatMonth } from "@/lib/utils";
-import type { Category } from "@/types";
+import { formatCurrency, formatMonth, getMonthRange } from "@/lib/utils";
+import type { Category, TopMerchantSpend } from "@/types";
 
 type ReviewFormat = "digest" | "deep";
 type Bucket = "needs" | "wants" | "savings" | "overall";
@@ -64,6 +65,7 @@ type ReviewMetrics = {
     message: string;
   }[];
   categoriesOverTarget: number;
+  topWantsMerchants?: TopMerchantSpend[];
 };
 
 type DigestRiskTag = {
@@ -220,15 +222,21 @@ export async function POST(request: Request) {
     );
   }
 
+  const homeCurrency = getHomeCurrency();
+  const { start, end } = getMonthRange(month);
+
   if (!regenerate) {
     const cached = getMonthReview<DigestReview | DeepReview, ReviewMetrics>(
       month,
       format,
     );
     if (cached && hasCurrentSavingsMath(cached.metrics)) {
+      const topWantsMerchants =
+        cached.metrics.topWantsMerchants ??
+        (await getTopWantsMerchantsForRange(start, end, homeCurrency));
       return NextResponse.json({
         format,
-        metrics: cached.metrics,
+        metrics: { ...cached.metrics, topWantsMerchants },
         review: cached.review,
         cached: true,
         model: cached.model,
@@ -266,7 +274,6 @@ export async function POST(request: Request) {
     .get();
   const model = modelSetting?.value ?? "gpt-4o-mini";
 
-  const homeCurrency = getHomeCurrency();
   const allCats = db.select().from(categories).all() as Category[];
   const rows = await buildBudgetCategoryRows(month, allCats, homeCurrency);
   const { income: scheduledIncome } = await getScheduledAmountsByCategory(
@@ -361,6 +368,11 @@ export async function POST(request: Request) {
 
   const incomeVariance =
     Math.round((actualIncome - scheduledIncome) * 100) / 100;
+  const topWantsMerchants = await getTopWantsMerchantsForRange(
+    start,
+    end,
+    homeCurrency,
+  );
 
   const metrics: ReviewMetrics = {
     month,
@@ -382,6 +394,7 @@ export async function POST(request: Request) {
     topOverspend,
     topUnderspend,
     categoriesOverTarget: rowStats.filter((r) => r.variance > 0).length,
+    topWantsMerchants,
   };
 
   const metricLines = rowStats
@@ -391,6 +404,17 @@ export async function POST(request: Request) {
         `- ${r.categoryName} [${r.bucket}] (${r.parentName}): target ${formatCurrency(r.targetAmount, homeCurrency)}, spent ${formatCurrency(r.actualSpent, homeCurrency)}, variance ${formatCurrency(r.variance, homeCurrency)}, 3m avg ${formatCurrency(r.avg3Month, homeCurrency)}`,
     )
     .join("\n");
+
+  const merchantLines = topWantsMerchants.length
+    ? topWantsMerchants
+        .map((merchant) => {
+          const flags = merchant.flagReasons.length
+            ? merchant.flagReasons.join(", ")
+            : "watch";
+          return `- ${merchant.merchant}: ${merchant.count} transactions, total ${formatCurrency(merchant.total, homeCurrency)}, average ${formatCurrency(merchant.average, homeCurrency)}, ${merchant.shareOfWants}% of wants spend, category ${merchant.categoryName ?? "Wants"}, flags ${flags}`;
+        })
+        .join("\n")
+    : "- No repeated wants merchants flagged.";
 
   const bucketLines = (
     [
@@ -419,13 +443,16 @@ Effective savings (tagged savings + true surplus): ${formatCurrency(effectiveSav
 ${bucketLines}
 
 Top category lines:
-${metricLines}`;
+${metricLines}
+
+Top wants merchant concentration (needs, bills, transfers, income and savings excluded):
+${merchantLines}`;
 
   const sharedRules = `Rules:
 - Frame the review as a 50/30/20 review. Treat only leftover surplus after expenses and tagged savings as additional effective savings.
 - Use ACTUAL income, not scheduled, for percentages. If actual differed materially from scheduled, call that out as its own point.
 - Every list item must be an object: { "bucket": "needs"|"wants"|"savings"|"overall", "text": "..." }.
-- Every recommendation/risk/action must name at least one specific category and a dollar amount, and tie back to the bucket's target percentage.
+- Every recommendation/risk/action must name at least one specific category or wants merchant and a dollar amount, and tie back to the bucket's target percentage.
 - bucketCommentary must be ONE concise sentence per bucket explaining where it landed and why.
 - Output valid JSON only. No prose, no markdown.`;
 

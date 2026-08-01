@@ -1,5 +1,36 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
+async function createAnalyticsTestAccount(page: Page) {
+  const accountName = `Analytics Merchants ${Date.now()}`;
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add account" }).first().click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.locator('input[name="name"]').fill(accountName);
+  await dialog.getByRole("combobox").nth(1).click();
+  await page.getByRole("option", { name: "CommBank" }).click();
+  await dialog.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(accountName)).toBeVisible();
+
+  return accountName;
+}
+
+async function deleteAnalyticsTestAccount(page: Page, accountName: string) {
+  await page.goto("/accounts");
+  const card = page.locator(".rounded-lg").filter({ hasText: accountName });
+  if (
+    !(await card
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false))
+  ) {
+    return;
+  }
+  await card.first().locator("button:has(.lucide-trash-2)").click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await page.waitForSelector('[role="dialog"]', { state: "hidden" });
+}
 test.describe("Analytics", () => {
   test("page heading and period control render", async ({ page }) => {
     await page.goto("/analytics");
@@ -20,6 +51,38 @@ test.describe("Analytics", () => {
     await expect(page.getByText(/Spending by category/i)).toBeVisible();
   });
 
+  test("shows repeated wants merchants", async ({ page }) => {
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createAnalyticsTestAccount(page);
+
+    try {
+      const seed = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName,
+          count: 7,
+          reset: true,
+          seedMonth,
+          categoryName: "Activities (dining, events, hobbies)",
+          merchant: "McDonalds",
+          description: "E2E McDonalds analytics",
+          amount: -300,
+        },
+      });
+      expect(seed.ok()).toBeTruthy();
+
+      await page.goto(
+        `/analytics?preset=custom&from=${seedMonth}-01&to=${seedMonth}-28`,
+      );
+      const card = page.getByTestId("top-merchants-card");
+      await expect(card.getByText("Top spend merchants")).toBeVisible();
+      await expect(card.getByText("McDonalds")).toBeVisible();
+      await expect(card.getByText(/7x.*avg/)).toBeVisible();
+      await expect(card.getByText("Frequent")).toBeVisible();
+    } finally {
+      await deleteAnalyticsTestAccount(page, accountName);
+    }
+  });
   test("category tabs swap content", async ({ page }) => {
     await page.goto("/analytics");
     await expect(page.getByRole("tab", { name: "Spending" })).toHaveAttribute(

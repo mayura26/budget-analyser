@@ -12,6 +12,7 @@ import { AnalyticsAccountsSection } from "@/components/analytics/analytics-accou
 import { AnalyticsCategoryTabs } from "@/components/analytics/analytics-category-tabs";
 import { AnalyticsMonthlyChart } from "@/components/analytics/analytics-monthly-chart";
 import { AnalyticsPeriodSelector } from "@/components/analytics/analytics-period-selector";
+import { TopMerchantsCard } from "@/components/analytics/top-merchants-card";
 import { KPICard } from "@/components/layout/kpi-card";
 import { PageHeader } from "@/components/layout/page-header";
 import {
@@ -109,6 +110,11 @@ export default async function AnalyticsPage({
         accounts={data.accounts}
         rangeStart={start}
         rangeEnd={end}
+        homeCurrency={homeCurrency}
+      />
+
+      <TopMerchantsCard
+        merchants={data.topWantsMerchants}
         homeCurrency={homeCurrency}
       />
 

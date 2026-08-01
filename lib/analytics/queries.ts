@@ -1,11 +1,13 @@
 import { and, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
 import { monthsInDateRangeInclusive } from "@/lib/analytics/date-range";
 import { buildTreemapDatumForNodes } from "@/lib/analytics/treemap-helpers";
+import { ruleBucketForSubcategory } from "@/lib/budget/rule-bucket";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
+import { normaliseMerchant } from "@/lib/import/normaliser";
 import type {
   AccountCashflowRow,
   AnalyticsBudgetTransactionLine,
@@ -15,6 +17,7 @@ import type {
   Category,
   CategoryHierarchyNode,
   MonthlyTotal,
+  TopMerchantSpend,
 } from "@/types";
 
 type DirectSpend = { total: number; count: number };
@@ -44,6 +47,8 @@ type LoadedRow = {
   categoryColor: string | null;
   categoryType: string | null;
   description: string;
+  normalised: string;
+  merchant: string | null;
 };
 
 async function loadConvertedRows(
@@ -57,6 +62,8 @@ async function loadConvertedRows(
       amount: transactions.amount,
       date: transactions.date,
       description: transactions.description,
+      normalised: transactions.normalised,
+      merchant: transactions.merchant,
       currency: accounts.currency,
       accountId: accounts.id,
       accountName: accounts.name,
@@ -103,6 +110,8 @@ async function loadConvertedRows(
       categoryColor: r.categoryColor,
       categoryType: r.categoryType,
       description: r.description,
+      normalised: r.normalised,
+      merchant: r.merchant,
     };
   });
 }
@@ -225,6 +234,131 @@ function isExpenseDebit(row: LoadedRow): boolean {
   if (row.categoryType === "transfer") return false;
   if (row.categoryType === "savings") return false;
   return true;
+}
+
+function resolvedBudgetBucket(
+  categoryId: number | null,
+  categoryById: Map<number, Category>,
+): string | null {
+  if (categoryId == null) return null;
+  const category = categoryById.get(categoryId);
+  if (!category) return null;
+
+  if (category.parentId === null) {
+    const raw = category.budgetRuleBucket;
+    if (raw === "needs" || raw === "wants" || raw === "savings") return raw;
+    if (category.type === "expense") return "wants";
+    if (category.type === "savings") return "savings";
+    return null;
+  }
+
+  return ruleBucketForSubcategory(categoryById.get(category.parentId));
+}
+
+function merchantSource(row: LoadedRow): string {
+  return (
+    row.merchant?.trim() || row.normalised.trim() || row.description.trim()
+  );
+}
+
+function merchantKey(raw: string): string {
+  return normaliseMerchant(raw)
+    .replace(/\b\d{3,}\b/g, " ")
+    .replace(/\b(pos|eftpos|visa|mastercard|card|purchase|debit)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function merchantLabel(raw: string): string {
+  const cleaned = raw
+    .replace(/\s+[:-]\s+[A-Z0-9#*/]+$/i, "")
+    .replace(/\b\d{5,}\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "Unknown merchant";
+}
+
+function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
+  const allCats = db.select().from(categories).all() as Category[];
+  const categoryById = new Map(
+    allCats.map((category) => [category.id, category]),
+  );
+  const byMerchant = new Map<
+    string,
+    {
+      merchant: string;
+      total: number;
+      count: number;
+      categories: Map<string, number>;
+    }
+  >();
+  let wantsTotal = 0;
+
+  for (const row of loaded) {
+    if (!isExpenseDebit(row)) continue;
+    if (row.categoryType !== "expense") continue;
+    if (resolvedBudgetBucket(row.categoryId, categoryById) !== "wants")
+      continue;
+
+    const spend = Math.abs(row.converted);
+    if (spend <= 0) continue;
+    wantsTotal += spend;
+
+    const source = merchantSource(row);
+    const key = merchantKey(source) || source.toLowerCase();
+    const existing = byMerchant.get(key) ?? {
+      merchant: merchantLabel(source),
+      total: 0,
+      count: 0,
+      categories: new Map<string, number>(),
+    };
+    existing.total += spend;
+    existing.count += 1;
+    const categoryName = row.categoryName ?? "Not processed";
+    existing.categories.set(
+      categoryName,
+      (existing.categories.get(categoryName) ?? 0) + spend,
+    );
+    byMerchant.set(key, existing);
+  }
+
+  const highSpendThreshold = Math.max(100, wantsTotal * 0.15);
+
+  return [...byMerchant.values()]
+    .map((merchant) => {
+      const total = roundMoney(merchant.total);
+      const average = roundMoney(merchant.total / merchant.count);
+      const flagReasons: TopMerchantSpend["flagReasons"] = [];
+      if (merchant.count >= 5) flagReasons.push("frequent");
+      if (merchant.total >= highSpendThreshold) flagReasons.push("high_spend");
+      if (average >= 75) flagReasons.push("high_average");
+
+      const topCategory = [...merchant.categories.entries()].sort(
+        (a, b) => b[1] - a[1],
+      )[0];
+
+      return {
+        merchant: merchant.merchant,
+        total,
+        count: merchant.count,
+        average,
+        shareOfWants:
+          wantsTotal > 0
+            ? Math.round((merchant.total / wantsTotal) * 1000) / 10
+            : 0,
+        categoryName: topCategory?.[0] ?? null,
+        flagReasons,
+      };
+    })
+    .filter((merchant) => merchant.count > 1 || merchant.flagReasons.length > 0)
+    .sort((a, b) => {
+      if (a.flagReasons.length !== b.flagReasons.length) {
+        return b.flagReasons.length - a.flagReasons.length;
+      }
+      if (a.total !== b.total) return b.total - a.total;
+      return b.count - a.count;
+    })
+    .slice(0, 5);
 }
 
 function categoryKey(categoryId: number | null): string {
@@ -722,6 +856,7 @@ export type AnalyticsPageData = {
     AnalyticsExpenseTransactionLine[]
   >;
   categoryIncomeRoots: CategoryHierarchyNode[];
+  topWantsMerchants: TopMerchantSpend[];
   /** Income credits/adjustments; `converted` may be negative (signed home currency). */
   incomeTransactionsByCategory: Record<
     string,
@@ -749,6 +884,7 @@ export async function getAnalyticsPageData(
     aggregateSavingsDebitsByCategory(loaded);
   const incomeTransactionsByCategory =
     aggregateIncomeTransactionsByCategory(loaded);
+  const topWantsMerchants = aggregateTopWantsMerchants(loaded);
   return {
     summary,
     accounts,
@@ -760,6 +896,7 @@ export async function getAnalyticsPageData(
     expenseTransactionsByCategory,
     savingsTransactionsByCategory,
     categoryIncomeRoots: incomeRoots,
+    topWantsMerchants,
     incomeTransactionsByCategory,
   };
 }
@@ -801,6 +938,15 @@ export async function getCategorySpendingHierarchy(
 }> {
   const loaded = await loadConvertedRows(start, end, homeCurrency);
   return buildCategoryHierarchy(loaded);
+}
+
+export async function getTopWantsMerchantsForRange(
+  start: string,
+  end: string,
+  homeCurrency: SupportedCurrency,
+): Promise<TopMerchantSpend[]> {
+  const loaded = await loadConvertedRows(start, end, homeCurrency);
+  return aggregateTopWantsMerchants(loaded);
 }
 
 /** Expense debits in home currency, grouped by category id (`"none"` for uncategorised). */
