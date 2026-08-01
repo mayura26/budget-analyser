@@ -285,6 +285,94 @@ test.describe("Dashboard", () => {
     }
   });
 
+  test("money flow svg renders before container width is measured", async ({
+    page,
+  }) => {
+    await page.request.delete("/api/test-cleanup?transactions=1");
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+
+    try {
+      const seed = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName,
+          count: 1,
+          reset: true,
+          seedMonth,
+          addIncome: true,
+          categoryName: "Activities (dining, events, hobbies)",
+          amount: -250,
+        },
+      });
+      expect(seed.ok()).toBeTruthy();
+
+      await page.addInitScript(() => {
+        const originalClientWidth = Object.getOwnPropertyDescriptor(
+          HTMLElement.prototype,
+          "clientWidth",
+        );
+        const isMoneyFlowElement = (target: Element) =>
+          Boolean(target.closest('[data-testid="money-flow"]'));
+
+        Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+          configurable: true,
+          get() {
+            if (isMoneyFlowElement(this)) return 0;
+            return originalClientWidth?.get?.call(this) ?? 800;
+          },
+        });
+
+        class TestResizeObserver {
+          callback: ResizeObserverCallback;
+
+          constructor(callback: ResizeObserverCallback) {
+            this.callback = callback;
+          }
+
+          observe(target: Element) {
+            const width = isMoneyFlowElement(target) ? 0 : 800;
+            this.callback(
+              [
+                {
+                  target,
+                  contentRect: {
+                    width,
+                    height: 400,
+                    x: 0,
+                    y: 0,
+                    top: 0,
+                    right: width,
+                    bottom: 400,
+                    left: 0,
+                    toJSON: () => ({}),
+                  },
+                } as ResizeObserverEntry,
+              ],
+              this as ResizeObserver,
+            );
+          }
+
+          unobserve() {}
+          disconnect() {}
+        }
+
+        Object.defineProperty(window, "ResizeObserver", {
+          configurable: true,
+          value: TestResizeObserver,
+        });
+      });
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const flow = page.getByTestId("money-flow");
+      const graphic = flow.locator('svg[role="img"]');
+      await expect(graphic).toBeVisible();
+      await expect(graphic).toHaveAttribute("width", "260");
+      await expect(flow.locator(".flow-ribbon")).toHaveCount(2);
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
+  });
   test.describe("pie chart with positive net", () => {
     test.beforeAll(async ({ browser }) => {
       const context = await browser.newContext({

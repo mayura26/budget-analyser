@@ -70,8 +70,12 @@ export function MoneyFlowSankey({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    if (typeof ResizeObserver === "undefined") {
+      setWidth(el.clientWidth);
+      return;
+    }
     const observer = new ResizeObserver((entries) => {
-      setWidth(entries[0].contentRect.width);
+      setWidth(entries[0]?.contentRect.width ?? el.clientWidth);
     });
     observer.observe(el);
     setWidth(el.clientWidth);
@@ -157,88 +161,86 @@ export function MoneyFlowSankey({
       </CardHeader>
       <CardContent className="px-4 pb-3 pt-0">
         <div ref={containerRef} className="w-full">
-          {width > 0 && (
-            <svg
-              width={W}
-              height={H}
-              viewBox={`0 0 ${W} ${H}`}
-              role="img"
-              aria-label="Money flow from income to spending, savings and net"
-            >
-              <style>{`.flow-ribbon{transition:fill-opacity .15s}.flow-ribbon:hover{fill-opacity:.55}`}</style>
+          <svg
+            width={W}
+            height={H}
+            viewBox={`0 0 ${W} ${H}`}
+            role="img"
+            aria-label="Money flow from income to spending, savings and net"
+          >
+            <style>{`.flow-ribbon{transition:fill-opacity .15s}.flow-ribbon:hover{fill-opacity:.55}`}</style>
 
-              {/* Ribbons (drawn first so nodes sit on top) */}
-              {laidOut.map((n) => (
-                <path
-                  key={n.key}
-                  className="flow-ribbon"
-                  d={ribbonPath(ribbonL, n.leftY, rightBarX, n.rightY, n.h)}
-                  fill={n.color}
-                  fillOpacity={0.3}
-                >
-                  <title>
-                    {`${n.label}: ${formatCurrency(n.value, homeCurrency)} (${pctOfIncome(n.value)}% of income)`}
-                  </title>
-                </path>
-              ))}
+            {/* Ribbons (drawn first so nodes sit on top) */}
+            {laidOut.map((n) => (
+              <path
+                key={n.key}
+                className="flow-ribbon"
+                d={ribbonPath(ribbonL, n.leftY, rightBarX, n.rightY, n.h)}
+                fill={n.color}
+                fillOpacity={0.3}
+              >
+                <title>
+                  {`${n.label}: ${formatCurrency(n.value, homeCurrency)} (${pctOfIncome(n.value)}% of income)`}
+                </title>
+              </path>
+            ))}
 
-              {/* Left source bar (income + optional shortfall) */}
+            {/* Left source bar (income + optional shortfall) */}
+            <rect
+              x={LEFT_X}
+              y={TOP_PAD}
+              width={BAR_W}
+              height={incomeH}
+              rx={2}
+              fill={COLORS.income}
+            />
+            {overspent && (
               <rect
                 x={LEFT_X}
-                y={TOP_PAD}
+                y={TOP_PAD + incomeH}
                 width={BAR_W}
-                height={incomeH}
+                height={shortfallH}
                 rx={2}
-                fill={COLORS.income}
+                fill={COLORS.shortfall}
               />
-              {overspent && (
-                <rect
-                  x={LEFT_X}
-                  y={TOP_PAD + incomeH}
-                  width={BAR_W}
-                  height={shortfallH}
-                  rx={2}
-                  fill={COLORS.shortfall}
-                />
-              )}
+            )}
 
-              {/* Right nodes + labels */}
-              {laidOut.map((n) => (
-                <g key={n.key} data-testid={`flow-node-${n.key}`}>
-                  <rect
-                    x={rightBarX}
-                    y={n.rightY}
-                    width={BAR_W}
-                    height={Math.max(n.h, 2)}
-                    rx={2}
-                    fill={n.color}
-                  />
-                  <text
-                    x={rightBarX + BAR_W + 5}
-                    y={n.labelYc - 2}
-                    fontSize={11}
-                    fontWeight={600}
-                    fill="var(--color-foreground)"
-                  >
-                    {n.label}
-                  </text>
-                  <text
-                    x={rightBarX + BAR_W + 5}
-                    y={n.labelYc + 10}
-                    fontSize={11}
-                  >
-                    <tspan fontWeight={700} fill={n.color}>
-                      {formatCurrency(n.value, homeCurrency)}
-                    </tspan>
-                    <tspan fill="var(--color-muted-foreground)">
-                      {" "}
-                      &middot; {pctOfIncome(n.value)}%
-                    </tspan>
-                  </text>
-                </g>
-              ))}
-            </svg>
-          )}
+            {/* Right nodes + labels */}
+            {laidOut.map((n) => (
+              <g key={n.key} data-testid={`flow-node-${n.key}`}>
+                <rect
+                  x={rightBarX}
+                  y={n.rightY}
+                  width={BAR_W}
+                  height={Math.max(n.h, 2)}
+                  rx={2}
+                  fill={n.color}
+                />
+                <text
+                  x={rightBarX + BAR_W + 5}
+                  y={n.labelYc - 2}
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="var(--color-foreground)"
+                >
+                  {n.label}
+                </text>
+                <text
+                  x={rightBarX + BAR_W + 5}
+                  y={n.labelYc + 10}
+                  fontSize={11}
+                >
+                  <tspan fontWeight={700} fill={n.color}>
+                    {formatCurrency(n.value, homeCurrency)}
+                  </tspan>
+                  <tspan fill="var(--color-muted-foreground)">
+                    {" "}
+                    &middot; {pctOfIncome(n.value)}%
+                  </tspan>
+                </text>
+              </g>
+            ))}
+          </svg>
         </div>
       </CardContent>
     </Card>
