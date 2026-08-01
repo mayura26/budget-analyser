@@ -4,6 +4,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Loader2,
   Sparkles,
 } from "lucide-react";
@@ -218,6 +219,15 @@ export function GenerateBudgetDialog({
     [rows, selectedIds, amounts],
   );
 
+  const expectedIncomeSplit = useMemo(
+    () => ({
+      needs: summary.expectedIncome * 0.5,
+      wants: summary.expectedIncome * 0.3,
+      savings: summary.expectedIncome * 0.2,
+    }),
+    [summary.expectedIncome],
+  );
+
   const groupedRows = useMemo(() => {
     const groups = new Map<string, BudgetGenerateRecommendationRow[]>();
     for (const row of rows) {
@@ -268,6 +278,13 @@ export function GenerateBudgetDialog({
     const amount = Number(value);
     if (Number.isNaN(amount) || amount < 0) return;
     setAmounts((prev) => new Map(prev).set(categoryId, amount));
+  }
+
+  function copyLastMonthTarget(row: BudgetGenerateRecommendationRow) {
+    setAmounts((prev) =>
+      new Map(prev).set(row.categoryId, row.lastMonthTarget),
+    );
+    setSelectedIds((prev) => new Set(prev).add(row.categoryId));
   }
 
   function selectAll() {
@@ -343,9 +360,9 @@ export function GenerateBudgetDialog({
               data-testid="generate-budget-context-bar"
             >
               <BudgetContextMetric
-                label="50 / 30 / 20"
-                value={`Needs ${formatCurrency(summary.rule502030.needs.targetTotal, homeCurrency)}`}
-                detail={`Wants ${formatCurrency(summary.rule502030.wants.targetTotal, homeCurrency)} / Savings ${formatCurrency(summary.rule502030.savings.targetTotal, homeCurrency)}`}
+                label="50 / 30 / 20 guide"
+                value={`Needs ${formatCurrency(expectedIncomeSplit.needs, homeCurrency)}`}
+                detail={`Wants ${formatCurrency(expectedIncomeSplit.wants, homeCurrency)} / Savings ${formatCurrency(expectedIncomeSplit.savings, homeCurrency)}`}
                 tone="guide"
               />
               <BudgetContextMetric
@@ -361,9 +378,9 @@ export function GenerateBudgetDialog({
                 tone="save"
               />
               <BudgetContextMetric
-                label="Income basis"
-                value={formatCurrency(summary.incomeBasis, homeCurrency)}
-                detail="Used for guideline splits"
+                label="Expected income"
+                value={formatCurrency(summary.expectedIncome, homeCurrency)}
+                detail="Source for guide split"
               />
             </div>
 
@@ -561,11 +578,29 @@ export function GenerateBudgetDialog({
                                     <span className="text-muted-foreground">
                                       Previous month target
                                     </span>
-                                    <span className="text-right tabular-nums">
-                                      {formatCurrency(
-                                        row.lastMonthTarget,
-                                        homeCurrency,
-                                      )}
+                                    <span className="flex items-center justify-end gap-2 text-right tabular-nums">
+                                      <span>
+                                        {formatCurrency(
+                                          row.lastMonthTarget,
+                                          homeCurrency,
+                                        )}
+                                      </span>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 px-2 text-[11px]"
+                                        aria-label={`Use last month target for ${row.categoryName}`}
+                                        data-testid="copy-last-month-target"
+                                        data-last-month-target={
+                                          row.lastMonthTarget
+                                        }
+                                        title={`Use ${formatCurrency(row.lastMonthTarget, homeCurrency)} from last month`}
+                                        onClick={() => copyLastMonthTarget(row)}
+                                      >
+                                        <Copy className="mr-1 h-3 w-3" />
+                                        Use last
+                                      </Button>
                                     </span>
                                     <span className="text-muted-foreground">
                                       Last spent

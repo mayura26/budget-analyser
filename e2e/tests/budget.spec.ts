@@ -289,17 +289,17 @@ test.describe("Budget", () => {
   test("generate budget dialog opens with context totals and target comparisons", async ({
     page,
   }) => {
-    await page.goto("/budget");
+    await page.goto("/budget", { waitUntil: "commit" });
     await page.getByRole("button", { name: "Generate Budget" }).first().click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Generate Budget")).toBeVisible();
 
     const contextBar = dialog.getByTestId("generate-budget-context-bar");
-    await expect(contextBar).toContainText("50 / 30 / 20");
+    await expect(contextBar).toContainText("50 / 30 / 20 guide");
     await expect(contextBar).toContainText("Expenses");
     await expect(contextBar).toContainText("Savings");
-    await expect(contextBar).toContainText("Income basis");
+    await expect(contextBar).toContainText("Expected income");
 
     const groupSummary = dialog
       .getByTestId("generate-budget-group-summary")
@@ -316,6 +316,18 @@ test.describe("Budget", () => {
     await expect(dialog.getByText("Last spent").first()).toBeVisible();
     await expect(dialog.getByText("3M avg").first()).toBeVisible();
     await expect(dialog.getByText("Expected").first()).toBeVisible();
+    const copyLastMonthButton = dialog
+      .getByTestId("copy-last-month-target")
+      .first();
+    await expect(copyLastMonthButton).toBeVisible();
+    const lastMonthTarget = await copyLastMonthButton.getAttribute(
+      "data-last-month-target",
+    );
+    expect(lastMonthTarget).not.toBeNull();
+    const copiedRow = copyLastMonthButton.locator("xpath=ancestor::tr");
+    const targetInput = copiedRow.locator('input[type="number"]').first();
+    await copyLastMonthButton.click();
+    await expect(targetInput).toHaveValue(String(Number(lastMonthTarget)));
     await expect(
       dialog.getByRole("columnheader", { name: "Target change" }).first(),
     ).toBeVisible();
