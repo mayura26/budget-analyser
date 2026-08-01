@@ -1,0 +1,23 @@
+
+> budget-analyser@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.220.1:3000
+- Environments: .env.local
+✓ Ready in 456ms
+Refreshed built-in bank profiles
+
+Refreshed built-in bank profiles
+ GET /offline 200 in 764ms (next.js: 332ms, application-code: 432ms)
+ GET /login 200 in 804ms (next.js: 682ms, proxy.ts: 19ms, application-code: 103ms)
+ GET /dashboard 200 in 184ms (next.js: 48ms, proxy.ts: 9ms, application-code: 127ms)
+ POST /login 303 in 262ms (next.js: 5ms, proxy.ts: 8ms, application-code: 249ms)
+  └─ ƒ login(null, {}) in 22ms lib/actions/auth.ts
+ GET /import 200 in 197ms (next.js: 133ms, proxy.ts: 10ms, application-code: 54ms)
+ POST /import 200 in 44ms (next.js: 4ms, proxy.ts: 6ms, application-code: 34ms)
+  └─ ƒ previewImport({}) in 12ms lib/actions/import.ts
+ GET /import 200 in 35ms (next.js: 3ms, proxy.ts: 4ms, application-code: 29ms)
+ POST /import 200 in 7.6s (next.js: 4ms, proxy.ts: 5ms, application-code: 7.6s)
+  └─ ƒ confirmImport({}) in 7531ms lib/actions/import.ts
