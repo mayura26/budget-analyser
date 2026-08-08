@@ -743,11 +743,12 @@ export function buildBudgetSummary(
   const savedTrackedR = roundMoney(totalSavingsAllocated);
   const actualIncomeR = roundMoney(incomeBasisFromActual);
   const surplus = actualIncomeR - spentR - savedTrackedR;
-  if (surplus > 0.001) {
+  if (monthClosed && surplus > 0.001) {
     implicitSurplusAsSavings = roundMoney(surplus);
   }
-  // Effective savings = actual income minus actual spend, capped at 0 (applies all months)
-  savingsBand.actualTotal = Math.max(0, roundMoney(actualIncomeR - spentR));
+  savingsBand.actualTotal = roundMoney(
+    totalSavingsAllocated + implicitSurplusAsSavings,
+  );
 
   const { start, end } = getMonthRange(month);
   const daysInMonth =

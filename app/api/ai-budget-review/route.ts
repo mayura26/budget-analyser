@@ -411,7 +411,7 @@ export async function POST(request: Request) {
           const flags = merchant.flagReasons.length
             ? merchant.flagReasons.join(", ")
             : "watch";
-          return `- ${merchant.merchant}: ${merchant.count} transactions, total ${formatCurrency(merchant.total, homeCurrency)}, average ${formatCurrency(merchant.average, homeCurrency)}, ${merchant.shareOfWants}% of wants spend, category ${merchant.categoryName ?? "Wants"}, flags ${flags}`;
+          return `- ${merchant.merchant}: ${merchant.count} transactions, total ${formatCurrency(merchant.total, homeCurrency)}, average ${formatCurrency(merchant.average, homeCurrency)}, ${merchant.shareOfCategory}% of its category, ${merchant.shareOfWants}% of wants spend, category ${merchant.categoryName ?? "Wants"}, flags ${flags}`;
         })
         .join("\n")
     : "- No repeated wants merchants flagged.";

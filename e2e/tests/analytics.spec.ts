@@ -83,6 +83,88 @@ test.describe("Analytics", () => {
       await deleteAnalyticsTestAccount(page, accountName);
     }
   });
+
+  test("only shows one-off wants merchants when they dominate their category", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createAnalyticsTestAccount(page);
+
+    try {
+      const dominant = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName,
+          count: 1,
+          reset: true,
+          seedMonth,
+          categoryName: "Activities (dining, events, hobbies)",
+          merchant: "E2E One Off Feast",
+          description: "E2E one off feast",
+          amount: -410,
+        },
+      });
+      expect(dominant.ok()).toBeTruthy();
+
+      const repeated = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName,
+          count: 2,
+          reset: false,
+          seedMonth,
+          categoryName: "Activities (dining, events, hobbies)",
+          merchant: "E2E Regular Dining",
+          description: "E2E regular dining",
+          amount: -295,
+        },
+      });
+      expect(repeated.ok()).toBeTruthy();
+
+      const smallOneOff = await page.request.post(
+        "/api/test-seed-transactions",
+        {
+          data: {
+            accountName,
+            count: 1,
+            reset: false,
+            seedMonth,
+            categoryName: "Shopping (clothes, random purchases)",
+            merchant: "E2E One Off Socks",
+            description: "E2E one off socks",
+            amount: -100,
+          },
+        },
+      );
+      expect(smallOneOff.ok()).toBeTruthy();
+
+      const shoppingBaseline = await page.request.post(
+        "/api/test-seed-transactions",
+        {
+          data: {
+            accountName,
+            count: 2,
+            reset: false,
+            seedMonth,
+            categoryName: "Shopping (clothes, random purchases)",
+            merchant: "E2E Regular Shopping",
+            description: "E2E regular shopping",
+            amount: -450,
+          },
+        },
+      );
+      expect(shoppingBaseline.ok()).toBeTruthy();
+
+      await page.goto(
+        `/analytics?preset=custom&from=${seedMonth}-01&to=${seedMonth}-28`,
+      );
+      const card = page.getByTestId("top-merchants-card");
+      await expect(card.getByText("E2E One Off Feast")).toBeVisible();
+      await expect(card.getByText("Category share").first()).toBeVisible();
+      await expect(card.getByText("E2E One Off Socks")).not.toBeVisible();
+    } finally {
+      await deleteAnalyticsTestAccount(page, accountName);
+    }
+  });
   test("category tabs swap content", async ({ page }) => {
     await page.goto("/analytics");
     await expect(page.getByRole("tab", { name: "Spending" })).toHaveAttribute(

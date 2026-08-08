@@ -292,6 +292,7 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
       categories: Map<string, number>;
     }
   >();
+  const byCategory = new Map<string, number>();
   let wantsTotal = 0;
 
   for (const row of loaded) {
@@ -303,6 +304,8 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
     const spend = Math.abs(row.converted);
     if (spend <= 0) continue;
     wantsTotal += spend;
+    const categoryName = row.categoryName ?? "Not processed";
+    byCategory.set(categoryName, (byCategory.get(categoryName) ?? 0) + spend);
 
     const source = merchantSource(row);
     const key = merchantKey(source) || source.toLowerCase();
@@ -314,7 +317,6 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
     };
     existing.total += spend;
     existing.count += 1;
-    const categoryName = row.categoryName ?? "Not processed";
     existing.categories.set(
       categoryName,
       (existing.categories.get(categoryName) ?? 0) + spend,
@@ -336,6 +338,14 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
       const topCategory = [...merchant.categories.entries()].sort(
         (a, b) => b[1] - a[1],
       )[0];
+      const categoryTotal = topCategory
+        ? (byCategory.get(topCategory[0]) ?? 0)
+        : 0;
+      const shareOfCategory =
+        categoryTotal > 0
+          ? Math.round(((topCategory?.[1] ?? 0) / categoryTotal) * 1000) / 10
+          : 0;
+      if (shareOfCategory > 40) flagReasons.push("category_concentration");
 
       return {
         merchant: merchant.merchant,
@@ -346,11 +356,12 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
           wantsTotal > 0
             ? Math.round((merchant.total / wantsTotal) * 1000) / 10
             : 0,
+        shareOfCategory,
         categoryName: topCategory?.[0] ?? null,
         flagReasons,
       };
     })
-    .filter((merchant) => merchant.count > 1 || merchant.flagReasons.length > 0)
+    .filter((merchant) => merchant.count > 1 || merchant.shareOfCategory > 40)
     .sort((a, b) => {
       if (a.flagReasons.length !== b.flagReasons.length) {
         return b.flagReasons.length - a.flagReasons.length;

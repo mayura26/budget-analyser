@@ -362,8 +362,14 @@ export type TopMerchantSpend = {
   count: number;
   average: number;
   shareOfWants: number;
+  shareOfCategory: number;
   categoryName: string | null;
-  flagReasons: ("frequent" | "high_spend" | "high_average")[];
+  flagReasons: (
+    | "frequent"
+    | "high_spend"
+    | "high_average"
+    | "category_concentration"
+  )[];
 };
 
 /**

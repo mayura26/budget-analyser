@@ -362,7 +362,7 @@ test.describe("Budget", () => {
   test("50/30/20 strip renders three mini grouped bar charts when budget exists", async ({
     page,
   }) => {
-    await page.goto("/budget");
+    await page.goto("/budget", { waitUntil: "commit" });
     const hasBudget = await page
       .getByTestId("summary-spending-progress")
       .isVisible({ timeout: 8000 })
@@ -548,6 +548,7 @@ test.describe("Budget", () => {
           count: 9,
           average: 20,
           shareOfWants: 40,
+          shareOfCategory: 40,
           categoryName: "Activities (dining, events, hobbies)",
           flagReasons: ["frequent", "high_spend"],
         },
@@ -782,6 +783,7 @@ test.describe("Budget", () => {
                 count: 9,
                 average: 20,
                 shareOfWants: 40,
+                shareOfCategory: 40,
                 categoryName: "Activities (dining, events, hobbies)",
                 flagReasons: ["frequent", "high_spend"],
               },

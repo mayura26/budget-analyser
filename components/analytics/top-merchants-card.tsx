@@ -9,6 +9,7 @@ const FLAG_LABELS: Record<TopMerchantSpend["flagReasons"][number], string> = {
   frequent: "Frequent",
   high_spend: "High spend",
   high_average: "High avg",
+  category_concentration: "Category share",
 };
 
 function MerchantFlags({
@@ -41,6 +42,8 @@ function MerchantFlags({
               "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
             reason === "high_average" &&
               "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+            reason === "category_concentration" &&
+              "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
           )}
         >
           {FLAG_LABELS[reason]}
@@ -70,13 +73,14 @@ export function TopMerchantsCard({
         </CardTitle>
         <p className="text-xs font-normal text-muted-foreground">
           Wants-category merchants only; needs, bills, transfers, income and
-          savings are excluded.
+          savings are excluded. One-off merchants only appear above 40% of their
+          category.
         </p>
       </CardHeader>
       <CardContent>
         {merchants.length === 0 ? (
           <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            No repeated wants merchants to flag for this period.
+            No wants merchants to flag for this period.
           </div>
         ) : (
           <div className="space-y-3">
@@ -98,7 +102,8 @@ export function TopMerchantsCard({
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {merchant.categoryName ?? "Wants"} -{" "}
-                      {merchant.shareOfWants.toFixed(1)}% of wants spend
+                      {merchant.shareOfCategory.toFixed(1)}% of category,{" "}
+                      {merchant.shareOfWants.toFixed(1)}% of wants
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
