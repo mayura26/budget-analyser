@@ -1,7 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
+import Database from "better-sqlite3";
 
 async function createAnalyticsTestAccount(page: Page) {
-  const accountName = `Analytics Merchants ${Date.now()}`;
+  const accountName = `Analytics Merchants ${Date.now()} ${Math.random()
+    .toString(36)
+    .slice(2)}`;
   await page.goto("/accounts");
   await page.getByRole("button", { name: "Add account" }).first().click();
 
@@ -31,6 +34,83 @@ async function deleteAnalyticsTestAccount(page: Page, accountName: string) {
   await page.getByRole("button", { name: "Delete" }).click();
   await page.waitForSelector('[role="dialog"]', { state: "hidden" });
 }
+
+type BudgetTargetRestore = {
+  id: number;
+  previousTargetAmount: number | null;
+};
+
+function setAnalyticsBudgetTarget(
+  month: string,
+  categoryName: string,
+  amount: number,
+): BudgetTargetRestore {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    const category = sqlite
+      .prepare("SELECT id FROM categories WHERE name = ? LIMIT 1")
+      .get(categoryName) as { id: number } | undefined;
+    if (!category) throw new Error(`Category not found: ${categoryName}`);
+
+    const existing = sqlite
+      .prepare(
+        `SELECT id, target_amount AS targetAmount
+         FROM budgets
+         WHERE month = ? AND category_id = ?`,
+      )
+      .get(month, category.id) as
+      | { id: number; targetAmount: number }
+      | undefined;
+
+    if (existing) {
+      sqlite
+        .prepare(
+          `UPDATE budgets
+           SET target_amount = ?, updated_at = unixepoch()
+           WHERE id = ?`,
+        )
+        .run(amount, existing.id);
+      return { id: existing.id, previousTargetAmount: existing.targetAmount };
+    }
+
+    const budget = sqlite
+      .prepare(
+        `INSERT INTO budgets
+           (month, category_id, target_amount, created_at, updated_at)
+         VALUES (?, ?, ?, unixepoch(), unixepoch())`,
+      )
+      .run(month, category.id, amount);
+    return { id: Number(budget.lastInsertRowid), previousTargetAmount: null };
+  } finally {
+    sqlite.close();
+  }
+}
+
+function cleanupAnalyticsBudgetTargets(restores: BudgetTargetRestore[]) {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    for (const restore of restores) {
+      if (restore.previousTargetAmount === null) {
+        sqlite.prepare("DELETE FROM budgets WHERE id = ?").run(restore.id);
+      } else {
+        sqlite
+          .prepare(
+            `UPDATE budgets
+             SET target_amount = ?, updated_at = unixepoch()
+             WHERE id = ?`,
+          )
+          .run(restore.previousTargetAmount, restore.id);
+      }
+    }
+  } finally {
+    sqlite.close();
+  }
+}
+
 test.describe("Analytics", () => {
   test("page heading and period control render", async ({ page }) => {
     await page.goto("/analytics");
@@ -90,8 +170,22 @@ test.describe("Analytics", () => {
     const now = new Date();
     const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const accountName = await createAnalyticsTestAccount(page);
+    const budgetTargets: BudgetTargetRestore[] = [];
 
     try {
+      budgetTargets.push(
+        setAnalyticsBudgetTarget(
+          seedMonth,
+          "Activities (dining, events, hobbies)",
+          1000,
+        ),
+        setAnalyticsBudgetTarget(
+          seedMonth,
+          "Shopping (clothes, random purchases)",
+          1000,
+        ),
+      );
+
       const dominant = await page.request.post("/api/test-seed-transactions", {
         data: {
           accountName,
@@ -115,7 +209,7 @@ test.describe("Analytics", () => {
           categoryName: "Activities (dining, events, hobbies)",
           merchant: "E2E Regular Dining",
           description: "E2E regular dining",
-          amount: -295,
+          amount: -400,
         },
       });
       expect(repeated.ok()).toBeTruthy();
@@ -159,9 +253,10 @@ test.describe("Analytics", () => {
       );
       const card = page.getByTestId("top-merchants-card");
       await expect(card.getByText("E2E One Off Feast")).toBeVisible();
-      await expect(card.getByText("Category share").first()).toBeVisible();
-      await expect(card.getByText("E2E One Off Socks")).not.toBeVisible();
+      await expect(card.getByText("Budget share").first()).toBeVisible();
+      await expect(card.getByText(/of category budget/).first()).toBeVisible();
     } finally {
+      cleanupAnalyticsBudgetTargets(budgetTargets);
       await deleteAnalyticsTestAccount(page, accountName);
     }
   });

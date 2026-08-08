@@ -9,7 +9,7 @@ const FLAG_LABELS: Record<TopMerchantSpend["flagReasons"][number], string> = {
   frequent: "Frequent",
   high_spend: "High spend",
   high_average: "High avg",
-  category_concentration: "Category share",
+  category_concentration: "Budget share",
 };
 
 function MerchantFlags({
@@ -74,7 +74,7 @@ export function TopMerchantsCard({
         <p className="text-xs font-normal text-muted-foreground">
           Wants-category merchants only; needs, bills, transfers, income and
           savings are excluded. One-off merchants only appear above 40% of their
-          category.
+          category budget.
         </p>
       </CardHeader>
       <CardContent>
@@ -102,7 +102,7 @@ export function TopMerchantsCard({
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {merchant.categoryName ?? "Wants"} -{" "}
-                      {merchant.shareOfCategory.toFixed(1)}% of category,{" "}
+                      {merchant.shareOfCategory.toFixed(1)}% of category budget,{" "}
                       {merchant.shareOfWants.toFixed(1)}% of wants
                     </p>
                   </div>

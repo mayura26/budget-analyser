@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { monthsInDateRangeInclusive } from "@/lib/analytics/date-range";
 import { buildTreemapDatumForNodes } from "@/lib/analytics/treemap-helpers";
 import { ruleBucketForSubcategory } from "@/lib/budget/rule-bucket";
@@ -6,7 +6,7 @@ import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
-import { accounts, categories, transactions } from "@/lib/db/schema";
+import { accounts, budgets, categories, transactions } from "@/lib/db/schema";
 import { normaliseMerchant } from "@/lib/import/normaliser";
 import type {
   AccountCashflowRow,
@@ -278,10 +278,44 @@ function merchantLabel(raw: string): string {
   return cleaned || "Unknown merchant";
 }
 
-function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
+function budgetTargetsByCategoryId(
+  rangeStart: string,
+  rangeEnd: string,
+): Map<number, number> {
+  const months = monthsInDateRangeInclusive(rangeStart, rangeEnd);
+  if (months.length === 0) return new Map();
+
+  const rows = db
+    .select({
+      categoryId: budgets.categoryId,
+      targetAmount: budgets.targetAmount,
+    })
+    .from(budgets)
+    .where(inArray(budgets.month, months))
+    .all();
+
+  const targets = new Map<number, number>();
+  for (const row of rows) {
+    targets.set(
+      row.categoryId,
+      (targets.get(row.categoryId) ?? 0) + row.targetAmount,
+    );
+  }
+  return targets;
+}
+
+function aggregateTopWantsMerchants(
+  loaded: LoadedRow[],
+  rangeStart: string,
+  rangeEnd: string,
+): TopMerchantSpend[] {
   const allCats = db.select().from(categories).all() as Category[];
   const categoryById = new Map(
     allCats.map((category) => [category.id, category]),
+  );
+  const budgetTargetByCategoryId = budgetTargetsByCategoryId(
+    rangeStart,
+    rangeEnd,
   );
   const byMerchant = new Map<
     string,
@@ -289,10 +323,9 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
       merchant: string;
       total: number;
       count: number;
-      categories: Map<string, number>;
+      categories: Map<number, { name: string; total: number }>;
     }
   >();
-  const byCategory = new Map<string, number>();
   let wantsTotal = 0;
 
   for (const row of loaded) {
@@ -304,8 +337,7 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
     const spend = Math.abs(row.converted);
     if (spend <= 0) continue;
     wantsTotal += spend;
-    const categoryName = row.categoryName ?? "Not processed";
-    byCategory.set(categoryName, (byCategory.get(categoryName) ?? 0) + spend);
+    if (row.categoryId == null) continue;
 
     const source = merchantSource(row);
     const key = merchantKey(source) || source.toLowerCase();
@@ -313,14 +345,16 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
       merchant: merchantLabel(source),
       total: 0,
       count: 0,
-      categories: new Map<string, number>(),
+      categories: new Map<number, { name: string; total: number }>(),
     };
+    const categoryName = row.categoryName ?? "Not processed";
+    const categorySpend = existing.categories.get(row.categoryId);
     existing.total += spend;
     existing.count += 1;
-    existing.categories.set(
-      categoryName,
-      (existing.categories.get(categoryName) ?? 0) + spend,
-    );
+    existing.categories.set(row.categoryId, {
+      name: categoryName,
+      total: (categorySpend?.total ?? 0) + spend,
+    });
     byMerchant.set(key, existing);
   }
 
@@ -336,14 +370,16 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
       if (average >= 75) flagReasons.push("high_average");
 
       const topCategory = [...merchant.categories.entries()].sort(
-        (a, b) => b[1] - a[1],
+        (a, b) => b[1].total - a[1].total,
       )[0];
-      const categoryTotal = topCategory
-        ? (byCategory.get(topCategory[0]) ?? 0)
+      const categoryBudget = topCategory
+        ? (budgetTargetByCategoryId.get(topCategory[0]) ?? 0)
         : 0;
       const shareOfCategory =
-        categoryTotal > 0
-          ? Math.round(((topCategory?.[1] ?? 0) / categoryTotal) * 1000) / 10
+        categoryBudget > 0
+          ? Math.round(
+              ((topCategory?.[1].total ?? 0) / categoryBudget) * 1000,
+            ) / 10
           : 0;
       if (shareOfCategory > 40) flagReasons.push("category_concentration");
 
@@ -357,7 +393,7 @@ function aggregateTopWantsMerchants(loaded: LoadedRow[]): TopMerchantSpend[] {
             ? Math.round((merchant.total / wantsTotal) * 1000) / 10
             : 0,
         shareOfCategory,
-        categoryName: topCategory?.[0] ?? null,
+        categoryName: topCategory?.[1].name ?? null,
         flagReasons,
       };
     })
@@ -895,7 +931,7 @@ export async function getAnalyticsPageData(
     aggregateSavingsDebitsByCategory(loaded);
   const incomeTransactionsByCategory =
     aggregateIncomeTransactionsByCategory(loaded);
-  const topWantsMerchants = aggregateTopWantsMerchants(loaded);
+  const topWantsMerchants = aggregateTopWantsMerchants(loaded, start, end);
   return {
     summary,
     accounts,
@@ -957,7 +993,7 @@ export async function getTopWantsMerchantsForRange(
   homeCurrency: SupportedCurrency,
 ): Promise<TopMerchantSpend[]> {
   const loaded = await loadConvertedRows(start, end, homeCurrency);
-  return aggregateTopWantsMerchants(loaded);
+  return aggregateTopWantsMerchants(loaded, start, end);
 }
 
 /** Expense debits in home currency, grouped by category id (`"none"` for uncategorised). */

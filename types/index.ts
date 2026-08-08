@@ -362,6 +362,7 @@ export type TopMerchantSpend = {
   count: number;
   average: number;
   shareOfWants: number;
+  /** Merchant spend as a percentage of the category budget target for the selected range. */
   shareOfCategory: number;
   categoryName: string | null;
   flagReasons: (
