@@ -365,6 +365,8 @@ export type TopMerchantSpend = {
   /** Merchant spend as a percentage of the category budget target for the selected range. */
   shareOfCategory: number;
   categoryName: string | null;
+  /** UI prominence based on spend, repeat behaviour and budget concentration. */
+  severity?: "critical" | "medium" | "low";
   flagReasons: (
     | "frequent"
     | "high_spend"

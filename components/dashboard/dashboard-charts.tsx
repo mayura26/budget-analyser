@@ -10,6 +10,7 @@ import {
   Legend,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -31,6 +32,11 @@ import type { CategoryTotal, MonthlyTotal } from "@/types";
 const UNSPENT_SLICE_COLOR = "#10b981";
 const SAVINGS_PIE_COLOR = "#059669";
 const MONTHLY_AXIS_WIDTH = 72;
+const MONTHLY_SERIES = [
+  { key: "Expenses", color: "#ef4444" },
+  { key: "Income", color: "#22c55e" },
+  { key: "Savings", color: "#059669" },
+] as const;
 
 type PieDatum = {
   name: string;
@@ -51,6 +57,14 @@ function formatMonthShort(monthStr: string) {
   const [year, month] = monthStr.split("-");
   const date = new Date(Number(year), Number(month) - 1, 1);
   return date.toLocaleDateString("en-AU", { month: "short" });
+}
+
+function averageMonthlySeries(
+  data: Array<Record<(typeof MONTHLY_SERIES)[number]["key"], number>>,
+  key: (typeof MONTHLY_SERIES)[number]["key"],
+) {
+  if (data.length === 0) return 0;
+  return data.reduce((sum, month) => sum + month[key], 0) / data.length;
 }
 
 interface TooltipProps {
@@ -157,6 +171,10 @@ export function DashboardCharts({
   const hasBarData = barData.some(
     (d) => d.Income > 0 || d.Expenses > 0 || d.Savings > 0,
   );
+  const monthlyAverages = MONTHLY_SERIES.map((series) => ({
+    ...series,
+    value: averageMonthlySeries(barData, series.key),
+  })).filter((series) => series.value > 0);
   const hasPieData = pieData.length > 0;
   const sliderDisabled = monthNet <= 0;
 
@@ -185,7 +203,7 @@ export function DashboardCharts({
             <ResponsiveContainer width="100%" height={240}>
               <BarChart
                 data={barData}
-                margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
+                margin={{ top: 4, right: 72, bottom: 0, left: 8 }}
                 barCategoryGap="30%"
                 barGap={2}
               >
@@ -217,6 +235,25 @@ export function DashboardCharts({
                 <Legend
                   wrapperStyle={{ fontSize: "0.8125rem", paddingTop: "12px" }}
                 />
+                {monthlyAverages.map((series) => (
+                  <ReferenceLine
+                    key={`${series.key}-average`}
+                    y={series.value}
+                    stroke={series.color}
+                    strokeDasharray="2 4"
+                    strokeOpacity={0.8}
+                    strokeWidth={1.5}
+                    ifOverflow="extendDomain"
+                    label={{
+                      value: `${series.key} avg`,
+                      position: "insideRight",
+                      fill: series.color,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      offset: 6,
+                    }}
+                  />
+                ))}
                 <Bar dataKey="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Savings" fill="#059669" radius={[4, 4, 0, 0]} />

@@ -410,11 +410,11 @@ export async function POST(request: Request) {
         .map((merchant) => {
           const flags = merchant.flagReasons.length
             ? merchant.flagReasons.join(", ")
-            : "watch";
-          return `- ${merchant.merchant}: ${merchant.count} transactions, total ${formatCurrency(merchant.total, homeCurrency)}, average ${formatCurrency(merchant.average, homeCurrency)}, ${merchant.shareOfCategory}% of its category budget, ${merchant.shareOfWants}% of wants spend, category ${merchant.categoryName ?? "Wants"}, flags ${flags}`;
+            : "repeat_activity";
+          return `- ${merchant.merchant}: ${merchant.severity ?? "low"} severity, ${merchant.count} transactions, total ${formatCurrency(merchant.total, homeCurrency)}, average ${formatCurrency(merchant.average, homeCurrency)}, ${merchant.shareOfCategory}% of its category budget, ${merchant.shareOfWants}% of wants spend, category ${merchant.categoryName ?? "Wants"}, signals ${flags}`;
         })
         .join("\n")
-    : "- No repeated wants merchants flagged.";
+    : "- No wants merchant signals.";
 
   const bucketLines = (
     [

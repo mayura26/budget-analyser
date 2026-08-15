@@ -155,10 +155,17 @@ test.describe("Analytics", () => {
         `/analytics?preset=custom&from=${seedMonth}-01&to=${seedMonth}-28`,
       );
       const card = page.getByTestId("top-merchants-card");
-      await expect(card.getByText("Top spend merchants")).toBeVisible();
-      await expect(card.getByText("McDonalds")).toBeVisible();
-      await expect(card.getByText(/7x.*avg/)).toBeVisible();
-      await expect(card.getByText("Frequent")).toBeVisible();
+      await expect(card.getByText("Merchant signals")).toBeVisible();
+      const row = card
+        .getByTestId("top-merchant-row")
+        .filter({
+          hasText: "McDonalds",
+        })
+        .first();
+      await expect(row).toBeVisible();
+      await expect(row.getByText(/7x.*avg/)).toBeVisible();
+      await expect(row.getByText("Critical", { exact: true })).toBeVisible();
+      await expect(row.getByText("Frequent")).toBeVisible();
     } finally {
       await deleteAnalyticsTestAccount(page, accountName);
     }
@@ -252,9 +259,18 @@ test.describe("Analytics", () => {
         `/analytics?preset=custom&from=${seedMonth}-01&to=${seedMonth}-28`,
       );
       const card = page.getByTestId("top-merchants-card");
-      await expect(card.getByText("E2E One Off Feast")).toBeVisible();
-      await expect(card.getByText("Budget share").first()).toBeVisible();
-      await expect(card.getByText(/of category budget/).first()).toBeVisible();
+      const row = card
+        .getByTestId("top-merchant-row")
+        .filter({
+          hasText: "E2E One Off Feast",
+        })
+        .first();
+      await expect(row).toBeVisible();
+      await expect(
+        row.getByText("Critical", { exact: true }).first(),
+      ).toBeVisible();
+      await expect(row.getByText("Budget share").first()).toBeVisible();
+      await expect(row.getByText(/of category budget/).first()).toBeVisible();
     } finally {
       cleanupAnalyticsBudgetTargets(budgetTargets);
       await deleteAnalyticsTestAccount(page, accountName);

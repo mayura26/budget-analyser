@@ -368,6 +368,10 @@ function aggregateTopWantsMerchants(
       if (merchant.count >= 5) flagReasons.push("frequent");
       if (merchant.total >= highSpendThreshold) flagReasons.push("high_spend");
       if (average >= 75) flagReasons.push("high_average");
+      const shareOfWants =
+        wantsTotal > 0
+          ? Math.round((merchant.total / wantsTotal) * 1000) / 10
+          : 0;
 
       const topCategory = [...merchant.categories.entries()].sort(
         (a, b) => b[1].total - a[1].total,
@@ -382,23 +386,34 @@ function aggregateTopWantsMerchants(
             ) / 10
           : 0;
       if (shareOfCategory > 40) flagReasons.push("category_concentration");
+      const severity = merchantSpendSeverity({
+        average,
+        count: merchant.count,
+        flagReasons,
+        shareOfCategory,
+        shareOfWants,
+      });
 
       return {
         merchant: merchant.merchant,
         total,
         count: merchant.count,
         average,
-        shareOfWants:
-          wantsTotal > 0
-            ? Math.round((merchant.total / wantsTotal) * 1000) / 10
-            : 0,
+        shareOfWants,
         shareOfCategory,
         categoryName: topCategory?.[1].name ?? null,
+        severity,
         flagReasons,
       };
     })
-    .filter((merchant) => merchant.count > 1 || merchant.shareOfCategory > 40)
+    .filter((merchant) => merchant.severity !== "low" || merchant.count > 1)
     .sort((a, b) => {
+      const severityRank = { critical: 3, medium: 2, low: 1 };
+      if (a.severity !== b.severity) {
+        return (
+          severityRank[b.severity ?? "low"] - severityRank[a.severity ?? "low"]
+        );
+      }
       if (a.flagReasons.length !== b.flagReasons.length) {
         return b.flagReasons.length - a.flagReasons.length;
       }
@@ -406,6 +421,40 @@ function aggregateTopWantsMerchants(
       return b.count - a.count;
     })
     .slice(0, 5);
+}
+
+function merchantSpendSeverity({
+  average,
+  count,
+  flagReasons,
+  shareOfCategory,
+  shareOfWants,
+}: {
+  average: number;
+  count: number;
+  flagReasons: TopMerchantSpend["flagReasons"];
+  shareOfCategory: number;
+  shareOfWants: number;
+}): NonNullable<TopMerchantSpend["severity"]> {
+  if (
+    flagReasons.length >= 2 ||
+    shareOfCategory >= 70 ||
+    shareOfWants >= 25 ||
+    average >= 150
+  ) {
+    return "critical";
+  }
+
+  if (
+    flagReasons.length >= 1 ||
+    count >= 3 ||
+    shareOfCategory >= 25 ||
+    shareOfWants >= 10
+  ) {
+    return "medium";
+  }
+
+  return "low";
 }
 
 function categoryKey(categoryId: number | null): string {

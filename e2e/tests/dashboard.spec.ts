@@ -133,10 +133,17 @@ test.describe("Dashboard", () => {
 
       await page.goto(`/dashboard?month=${seedMonth}`);
       const card = page.getByTestId("top-merchants-card");
-      await expect(card.getByText("Top spend merchants")).toBeVisible();
-      await expect(card.getByText("McDonalds")).toBeVisible();
-      await expect(card.getByText(/6x.*avg/)).toBeVisible();
-      await expect(card.getByText("Frequent")).toBeVisible();
+      await expect(card.getByText("Merchant signals")).toBeVisible();
+      const row = card
+        .getByTestId("top-merchant-row")
+        .filter({
+          hasText: "McDonalds",
+        })
+        .first();
+      await expect(row).toBeVisible();
+      await expect(row.getByText(/6x.*avg/)).toBeVisible();
+      await expect(row.getByText("Critical", { exact: true })).toBeVisible();
+      await expect(row.getByText("Frequent")).toBeVisible();
     } finally {
       await deleteDashboardTestAccount(page, accountName);
     }
@@ -172,6 +179,12 @@ test.describe("Dashboard", () => {
         hasText: "AUD",
       });
       await expect(tickLabels.first()).toContainText("AUD");
+      await expect(chartCard.getByText("Income avg")).toBeVisible();
+      await expect(chartCard.getByText("Expenses avg")).toBeVisible();
+      const averageLineCount = await chartCard
+        .locator('line[stroke-dasharray="2 4"]')
+        .count();
+      expect(averageLineCount).toBeGreaterThanOrEqual(2);
 
       const ticks = await tickLabels.evaluateAll((nodes) =>
         nodes.map((node) => {

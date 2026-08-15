@@ -5,6 +5,8 @@ import type { SupportedCurrency } from "@/lib/currency/supported";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { TopMerchantSpend } from "@/types";
 
+type MerchantSeverity = NonNullable<TopMerchantSpend["severity"]>;
+
 const FLAG_LABELS: Record<TopMerchantSpend["flagReasons"][number], string> = {
   frequent: "Frequent",
   high_spend: "High spend",
@@ -12,24 +14,67 @@ const FLAG_LABELS: Record<TopMerchantSpend["flagReasons"][number], string> = {
   category_concentration: "Budget share",
 };
 
-function MerchantFlags({
+const SEVERITY_META: Record<
+  MerchantSeverity,
+  {
+    label: string;
+    rowClass: string;
+    badgeClass: string;
+    barClass: string;
+  }
+> = {
+  critical: {
+    label: "Critical",
+    rowClass:
+      "border-red-500/30 bg-red-500/[0.06] shadow-sm dark:bg-red-500/[0.08]",
+    badgeClass:
+      "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
+    barClass: "bg-red-500",
+  },
+  medium: {
+    label: "Medium",
+    rowClass:
+      "border-amber-500/25 bg-amber-500/[0.05] dark:bg-amber-500/[0.07]",
+    badgeClass:
+      "border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    barClass: "bg-amber-500",
+  },
+  low: {
+    label: "Low",
+    rowClass: "border-border/80 bg-muted/20",
+    badgeClass:
+      "border-slate-500/25 bg-slate-500/10 text-slate-600 dark:text-slate-300",
+    barClass: "bg-slate-400",
+  },
+};
+
+function severityForMerchant(merchant: TopMerchantSpend): MerchantSeverity {
+  if (merchant.severity) return merchant.severity;
+  if (merchant.flagReasons.length >= 2) return "critical";
+  if (merchant.flagReasons.length >= 1) return "medium";
+  return "low";
+}
+
+function MerchantSignals({
+  severity,
   reasons,
 }: {
+  severity: MerchantSeverity;
   reasons: TopMerchantSpend["flagReasons"];
 }) {
-  if (reasons.length === 0) {
-    return (
-      <Badge
-        variant="outline"
-        className="text-[10px] font-medium uppercase tracking-wide"
-      >
-        Watch
-      </Badge>
-    );
-  }
+  const meta = SEVERITY_META[severity];
 
   return (
     <div className="flex flex-wrap justify-end gap-1">
+      <Badge
+        variant="outline"
+        className={cn(
+          "border text-[10px] font-medium uppercase tracking-wide",
+          meta.badgeClass,
+        )}
+      >
+        {meta.label}
+      </Badge>
       {reasons.map((reason) => (
         <Badge
           key={reason}
@@ -63,19 +108,49 @@ export function TopMerchantsCard({
   className?: string;
 }) {
   const maxTotal = Math.max(1, ...merchants.map((merchant) => merchant.total));
+  const severityCounts = merchants.reduce(
+    (counts, merchant) => {
+      counts[severityForMerchant(merchant)] += 1;
+      return counts;
+    },
+    { critical: 0, medium: 0, low: 0 } satisfies Record<
+      MerchantSeverity,
+      number
+    >,
+  );
 
   return (
     <Card className={className} data-testid="top-merchants-card">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <Store className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          Top spend merchants
-        </CardTitle>
-        <p className="text-xs font-normal text-muted-foreground">
-          Wants-category merchants only; needs, bills, transfers, income and
-          savings are excluded. One-off merchants only appear above 40% of their
-          category budget.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Store className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              Merchant signals
+            </CardTitle>
+            <p className="mt-1 text-xs font-normal text-muted-foreground">
+              Wants-category merchants ranked by repeat activity, average size
+              and budget concentration.
+            </p>
+          </div>
+          {merchants.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-1">
+              {(["critical", "medium", "low"] as const).map((severity) => (
+                <Badge
+                  key={severity}
+                  variant="outline"
+                  className={cn(
+                    "border text-[10px] font-medium uppercase tracking-wide",
+                    SEVERITY_META[severity].badgeClass,
+                    severityCounts[severity] === 0 && "hidden",
+                  )}
+                >
+                  {severityCounts[severity]} {SEVERITY_META[severity].label}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {merchants.length === 0 ? (
@@ -84,52 +159,98 @@ export function TopMerchantsCard({
           </div>
         ) : (
           <div className="space-y-3">
-            {merchants.map((merchant) => (
-              <div
-                key={`${merchant.merchant}-${merchant.total}-${merchant.count}`}
-                className="rounded-md border bg-muted/20 p-3"
-                data-testid="top-merchant-row"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      {merchant.flagReasons.length > 0 && (
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                      )}
-                      <p className="truncate text-sm font-medium">
-                        {merchant.merchant}
+            {merchants.map((merchant) => {
+              const severity = severityForMerchant(merchant);
+              const meta = SEVERITY_META[severity];
+              const isLow = severity === "low";
+
+              return (
+                <div
+                  key={`${merchant.merchant}-${merchant.total}-${merchant.count}`}
+                  className={cn(
+                    "rounded-md border transition-colors",
+                    meta.rowClass,
+                    isLow ? "p-2" : "p-3",
+                  )}
+                  data-severity={severity}
+                  data-testid="top-merchant-row"
+                >
+                  <div
+                    className={cn(
+                      "flex justify-between gap-3",
+                      isLow ? "items-center" : "items-start",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {!isLow && (
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                        )}
+                        <p
+                          className={cn(
+                            "truncate font-medium",
+                            isLow ? "text-xs" : "text-sm",
+                          )}
+                        >
+                          {merchant.merchant}
+                        </p>
+                      </div>
+                      <p
+                        className={cn(
+                          "mt-0.5 truncate text-muted-foreground",
+                          isLow ? "text-[11px]" : "text-xs",
+                        )}
+                      >
+                        {merchant.categoryName ?? "Wants"} -{" "}
+                        {merchant.shareOfCategory.toFixed(1)}% of category
+                        budget, {merchant.shareOfWants.toFixed(1)}% of wants
                       </p>
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {merchant.categoryName ?? "Wants"} -{" "}
-                      {merchant.shareOfCategory.toFixed(1)}% of category budget,{" "}
-                      {merchant.shareOfWants.toFixed(1)}% of wants
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-sm font-semibold tabular-nums">
-                      {formatCurrency(merchant.total, homeCurrency)}
+                    <div className="shrink-0 text-right">
+                      <div
+                        className={cn(
+                          "font-semibold tabular-nums",
+                          isLow ? "text-xs" : "text-sm",
+                        )}
+                      >
+                        {formatCurrency(merchant.total, homeCurrency)}
+                      </div>
+                      <div
+                        className={cn(
+                          "flex items-center justify-end gap-1 text-muted-foreground",
+                          isLow ? "text-[11px]" : "text-xs",
+                        )}
+                      >
+                        <Repeat className="h-3 w-3" />
+                        {merchant.count}x - avg{" "}
+                        {formatCurrency(merchant.average, homeCurrency)}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                      <Repeat className="h-3 w-3" />
-                      {merchant.count}x - avg{" "}
-                      {formatCurrency(merchant.average, homeCurrency)}
-                    </div>
                   </div>
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-amber-500"
-                      style={{
-                        width: `${Math.max(8, (merchant.total / maxTotal) * 100)}%`,
-                      }}
+                  <div
+                    className={cn(
+                      "flex items-center gap-3",
+                      isLow ? "mt-1 justify-end" : "mt-3",
+                    )}
+                  >
+                    {!isLow && (
+                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn("h-full rounded-full", meta.barClass)}
+                          style={{
+                            width: `${Math.max(8, (merchant.total / maxTotal) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+                    <MerchantSignals
+                      severity={severity}
+                      reasons={merchant.flagReasons}
                     />
                   </div>
-                  <MerchantFlags reasons={merchant.flagReasons} />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

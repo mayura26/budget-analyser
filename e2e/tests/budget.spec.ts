@@ -550,6 +550,7 @@ test.describe("Budget", () => {
           shareOfWants: 40,
           shareOfCategory: 40,
           categoryName: "Activities (dining, events, hobbies)",
+          severity: "critical",
           flagReasons: ["frequent", "high_spend"],
         },
       ],
@@ -676,10 +677,20 @@ test.describe("Budget", () => {
 
     // Category variance chart shows full long category labels (Y-axis space)
     await expect(page.getByText("Category variance")).toBeVisible();
-    await expect(page.getByText("Top spend merchants")).toBeVisible();
-    await expect(page.getByText("McDonalds")).toBeVisible();
-    await expect(page.getByText(/9x.*avg/)).toBeVisible();
-    await expect(page.getByText("Frequent")).toBeVisible();
+    const merchantCard = page.getByTestId("top-merchants-card");
+    await expect(merchantCard.getByText("Merchant signals")).toBeVisible();
+    const merchantRow = merchantCard
+      .getByTestId("top-merchant-row")
+      .filter({
+        hasText: "McDonalds",
+      })
+      .first();
+    await expect(merchantRow).toBeVisible();
+    await expect(merchantRow.getByText(/9x.*avg/)).toBeVisible();
+    await expect(
+      merchantRow.getByText("Critical", { exact: true }),
+    ).toBeVisible();
+    await expect(merchantRow.getByText("Frequent")).toBeVisible();
     // Category variance chart shows lean names (before parenthetical)
     await expect(
       page.locator(".recharts-wrapper").getByText("Takeout", { exact: true }),
@@ -785,6 +796,7 @@ test.describe("Budget", () => {
                 shareOfWants: 40,
                 shareOfCategory: 40,
                 categoryName: "Activities (dining, events, hobbies)",
+                severity: "critical",
                 flagReasons: ["frequent", "high_spend"],
               },
             ],
@@ -805,11 +817,18 @@ test.describe("Budget", () => {
 
     await page.goto(`/budget/review?month=${month}`);
     const card = page.getByTestId("top-merchants-card");
-    await expect(card.getByText("Top spend merchants")).toBeVisible();
-    await expect(card.getByText("McDonalds")).toBeVisible();
-    await expect(card.getByText(/9x.*avg/)).toBeVisible();
-    await expect(card.getByText("Frequent")).toBeVisible();
-    await expect(card.getByText("High spend")).toBeVisible();
+    await expect(card.getByText("Merchant signals")).toBeVisible();
+    const row = card
+      .getByTestId("top-merchant-row")
+      .filter({
+        hasText: "McDonalds",
+      })
+      .first();
+    await expect(row).toBeVisible();
+    await expect(row.getByText(/9x.*avg/)).toBeVisible();
+    await expect(row.getByText("Critical", { exact: true })).toBeVisible();
+    await expect(row.getByText("Frequent")).toBeVisible();
+    await expect(row.getByText("High spend")).toBeVisible();
   });
   test("share button opens dialog and reveals a public read-only link", async ({
     page,
