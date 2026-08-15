@@ -58,18 +58,22 @@ function severityForMerchant(merchant: TopMerchantSpend): MerchantSeverity {
 function MerchantSignals({
   severity,
   reasons,
+  compact = false,
 }: {
   severity: MerchantSeverity;
   reasons: TopMerchantSpend["flagReasons"];
+  compact?: boolean;
 }) {
   const meta = SEVERITY_META[severity];
+  const badgeSize = compact ? "px-1.5 py-0 text-[9px]" : "text-[10px]";
 
   return (
     <div className="flex flex-wrap justify-end gap-1">
       <Badge
         variant="outline"
         className={cn(
-          "border text-[10px] font-medium uppercase tracking-wide",
+          "border font-medium uppercase tracking-wide",
+          badgeSize,
           meta.badgeClass,
         )}
       >
@@ -80,7 +84,8 @@ function MerchantSignals({
           key={reason}
           variant="outline"
           className={cn(
-            "border text-[10px] font-medium uppercase tracking-wide",
+            "border font-medium uppercase tracking-wide",
+            badgeSize,
             reason === "frequent" &&
               "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
             reason === "high_spend" &&
@@ -158,11 +163,14 @@ export function TopMerchantsCard({
             No wants merchants to flag for this period.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {merchants.map((merchant) => {
               const severity = severityForMerchant(merchant);
               const meta = SEVERITY_META[severity];
+              const isCritical = severity === "critical";
+              const isMedium = severity === "medium";
               const isLow = severity === "low";
+              const isCompact = !isCritical;
 
               return (
                 <div
@@ -170,7 +178,9 @@ export function TopMerchantsCard({
                   className={cn(
                     "rounded-md border transition-colors",
                     meta.rowClass,
-                    isLow ? "p-2" : "p-3",
+                    isCritical && "p-3",
+                    isMedium && "p-2",
+                    isLow && "px-2 py-1.5",
                   )}
                   data-severity={severity}
                   data-testid="top-merchant-row"
@@ -178,18 +188,20 @@ export function TopMerchantsCard({
                   <div
                     className={cn(
                       "flex justify-between gap-3",
-                      isLow ? "items-center" : "items-start",
+                      isCompact ? "items-center" : "items-start",
                     )}
                   >
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-1.5">
-                        {!isLow && (
+                        {isCritical && (
                           <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                         )}
                         <p
                           className={cn(
                             "truncate font-medium",
-                            isLow ? "text-xs" : "text-sm",
+                            isCritical && "text-sm",
+                            isMedium && "text-xs",
+                            isLow && "text-[11px]",
                           )}
                         >
                           {merchant.merchant}
@@ -198,7 +210,8 @@ export function TopMerchantsCard({
                       <p
                         className={cn(
                           "mt-0.5 truncate text-muted-foreground",
-                          isLow ? "text-[11px]" : "text-xs",
+                          isCritical && "text-xs",
+                          isCompact && "text-[11px]",
                         )}
                       >
                         {merchant.categoryName ?? "Wants"} -{" "}
@@ -210,7 +223,9 @@ export function TopMerchantsCard({
                       <div
                         className={cn(
                           "font-semibold tabular-nums",
-                          isLow ? "text-xs" : "text-sm",
+                          isCritical && "text-sm",
+                          isMedium && "text-xs",
+                          isLow && "text-[11px]",
                         )}
                       >
                         {formatCurrency(merchant.total, homeCurrency)}
@@ -218,7 +233,8 @@ export function TopMerchantsCard({
                       <div
                         className={cn(
                           "flex items-center justify-end gap-1 text-muted-foreground",
-                          isLow ? "text-[11px]" : "text-xs",
+                          isCritical && "text-xs",
+                          isCompact && "text-[11px]",
                         )}
                       >
                         <Repeat className="h-3 w-3" />
@@ -230,11 +246,18 @@ export function TopMerchantsCard({
                   <div
                     className={cn(
                       "flex items-center gap-3",
-                      isLow ? "mt-1 justify-end" : "mt-3",
+                      isCritical && "mt-3",
+                      isMedium && "mt-1.5",
+                      isLow && "mt-1 justify-end",
                     )}
                   >
                     {!isLow && (
-                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn(
+                          "min-w-0 flex-1 overflow-hidden rounded-full bg-muted",
+                          isCritical ? "h-2" : "h-1.5",
+                        )}
+                      >
                         <div
                           className={cn("h-full rounded-full", meta.barClass)}
                           style={{
@@ -246,6 +269,7 @@ export function TopMerchantsCard({
                     <MerchantSignals
                       severity={severity}
                       reasons={merchant.flagReasons}
+                      compact={isCompact}
                     />
                   </div>
                 </div>
