@@ -80,6 +80,7 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     delimiter: ",",
     negativeIsDebit: false,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["activity*.csv"],
       descriptionCreditSubstrings: ["ONLINE PAYMENT RECEIVED"],
     }),
     isSystem: true,
@@ -136,9 +137,76 @@ export const COLUMN_ALIASES: Record<string, string[]> = {
   credit: ["credit", "deposit", "credit amount", "money in"],
 };
 
+type ProfileWithExtraMappings = Pick<
+  BankProfileTemplate,
+  "extraMappings" | "name"
+>;
+
+function parseExtraMappings(
+  profile: ProfileWithExtraMappings,
+): Record<string, unknown> | null {
+  if (!profile.extraMappings) return null;
+  try {
+    const parsed = JSON.parse(profile.extraMappings);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function bankProfileFilenamePatterns(
+  profile: ProfileWithExtraMappings,
+): string[] {
+  const mappings = parseExtraMappings(profile);
+  const patterns = mappings?.filenamePatterns;
+  if (!Array.isArray(patterns)) return [];
+
+  return patterns
+    .filter((pattern): pattern is string => typeof pattern === "string")
+    .map((pattern) => pattern.trim())
+    .filter(Boolean);
+}
+
+function filenameBasename(filename: string): string {
+  const normalised = filename.replace(/\\/g, "/");
+  return normalised.split("/").pop() ?? filename;
+}
+
+function wildcardToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  const wildcarded = escaped.replace(/\*/g, ".*").replace(/\?/g, ".");
+  return new RegExp(`^${wildcarded}$`, "i");
+}
+
+export function filenameMatchesWildcard(
+  filename: string,
+  pattern: string,
+): boolean {
+  return wildcardToRegExp(pattern.trim()).test(filenameBasename(filename));
+}
+
+export function bankProfileMatchesFilename(
+  profile: ProfileWithExtraMappings,
+  filename: string,
+): boolean {
+  return bankProfileFilenamePatterns(profile).some((pattern) =>
+    filenameMatchesWildcard(filename, pattern),
+  );
+}
+
 export function detectBankProfile(
   headers: string[],
+  filename?: string,
 ): BankProfileTemplate | null {
+  if (filename) {
+    const filenameMatch = BUILT_IN_PROFILES.find((profile) =>
+      bankProfileMatchesFilename(profile, filename),
+    );
+    if (filenameMatch) return filenameMatch;
+  }
+
   const lowerHeaders = headers.map((h) => h.toLowerCase().trim());
 
   for (const profile of BUILT_IN_PROFILES) {

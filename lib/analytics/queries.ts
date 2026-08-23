@@ -1,12 +1,19 @@
 import { and, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { monthsInDateRangeInclusive } from "@/lib/analytics/date-range";
 import { buildTreemapDatumForNodes } from "@/lib/analytics/treemap-helpers";
+import { generateOccurrences } from "@/lib/budget/generate";
 import { ruleBucketForSubcategory } from "@/lib/budget/rule-bucket";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { db } from "@/lib/db";
-import { accounts, budgets, categories, transactions } from "@/lib/db/schema";
+import {
+  accounts,
+  budgets,
+  categories,
+  scheduledTransactions,
+  transactions,
+} from "@/lib/db/schema";
 import { normaliseMerchant } from "@/lib/import/normaliser";
 import type {
   AccountCashflowRow,
@@ -17,6 +24,7 @@ import type {
   Category,
   CategoryHierarchyNode,
   MonthlyTotal,
+  ScheduledTransaction,
   TopMerchantSpend,
 } from "@/types";
 
@@ -269,6 +277,58 @@ function merchantKey(raw: string): string {
     .trim();
 }
 
+function isLikelyScheduledMerchant(
+  source: string,
+  scheduledKeys: Set<string>,
+): boolean {
+  const key = merchantKey(source);
+  if (!key) return false;
+  if (scheduledKeys.has(key)) return true;
+
+  for (const scheduledKey of scheduledKeys) {
+    if (scheduledKey.length < 4) continue;
+    if (key.includes(scheduledKey) || scheduledKey.includes(key)) return true;
+  }
+
+  return false;
+}
+
+function scheduledMerchantKeysForRange(
+  rangeStart: string,
+  rangeEnd: string,
+): Set<string> {
+  const schedules = db
+    .select()
+    .from(scheduledTransactions)
+    .all() as ScheduledTransaction[];
+  const expenseSchedules = schedules.filter((schedule) => schedule.amount < 0);
+  const occurrences = generateOccurrences(
+    expenseSchedules.map((schedule) => ({ ...schedule, categoryColor: null })),
+    rangeStart,
+    rangeEnd,
+  );
+  const scheduleById = new Map(
+    expenseSchedules.map((schedule) => [schedule.id, schedule]),
+  );
+  const keys = new Set<string>();
+
+  for (const occurrence of occurrences) {
+    const schedule = scheduleById.get(occurrence.scheduleId);
+    if (!schedule) continue;
+    for (const name of [
+      schedule.internalName,
+      schedule.displayName,
+      schedule.name,
+      occurrence.name,
+    ]) {
+      const key = merchantKey(name ?? "");
+      if (key) keys.add(key);
+    }
+  }
+
+  return keys;
+}
+
 function merchantLabel(raw: string): string {
   const cleaned = raw
     .replace(/\s+[:-]\s+[A-Z0-9#*/]+$/i, "")
@@ -317,6 +377,10 @@ function aggregateTopWantsMerchants(
     rangeStart,
     rangeEnd,
   );
+  const scheduledMerchantKeys = scheduledMerchantKeysForRange(
+    rangeStart,
+    rangeEnd,
+  );
   const byMerchant = new Map<
     string,
     {
@@ -336,10 +400,12 @@ function aggregateTopWantsMerchants(
 
     const spend = Math.abs(row.converted);
     if (spend <= 0) continue;
-    wantsTotal += spend;
     if (row.categoryId == null) continue;
 
     const source = merchantSource(row);
+    if (isLikelyScheduledMerchant(source, scheduledMerchantKeys)) continue;
+
+    wantsTotal += spend;
     const key = merchantKey(source) || source.toLowerCase();
     const existing = byMerchant.get(key) ?? {
       merchant: merchantLabel(source),

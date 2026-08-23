@@ -23,7 +23,10 @@ import {
   profileToColumnMapping,
 } from "@/lib/import/parser";
 import { parseCommBankPDF } from "@/lib/import/pdf-parser";
-import { detectBankProfile } from "@/lib/import/profiles";
+import {
+  bankProfileMatchesFilename,
+  detectBankProfile,
+} from "@/lib/import/profiles";
 import type { ActionResult, ImportPreview, PreviewRow } from "@/types";
 
 const MERGE_AMOUNT_TOLERANCE = 0.1; // ±10%
@@ -148,7 +151,14 @@ async function buildImportPreview(
       .get();
     if (!profile) return { success: false, error: "Bank profile not found" };
 
-    const mapping = profileToColumnMapping(profile);
+    const filenameProfile = db
+      .select()
+      .from(bankProfiles)
+      .all()
+      .find((candidate) => bankProfileMatchesFilename(candidate, filename));
+    const activeProfile = filenameProfile ?? profile;
+
+    const mapping = profileToColumnMapping(activeProfile);
     mapping.accountCurrency = account.currency;
     const csvResult = parseCSV(csvContent, mapping);
     rows = csvResult.rows;

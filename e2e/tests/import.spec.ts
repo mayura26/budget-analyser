@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 
@@ -452,6 +453,26 @@ test.describe("Import", () => {
     await page.getByRole("option", { name: "CommBank" }).click();
 
     await page.locator("#csv-file").setInputFiles(amexCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("3 new")).toBeVisible();
+    await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
+  });
+
+  test("Amex CSV auto-detects from activity filename", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+
+    await page.locator("#csv-file").setInputFiles({
+      name: "activity-2026.csv",
+      mimeType: "text/csv",
+      buffer: fs.readFileSync(amexCsv),
+    });
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("3 new")).toBeVisible();

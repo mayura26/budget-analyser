@@ -445,7 +445,7 @@ ${bucketLines}
 Top category lines:
 ${metricLines}
 
-Top wants merchant concentration (needs, bills, transfers, income and savings excluded):
+Top wants merchant concentration (needs, scheduled calendar payments, transfers, income and savings excluded):
 ${merchantLines}`;
 
   const sharedRules = `Rules:

@@ -140,6 +140,7 @@ const DEFAULT_BANK_PROFILES = [
     delimiter: ",",
     negativeIsDebit: false,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["activity*.csv"],
       descriptionCreditSubstrings: ["ONLINE PAYMENT RECEIVED"],
     }),
     isSystem: true,

@@ -111,6 +111,44 @@ function cleanupAnalyticsBudgetTargets(restores: BudgetTargetRestore[]) {
   }
 }
 
+function insertAnalyticsSchedule({
+  name,
+  amount,
+  startDate,
+}: {
+  name: string;
+  amount: number;
+  startDate: string;
+}) {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    sqlite
+      .prepare(
+        `INSERT INTO scheduled_transactions
+           (name, internal_name, display_name, amount, frequency, start_date, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'monthly', ?, 1, unixepoch(), unixepoch())`,
+      )
+      .run(name, name.toLowerCase(), name, amount, startDate);
+  } finally {
+    sqlite.close();
+  }
+}
+
+function deleteAnalyticsSchedule(name: string) {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    sqlite
+      .prepare("DELETE FROM scheduled_transactions WHERE name = ?")
+      .run(name);
+  } finally {
+    sqlite.close();
+  }
+}
+
 test.describe("Analytics", () => {
   test("page heading and period control render", async ({ page }) => {
     await page.goto("/analytics");
@@ -167,6 +205,69 @@ test.describe("Analytics", () => {
       await expect(row.getByText("Critical", { exact: true })).toBeVisible();
       await expect(row.getByText("Frequent")).toBeVisible();
     } finally {
+      await deleteAnalyticsTestAccount(page, accountName);
+    }
+  });
+
+  test("excludes scheduled calendar merchants from signals", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createAnalyticsTestAccount(page);
+    const scheduledMerchant = `E2E Scheduled Gym ${Date.now()}`;
+    const unscheduledMerchant = `E2E Control Cafe ${Date.now()}`;
+
+    try {
+      insertAnalyticsSchedule({
+        name: scheduledMerchant,
+        amount: -250,
+        startDate: `${seedMonth}-01`,
+      });
+
+      const scheduledSeed = await page.request.post(
+        "/api/test-seed-transactions",
+        {
+          data: {
+            accountName,
+            count: 6,
+            reset: true,
+            seedMonth,
+            categoryName: "Activities (dining, events, hobbies)",
+            merchant: scheduledMerchant,
+            description: scheduledMerchant,
+            amount: -250,
+          },
+        },
+      );
+      expect(scheduledSeed.ok()).toBeTruthy();
+
+      const unscheduledSeed = await page.request.post(
+        "/api/test-seed-transactions",
+        {
+          data: {
+            accountName,
+            count: 5,
+            reset: false,
+            seedMonth,
+            categoryName: "Activities (dining, events, hobbies)",
+            merchant: unscheduledMerchant,
+            description: unscheduledMerchant,
+            amount: -1000,
+          },
+        },
+      );
+      expect(unscheduledSeed.ok()).toBeTruthy();
+
+      await page.goto(
+        `/analytics?preset=custom&from=${seedMonth}-01&to=${seedMonth}-28`,
+      );
+      const card = page.getByTestId("top-merchants-card");
+      await expect(card.getByText("Merchant signals")).toBeVisible();
+      await expect(card.getByText(scheduledMerchant)).not.toBeVisible();
+      await expect(card.getByText(/E2E Control Cafe/)).toBeVisible();
+    } finally {
+      deleteAnalyticsSchedule(scheduledMerchant);
       await deleteAnalyticsTestAccount(page, accountName);
     }
   });
