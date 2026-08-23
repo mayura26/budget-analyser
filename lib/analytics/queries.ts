@@ -430,10 +430,6 @@ function aggregateTopWantsMerchants(
     .map((merchant) => {
       const total = roundMoney(merchant.total);
       const average = roundMoney(merchant.total / merchant.count);
-      const flagReasons: TopMerchantSpend["flagReasons"] = [];
-      if (merchant.count >= 5) flagReasons.push("frequent");
-      if (merchant.total >= highSpendThreshold) flagReasons.push("high_spend");
-      if (average >= 75) flagReasons.push("high_average");
       const shareOfWants =
         wantsTotal > 0
           ? Math.round((merchant.total / wantsTotal) * 1000) / 10
@@ -451,9 +447,14 @@ function aggregateTopWantsMerchants(
               ((topCategory?.[1].total ?? 0) / categoryBudget) * 1000,
             ) / 10
           : 0;
+      const flagReasons: TopMerchantSpend["flagReasons"] = [];
+      if (merchant.count >= 5) flagReasons.push("frequent");
+      if (merchant.total >= highSpendThreshold) flagReasons.push("high_spend");
+      if (average >= 75 && (merchant.count > 1 || shareOfCategory >= 30)) {
+        flagReasons.push("high_average");
+      }
       if (shareOfCategory > 40) flagReasons.push("category_concentration");
       const severity = merchantSpendSeverity({
-        average,
         count: merchant.count,
         flagReasons,
         shareOfCategory,
@@ -490,24 +491,17 @@ function aggregateTopWantsMerchants(
 }
 
 function merchantSpendSeverity({
-  average,
   count,
   flagReasons,
   shareOfCategory,
   shareOfWants,
 }: {
-  average: number;
   count: number;
   flagReasons: TopMerchantSpend["flagReasons"];
   shareOfCategory: number;
   shareOfWants: number;
 }): NonNullable<TopMerchantSpend["severity"]> {
-  if (
-    flagReasons.length >= 2 ||
-    shareOfCategory >= 70 ||
-    shareOfWants >= 25 ||
-    average >= 150
-  ) {
+  if (flagReasons.length >= 2 || shareOfCategory >= 70 || shareOfWants >= 25) {
     return "critical";
   }
 

@@ -18,6 +18,14 @@ const wiseCsv = path.join(__dirname, "../fixtures/wise.csv");
 const amexCsv = path.join(__dirname, "../fixtures/amex.csv");
 const kiwiBankCsv = path.join(__dirname, "../fixtures/kiwi-bank.csv");
 
+function namedCsvUpload(filePath: string, name: string) {
+  return {
+    name,
+    mimeType: "text/csv",
+    buffer: fs.readFileSync(filePath),
+  };
+}
+
 test.describe("Import", () => {
   test.beforeAll(async ({ browser }) => {
     // Create "Import Test Account" via UI if it doesn't exist
@@ -267,9 +275,27 @@ test.describe("Import", () => {
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 
+  test("CommBank CSV auto-detects from CSVData filename", async ({ page }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Amex" }).click();
+
+    await page
+      .locator("#csv-file")
+      .setInputFiles(namedCsvUpload(commbankCsv, "CSVData (23).csv"));
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.locator("tbody tr").first()).toBeVisible();
+    await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
+  });
+
   test("Coles CSV parses even if wrong profile selected", async ({ page }) => {
     // Intentionally select CommBank while uploading Coles CSV.
-    // The server should auto-detect the correct profile from the CSV header.
+    // The server should auto-detect the correct profile from the export filename.
     await page.goto("/import");
 
     await page.getByRole("combobox").nth(0).click();
@@ -278,7 +304,9 @@ test.describe("Import", () => {
     await page.getByRole("combobox").nth(1).click();
     await page.getByRole("option", { name: "CommBank" }).click();
 
-    await page.locator("#csv-file").setInputFiles(colesCsv);
+    await page
+      .locator("#csv-file")
+      .setInputFiles(namedCsvUpload(colesCsv, "Transactions (22).csv"));
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("4 new")).toBeVisible();
@@ -434,7 +462,9 @@ test.describe("Import", () => {
     await page.getByRole("combobox").nth(1).click();
     await page.getByRole("option", { name: "CommBank" }).click();
 
-    await page.locator("#csv-file").setInputFiles(wiseCsv);
+    await page
+      .locator("#csv-file")
+      .setInputFiles(namedCsvUpload(wiseCsv, "transaction-history (10).csv"));
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("2 new")).toBeVisible();
@@ -468,11 +498,9 @@ test.describe("Import", () => {
     await page.getByRole("combobox").nth(1).click();
     await page.getByRole("option", { name: "CommBank" }).click();
 
-    await page.locator("#csv-file").setInputFiles({
-      name: "activity-2026.csv",
-      mimeType: "text/csv",
-      buffer: fs.readFileSync(amexCsv),
-    });
+    await page
+      .locator("#csv-file")
+      .setInputFiles(namedCsvUpload(amexCsv, "activity (24).csv"));
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("3 new")).toBeVisible();

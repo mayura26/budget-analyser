@@ -22,9 +22,18 @@ test("filename wildcard matching is basename-only and case-insensitive", () => {
   );
 });
 
-test("Amex profile can be detected from activity filename without headers", () => {
-  const detected = detectBankProfile([], "activity2026.csv");
-  assert.strictEqual(detected?.name, "Amex");
+test("built-in profiles can be detected from bank export filenames", () => {
+  const filenames = [
+    ["CSVData (23).csv", "CommBank"],
+    ["Transactions (22).csv", "Coles"],
+    ["transaction-history (10).csv", "Wise"],
+    ["activity (24).csv", "Amex"],
+  ] as const;
+
+  for (const [filename, bankName] of filenames) {
+    const detected = detectBankProfile([], filename);
+    assert.strictEqual(detected?.name, bankName);
+  }
 });
 
 test("profile filename patterns are read from extra mappings", () => {

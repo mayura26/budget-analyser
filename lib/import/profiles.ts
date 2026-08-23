@@ -15,6 +15,7 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     delimiter: ",",
     negativeIsDebit: true,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["CSVData*.csv"],
       hasHeader: false,
       positionalColumns: {
         date: 0,
@@ -50,6 +51,7 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     delimiter: ",",
     negativeIsDebit: true,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["transaction-history*.csv"],
       directionColumn: "Direction",
       outValues: ["OUT"],
       inValues: ["IN"],
@@ -97,6 +99,7 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     delimiter: ",",
     negativeIsDebit: true,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["Transactions.csv", "Transactions (*).csv"],
       merchantColumn: "Merchant Name",
       accountReferenceColumn: "Account Number",
       pendingFlagColumn: "Processed On",

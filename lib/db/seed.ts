@@ -75,6 +75,7 @@ const DEFAULT_BANK_PROFILES = [
     delimiter: ",",
     negativeIsDebit: true,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["CSVData*.csv"],
       hasHeader: false,
       positionalColumns: {
         date: 0,
@@ -110,6 +111,7 @@ const DEFAULT_BANK_PROFILES = [
     delimiter: ",",
     negativeIsDebit: true,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["transaction-history*.csv"],
       directionColumn: "Direction",
       outValues: ["OUT"],
       inValues: ["IN"],
@@ -157,6 +159,7 @@ const DEFAULT_BANK_PROFILES = [
     delimiter: ",",
     negativeIsDebit: true,
     extraMappings: JSON.stringify({
+      filenamePatterns: ["Transactions.csv", "Transactions (*).csv"],
       merchantColumn: "Merchant Name",
       accountReferenceColumn: "Account Number",
       pendingFlagColumn: "Processed On",

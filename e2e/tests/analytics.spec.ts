@@ -275,8 +275,7 @@ test.describe("Analytics", () => {
   test("only shows one-off wants merchants when they dominate their category", async ({
     page,
   }) => {
-    const now = new Date();
-    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const seedMonth = "2030-01";
     const accountName = await createAnalyticsTestAccount(page);
     const budgetTargets: BudgetTargetRestore[] = [];
 
@@ -339,6 +338,23 @@ test.describe("Analytics", () => {
       );
       expect(smallOneOff.ok()).toBeTruthy();
 
+      const highAverageOneOff = await page.request.post(
+        "/api/test-seed-transactions",
+        {
+          data: {
+            accountName,
+            count: 1,
+            reset: false,
+            seedMonth,
+            categoryName: "Shopping (clothes, random purchases)",
+            merchant: "E2E One Off Workshop",
+            description: "E2E one off workshop",
+            amount: -200,
+          },
+        },
+      );
+      expect(highAverageOneOff.ok()).toBeTruthy();
+
       const shoppingBaseline = await page.request.post(
         "/api/test-seed-transactions",
         {
@@ -360,6 +376,11 @@ test.describe("Analytics", () => {
         `/analytics?preset=custom&from=${seedMonth}-01&to=${seedMonth}-28`,
       );
       const card = page.getByTestId("top-merchants-card");
+      const showMore = card.getByRole("button", { name: /Show \d+ more/ });
+      if (await showMore.isVisible().catch(() => false)) {
+        await showMore.click();
+      }
+
       const row = card
         .getByTestId("top-merchant-row")
         .filter({
@@ -372,6 +393,7 @@ test.describe("Analytics", () => {
       ).toBeVisible();
       await expect(row.getByText("Budget share").first()).toBeVisible();
       await expect(row.getByText(/of category budget/).first()).toBeVisible();
+      await expect(card.getByText("E2E One Off Workshop")).toHaveCount(0);
     } finally {
       cleanupAnalyticsBudgetTargets(budgetTargets);
       await deleteAnalyticsTestAccount(page, accountName);
