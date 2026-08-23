@@ -1,11 +1,23 @@
-import { AlertTriangle, Repeat, Store } from "lucide-react";
+"use client";
+
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Repeat,
+  Store,
+} from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { TopMerchantSpend } from "@/types";
 
 type MerchantSeverity = NonNullable<TopMerchantSpend["severity"]>;
+
+const DEFAULT_VISIBLE_MERCHANTS = 2;
 
 const FLAG_LABELS: Record<TopMerchantSpend["flagReasons"][number], string> = {
   frequent: "Frequent",
@@ -112,7 +124,13 @@ export function TopMerchantsCard({
   homeCurrency: SupportedCurrency;
   className?: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const maxTotal = Math.max(1, ...merchants.map((merchant) => merchant.total));
+  const hasHiddenMerchants = merchants.length > DEFAULT_VISIBLE_MERCHANTS;
+  const visibleMerchants = expanded
+    ? merchants
+    : merchants.slice(0, DEFAULT_VISIBLE_MERCHANTS);
+  const hiddenCount = Math.max(0, merchants.length - visibleMerchants.length);
   const severityCounts = merchants.reduce(
     (counts, merchant) => {
       counts[severityForMerchant(merchant)] += 1;
@@ -164,7 +182,7 @@ export function TopMerchantsCard({
           </div>
         ) : (
           <div className="space-y-2">
-            {merchants.map((merchant) => {
+            {visibleMerchants.map((merchant) => {
               const severity = severityForMerchant(merchant);
               const meta = SEVERITY_META[severity];
               const isCritical = severity === "critical";
@@ -275,6 +293,30 @@ export function TopMerchantsCard({
                 </div>
               );
             })}
+            {hasHiddenMerchants && (
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  aria-expanded={expanded}
+                  onClick={() => setExpanded((current) => !current)}
+                >
+                  {expanded ? (
+                    <>
+                      <ChevronUp className="h-3.5 w-3.5" />
+                      Show less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                      Show {hiddenCount} more
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

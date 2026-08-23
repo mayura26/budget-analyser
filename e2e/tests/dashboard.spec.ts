@@ -148,6 +148,69 @@ test.describe("Dashboard", () => {
       await deleteDashboardTestAccount(page, accountName);
     }
   });
+
+  test("merchant signals can expand beyond the first two rows", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+    const suffix = Date.now().toString(36);
+    const merchants = [
+      {
+        name: `E2E Signal Alpha ${suffix}`,
+        displayName: `E2E Signal Alpha ${suffix}`,
+        amount: -5000,
+      },
+      {
+        name: `E2E Signal Beta ${suffix}`,
+        displayName: `E2E Signal Beta ${suffix}`,
+        amount: -4800,
+      },
+      {
+        name: `E2E Signal Gamma ${suffix}`,
+        displayName: `E2E Signal Gamma ${suffix}`,
+        amount: -4600,
+      },
+    ];
+
+    try {
+      for (const [index, merchant] of merchants.entries()) {
+        const seed = await page.request.post("/api/test-seed-transactions", {
+          data: {
+            accountName,
+            count: 5,
+            reset: index === 0,
+            seedMonth,
+            categoryName: "Activities (dining, events, hobbies)",
+            merchant: merchant.name,
+            description: merchant.name,
+            amount: merchant.amount,
+          },
+        });
+        expect(seed.ok()).toBeTruthy();
+      }
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const card = page.getByTestId("top-merchants-card");
+      await expect(card.getByText("Merchant signals")).toBeVisible();
+      await expect(card.getByTestId("top-merchant-row")).toHaveCount(2);
+      await expect(card.getByText(merchants[0].displayName)).toBeVisible();
+      await expect(card.getByText(merchants[1].displayName)).toBeVisible();
+      await expect(card.getByText(merchants[2].displayName)).toHaveCount(0);
+
+      await card.getByRole("button", { name: /Show \d+ more/ }).click();
+
+      await expect(card.getByTestId("top-merchant-row").nth(2)).toBeVisible();
+      await expect(card.getByText(merchants[2].displayName)).toBeVisible();
+
+      await card.getByRole("button", { name: "Show less" }).click();
+      await expect(card.getByTestId("top-merchant-row")).toHaveCount(2);
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
+  });
+
   test("monthly overview scale labels stay inside the chart", async ({
     page,
   }) => {
