@@ -24,6 +24,11 @@ import {
 import { confirmImport, previewImport } from "@/lib/actions/import";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { DEFAULT_HOME_CURRENCY } from "@/lib/currency/supported";
+import {
+  bankProfileFilenamePatterns,
+  bankProfileMatchesFilename,
+  filenameMatchesWildcard,
+} from "@/lib/import/profiles";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Account, BankProfile, ImportPreview } from "@/types";
 
@@ -45,6 +50,10 @@ function resolveDefaultProfileIdForAccount(
   }
 
   return null;
+}
+
+function accountUsesProfile(account: Account, profile: BankProfile): boolean {
+  return String(account.bankProfileId) === String(profile.id);
 }
 
 export function ImportWizard({
@@ -121,6 +130,40 @@ export function ImportWizard({
     accounts.find((a) => String(a.id) === accountId)?.currency,
     DEFAULT_HOME_CURRENCY,
   );
+  const filenameMatchedProfile = file
+    ? (bankProfiles.find((profile) =>
+        bankProfileMatchesFilename(profile, file.name),
+      ) ?? null)
+    : null;
+  const filenameMatchedPatterns = filenameMatchedProfile
+    ? bankProfileFilenamePatterns(filenameMatchedProfile).filter((pattern) =>
+        filenameMatchesWildcard(file?.name ?? "", pattern),
+      )
+    : [];
+  const filenameMatchedAccount = filenameMatchedProfile
+    ? (accounts.find((account) =>
+        accountUsesProfile(account, filenameMatchedProfile),
+      ) ?? null)
+    : null;
+
+  function selectFile(nextFile: File | null) {
+    setFile(nextFile);
+    setError(null);
+    if (!nextFile || !nextFile.name.toLowerCase().endsWith(".csv")) return;
+
+    const matchedProfile = bankProfiles.find((profile) =>
+      bankProfileMatchesFilename(profile, nextFile.name),
+    );
+    if (!matchedProfile) return;
+
+    setProfileId(String(matchedProfile.id));
+    const matchedAccount = accounts.find((account) =>
+      accountUsesProfile(account, matchedProfile),
+    );
+    if (matchedAccount) {
+      setAccountId(String(matchedAccount.id));
+    }
+  }
 
   async function handlePreview() {
     if (!file || !accountId || !profileId) {
@@ -471,7 +514,7 @@ export function ImportWizard({
               const dropped = e.dataTransfer.files[0];
               const name = dropped?.name.toLowerCase() ?? "";
               if (name.endsWith(".csv") || name.endsWith(".pdf"))
-                setFile(dropped);
+                selectFile(dropped);
             }}
           >
             <Upload className="h-8 w-8 text-muted-foreground mb-2" />
@@ -486,9 +529,34 @@ export function ImportWizard({
               type="file"
               accept=".csv,.pdf"
               className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => selectFile(e.target.files?.[0] ?? null)}
             />
           </label>
+          {filenameMatchedProfile && (
+            <div
+              className="flex flex-wrap items-center gap-1.5 rounded-md border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs text-sky-700 dark:text-sky-300"
+              data-testid="filename-profile-match"
+            >
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span className="font-medium">
+                Filename match: {filenameMatchedProfile.name}
+              </span>
+              {filenameMatchedAccount ? (
+                <span>Account: {filenameMatchedAccount.name}</span>
+              ) : (
+                <span>No account uses this profile yet</span>
+              )}
+              {filenameMatchedPatterns.map((pattern) => (
+                <Badge
+                  key={pattern}
+                  variant="outline"
+                  className="border-sky-500/30 bg-background/40 font-mono text-[10px] font-normal text-sky-700 dark:text-sky-300"
+                >
+                  {pattern}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && (

@@ -26,23 +26,33 @@ function namedCsvUpload(filePath: string, name: string) {
   };
 }
 
+async function createImportAccountIfMissing(
+  page: import("@playwright/test").Page,
+  accountName: string,
+  profileName: string,
+) {
+  await page.goto("/accounts");
+  const exists = await page.getByText(accountName, { exact: true }).isVisible();
+  if (exists) return;
+
+  await page.getByRole("button", { name: "Add account" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.locator('input[name="name"]').fill(accountName);
+  await dialog.getByRole("combobox").nth(1).click();
+  await page.getByRole("option", { name: profileName }).click();
+  await dialog.getByRole("button", { name: "Create account" }).click();
+  await page.waitForSelector(`text=${accountName}`);
+}
+
 test.describe("Import", () => {
   test.beforeAll(async ({ browser }) => {
-    // Create "Import Test Account" via UI if it doesn't exist
-    const context = await browser.newContext();
+    const context = await browser.newContext({
+      storageState: "e2e/.auth/user.json",
+    });
     const page = await context.newPage();
-    await page.goto("/accounts");
-    const exists = await page.getByText("Import Test Account").isVisible();
-    if (!exists) {
-      await page.getByRole("button", { name: "Add account" }).first().click();
-      const dialog = page.getByRole("dialog");
-      await expect(dialog).toBeVisible();
-      await dialog.locator('input[name="name"]').fill("Import Test Account");
-      await dialog.getByRole("combobox").nth(1).click();
-      await page.getByRole("option", { name: "CommBank" }).click();
-      await dialog.getByRole("button", { name: "Create account" }).click();
-      await page.waitForSelector("text=Import Test Account");
-    }
+    await createImportAccountIfMissing(page, "Import Test Account", "CommBank");
+    await createImportAccountIfMissing(page, "Import Amex Account", "Amex");
     await context.close();
   });
 
@@ -287,6 +297,10 @@ test.describe("Import", () => {
     await page
       .locator("#csv-file")
       .setInputFiles(namedCsvUpload(commbankCsv, "CSVData (23).csv"));
+    await expect(page.getByRole("combobox").nth(1)).toContainText("CommBank");
+    const filenameMatch = page.getByTestId("filename-profile-match");
+    await expect(filenameMatch).toContainText("Filename match: CommBank");
+    await expect(filenameMatch).toContainText("CSVData*.csv");
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.locator("tbody tr").first()).toBeVisible();
@@ -307,6 +321,10 @@ test.describe("Import", () => {
     await page
       .locator("#csv-file")
       .setInputFiles(namedCsvUpload(colesCsv, "Transactions (22).csv"));
+    await expect(page.getByRole("combobox").nth(1)).toContainText("Coles");
+    await expect(page.getByTestId("filename-profile-match")).toContainText(
+      "Filename match: Coles",
+    );
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("4 new")).toBeVisible();
@@ -465,6 +483,10 @@ test.describe("Import", () => {
     await page
       .locator("#csv-file")
       .setInputFiles(namedCsvUpload(wiseCsv, "transaction-history (10).csv"));
+    await expect(page.getByRole("combobox").nth(1)).toContainText("Wise");
+    await expect(page.getByTestId("filename-profile-match")).toContainText(
+      "Filename match: Wise",
+    );
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("2 new")).toBeVisible();
@@ -501,6 +523,14 @@ test.describe("Import", () => {
     await page
       .locator("#csv-file")
       .setInputFiles(namedCsvUpload(amexCsv, "activity (24).csv"));
+    await expect(page.getByRole("combobox").nth(0)).not.toContainText(
+      "Import Test Account",
+    );
+    await expect(page.getByRole("combobox").nth(1)).toContainText("Amex");
+    const filenameMatch = page.getByTestId("filename-profile-match");
+    await expect(filenameMatch).toContainText("Filename match: Amex");
+    await expect(filenameMatch).toContainText("Account:");
+    await expect(filenameMatch).toContainText("activity*.csv");
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("3 new")).toBeVisible();

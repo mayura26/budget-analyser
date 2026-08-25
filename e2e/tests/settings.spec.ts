@@ -66,6 +66,24 @@ test.describe("Settings", () => {
     await expect(page.getByText("built-in").first()).toBeVisible();
   });
 
+  test("bank profiles show filename auto-detect patterns", async ({ page }) => {
+    await page.goto("/settings");
+    const profilesCard = page.locator(".rounded-lg").filter({
+      hasText: "Bank Profiles",
+    });
+
+    for (const pattern of [
+      "CSVData*.csv",
+      "Transactions (*).csv",
+      "transaction-history*.csv",
+      "activity*.csv",
+    ]) {
+      await expect(
+        profilesCard.getByText(pattern, { exact: true }),
+      ).toBeVisible();
+    }
+  });
+
   test("export database downloads budget.db", async ({ page }) => {
     await page.goto("/settings");
     await expect(
