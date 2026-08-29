@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { accounts, categories, transactions } from "@/lib/db/schema";
 import { getMonthRange } from "@/lib/utils";
 import type {
+  BudgetRuleBucket,
   Category,
   CategoryTotal,
   DailyNeedsWants,
@@ -14,6 +15,27 @@ import type {
   MoneyFlowBreakdownBucket,
   MonthlyTotal,
 } from "@/types";
+
+function ruleBucketForCategory(
+  categoryId: number | null,
+  categoryById: Map<number, Category>,
+  mainById: Map<number, Category>,
+): BudgetRuleBucket | null {
+  if (categoryId == null) return null;
+  const category = categoryById.get(categoryId);
+  if (!category) return null;
+
+  if (category.parentId !== null) {
+    return ruleBucketForSubcategory(mainById.get(category.parentId));
+  }
+
+  const raw = category.budgetRuleBucket;
+  if (raw === "needs" || raw === "wants" || raw === "savings") return raw;
+  if (raw === "none") return null;
+  if (category.type === "expense") return "wants";
+  if (category.type === "savings") return "savings";
+  return null;
+}
 
 export async function getMonthlyTotalsInHomeCurrency(
   months: string[],
@@ -178,16 +200,14 @@ export async function getDailyNeedsWantsForMonth(
   const allCats = db.select().from(categories).all() as Category[];
   const mains = allCats.filter((c) => c.parentId === null);
   const mainById = new Map(mains.map((c) => [c.id, c]));
+  const catById = new Map(allCats.map((c) => [c.id, c]));
 
   const catMeta = new Map<
     number,
     { ruleBucket: string | null; type: string }
   >();
   for (const cat of allCats) {
-    const parentMain =
-      cat.parentId != null ? mainById.get(cat.parentId) : undefined;
-    const rb =
-      cat.parentId === null ? null : ruleBucketForSubcategory(parentMain);
+    const rb = ruleBucketForCategory(cat.id, catById, mainById);
     catMeta.set(cat.id, { ruleBucket: rb, type: cat.type });
   }
 
@@ -252,8 +272,8 @@ export async function getDailyNeedsWantsForMonth(
     if (catType === "income" && v > 0) {
       bucket.income += v;
     } else if (catType === "expense") {
-      if (ruleBucket === "needs") bucket.needs += -v;
-      else if (ruleBucket === "wants") bucket.wants += -v;
+      if (ruleBucket === "needs") bucket.needs += Math.max(0, -v);
+      else if (ruleBucket === "wants") bucket.wants += Math.max(0, -v);
     }
   }
 
@@ -297,16 +317,14 @@ export async function getRuleBucketTotalsForMonth(
   const allCats = db.select().from(categories).all() as Category[];
   const mains = allCats.filter((c) => c.parentId === null);
   const mainById = new Map(mains.map((c) => [c.id, c]));
+  const catById = new Map(allCats.map((c) => [c.id, c]));
 
   const catMeta = new Map<
     number,
     { ruleBucket: string | null; type: string }
   >();
   for (const cat of allCats) {
-    const parentMain =
-      cat.parentId != null ? mainById.get(cat.parentId) : undefined;
-    const rb =
-      cat.parentId === null ? null : ruleBucketForSubcategory(parentMain);
+    const rb = ruleBucketForCategory(cat.id, catById, mainById);
     catMeta.set(cat.id, { ruleBucket: rb, type: cat.type });
   }
 
@@ -349,8 +367,8 @@ export async function getRuleBucketTotalsForMonth(
     const catType = meta?.type ?? row.categoryType;
     const ruleBucket = meta?.ruleBucket ?? null;
     if (catType !== "expense") continue;
-    if (ruleBucket === "needs") needs += -v;
-    else if (ruleBucket === "wants") wants += -v;
+    if (ruleBucket === "needs") needs += Math.max(0, -v);
+    else if (ruleBucket === "wants") wants += Math.max(0, -v);
   }
 
   return {
@@ -449,12 +467,7 @@ export async function getMoneyFlowBreakdownForMonth(
   for (const row of rows) {
     const cur = parseAccountCurrency(row.currency, homeCurrency);
     const v = convertToHome(db, row.amount, cur, homeCurrency, row.date);
-    const category =
-      row.categoryId != null ? catById.get(row.categoryId) : undefined;
-    const parentMain =
-      category?.parentId != null ? mainById.get(category.parentId) : undefined;
-    const ruleBucket =
-      category?.parentId == null ? null : ruleBucketForSubcategory(parentMain);
+    const ruleBucket = ruleBucketForCategory(row.categoryId, catById, mainById);
     const key =
       row.categoryId == null ? "uncategorised" : `cat-${row.categoryId}`;
     const label = row.categoryName;

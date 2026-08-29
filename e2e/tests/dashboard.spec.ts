@@ -384,11 +384,19 @@ test.describe("Dashboard", () => {
       await page.goto(`/dashboard?month=${seedMonth}`);
       const flow = page.getByTestId("money-flow");
       await expect(flow).toBeVisible();
+      await expect(flow.getByTestId("flow-node-wants")).toBeVisible();
+      const compactHeight = await flow
+        .locator('svg[role="img"]')
+        .evaluate((node) => node.getBoundingClientRect().height);
 
       await flow
         .getByRole("button", { name: "Expand Wants breakdown" })
         .click();
       await expect(flow.getByTestId("flow-detail-panel-wants")).toBeVisible();
+      const expandedHeight = await flow
+        .locator('svg[role="img"]')
+        .evaluate((node) => node.getBoundingClientRect().height);
+      expect(expandedHeight).toBeGreaterThan(compactHeight + 150);
       await expect(
         flow
           .locator("svg text")

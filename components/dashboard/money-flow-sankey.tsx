@@ -49,12 +49,15 @@ type LaidOutSlice = MoneyFlowBreakdownSlice & {
 const BAR_W = 10;
 const LEFT_X = 5;
 const RIGHT_LABEL_W = 100;
-const DETAIL_LABEL_W = 142;
+const DETAIL_LABEL_W = 220;
 const TOP_PAD = 8;
 const BOT_PAD = 8;
 const NODE_GAP = 1.5;
-const MIN_ROW = 30;
-const MAX_DETAIL_SLICES = 7;
+const COMPACT_ROW = 30;
+const EXPANDED_ROW = 58;
+const DETAIL_ROW = 64;
+const COMPACT_MIN_PLOT_H = 110;
+const EXPANDED_MIN_PLOT_H = 360;
 
 /** Cubic-bezier flow ribbon between a left slice and a right node. */
 function ribbonPath(
@@ -86,31 +89,28 @@ function detailSlices(
   parent: FlowNode | undefined,
 ): MoneyFlowBreakdownSlice[] {
   if (!parent) return [];
-  const positive = slices.filter((s) => s.value > 0);
-  if (positive.length <= MAX_DETAIL_SLICES) return positive;
-
-  const shown = positive.slice(0, MAX_DETAIL_SLICES - 1);
-  const rest = positive.slice(MAX_DETAIL_SLICES - 1);
-  const restValue = rest.reduce((sum, s) => sum + s.value, 0);
-  const restCount = rest.reduce((sum, s) => sum + s.count, 0);
-  return [
-    ...shown,
-    {
-      key: `${parent.key}-more`,
-      label: `More ${parent.label.toLowerCase()}`,
-      value: Math.round(restValue * 100) / 100,
-      color: parent.color,
-      count: restCount,
-    },
-  ];
+  return slices.filter((s) => s.value > 0);
 }
 
-function spreadLabels<T extends { labelYc: number }>(items: T[]) {
+function spreadLabels<T extends { labelYc: number }>(
+  items: T[],
+  minRow: number,
+) {
   let prev = -Infinity;
   for (const item of items) {
-    if (item.labelYc < prev + MIN_ROW) item.labelYc = prev + MIN_ROW;
+    if (item.labelYc < prev + minRow) item.labelYc = prev + minRow;
     prev = item.labelYc;
   }
+}
+
+function sliceTotal(slices: MoneyFlowBreakdownSlice[] | undefined): number {
+  return (
+    Math.round(
+      (slices ?? [])
+        .filter((slice) => slice.value > 0)
+        .reduce((sum, slice) => sum + slice.value, 0) * 100,
+    ) / 100
+  );
 }
 
 export function MoneyFlowSankey({
@@ -167,11 +167,21 @@ export function MoneyFlowSankey({
     );
   }
 
+  const needsFlow = Math.max(needs, sliceTotal(breakdown?.needs));
+  const wantsFlow = Math.max(wants, sliceTotal(breakdown?.wants));
+  const otherFlow = Math.max(other, sliceTotal(breakdown?.other));
+  const savingsFlow = Math.max(savings, sliceTotal(breakdown?.savings));
+
   const baseUses: FlowNode[] = [
-    { key: "needs", label: "Needs", value: needs, color: COLORS.needs },
-    { key: "wants", label: "Wants", value: wants, color: COLORS.wants },
-    { key: "other", label: "Other", value: other, color: COLORS.other },
-    { key: "savings", label: "Savings", value: savings, color: COLORS.savings },
+    { key: "needs", label: "Needs", value: needsFlow, color: COLORS.needs },
+    { key: "wants", label: "Wants", value: wantsFlow, color: COLORS.wants },
+    { key: "other", label: "Other", value: otherFlow, color: COLORS.other },
+    {
+      key: "savings",
+      label: "Savings",
+      value: savingsFlow,
+      color: COLORS.savings,
+    },
     ...(overspent
       ? []
       : [{ key: "net" as const, label: "Net", value: net, color: COLORS.net }]),
@@ -189,16 +199,18 @@ export function MoneyFlowSankey({
   const hasActiveDetail = Boolean(activeParent && activeSlices.length > 0);
   const total = uses.reduce((sum, n) => sum + n.value, 0) || income;
 
-  const W = Math.max(width, hasActiveDetail ? 520 : 260);
+  const W = Math.max(width, hasActiveDetail ? 760 : 260);
   const ribbonL = LEFT_X + BAR_W;
   const rightBarX = hasActiveDetail
-    ? Math.max(150, Math.round(W * 0.42))
+    ? Math.min(Math.max(118, Math.round(W * 0.12)), W - DETAIL_LABEL_W - 360)
     : W - RIGHT_LABEL_W - BAR_W;
   const detailBarX = W - DETAIL_LABEL_W - BAR_W;
   const detailPlotH = hasActiveDetail
-    ? Math.max(activeSlices.length * MIN_ROW, 120)
+    ? Math.max(activeSlices.length * DETAIL_ROW, EXPANDED_MIN_PLOT_H)
     : 0;
-  const plotH = Math.max(uses.length * MIN_ROW, detailPlotH, 110);
+  const plotH = hasActiveDetail
+    ? Math.max(uses.length * EXPANDED_ROW, detailPlotH, EXPANDED_MIN_PLOT_H)
+    : Math.max(uses.length * COMPACT_ROW, COMPACT_MIN_PLOT_H);
   const H = plotH + TOP_PAD + BOT_PAD;
   const scale = (plotH - NODE_GAP * Math.max(uses.length - 1, 0)) / total;
 
@@ -222,14 +234,14 @@ export function MoneyFlowSankey({
       expandable: bucketBreakdown(n.key).length > 0,
     };
   });
-  spreadLabels(laidOut);
+  spreadLabels(laidOut, hasActiveDetail ? EXPANDED_ROW : COMPACT_ROW);
 
   const selectedNode = laidOut.find((n) => n.key === activeKey);
   const activeTotal = activeSlices.reduce((sum, s) => sum + s.value, 0);
   const childPlotH = hasActiveDetail
     ? Math.max(
-        activeSlices.length * MIN_ROW,
-        Math.min(plotH, (selectedNode?.h ?? 0) * 2),
+        activeSlices.length * DETAIL_ROW,
+        Math.min(plotH, (selectedNode?.h ?? 0) * 1.6),
       )
     : 0;
   const childStartY =
@@ -261,7 +273,7 @@ export function MoneyFlowSankey({
       labelYc: rightY + h / 2,
     };
   });
-  spreadLabels(laidOutChildren);
+  spreadLabels(laidOutChildren, DETAIL_ROW);
 
   function toggleNode(key: FlowKey) {
     if (key === "net" || bucketBreakdown(key).length === 0) return;
