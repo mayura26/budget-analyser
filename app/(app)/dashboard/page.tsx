@@ -36,6 +36,7 @@ import {
   enumerateMonthsInclusive,
   formatCurrency,
   formatMonth,
+  formatSignedCurrency,
   getCurrentMonth,
   getMonthRange,
   getMonthsEndingAt,
@@ -95,7 +96,7 @@ function DashboardBudgetStatus({
         <div>
           <div className="flex items-center justify-between text-sm mb-1.5">
             <span>
-              {formatCurrency(summary.totalSpent, homeCurrency)} of{" "}
+              {formatSignedCurrency(summary.totalSpent, homeCurrency)} of{" "}
               {formatCurrency(summary.totalBudgeted, homeCurrency)} spent
             </span>
             <span
@@ -145,7 +146,7 @@ function DashboardBudgetStatus({
                   </div>
                   <div className="flex shrink-0 items-center justify-end gap-3 pl-6 sm:pl-0">
                     <span className="tabular-nums text-muted-foreground">
-                      {formatCurrency(row.actualSpent, homeCurrency)} /{" "}
+                      {formatSignedCurrency(row.actualSpent, homeCurrency)} /{" "}
                       {formatCurrency(row.targetAmount, homeCurrency)}
                     </span>
                     <span

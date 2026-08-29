@@ -252,8 +252,8 @@ export async function getDailyNeedsWantsForMonth(
     if (catType === "income" && v > 0) {
       bucket.income += v;
     } else if (catType === "expense") {
-      if (ruleBucket === "needs") bucket.needs += Math.max(0, -v);
-      else if (ruleBucket === "wants") bucket.wants += Math.max(0, -v);
+      if (ruleBucket === "needs") bucket.needs += -v;
+      else if (ruleBucket === "wants") bucket.wants += -v;
     }
   }
 
@@ -349,8 +349,8 @@ export async function getRuleBucketTotalsForMonth(
     const catType = meta?.type ?? row.categoryType;
     const ruleBucket = meta?.ruleBucket ?? null;
     if (catType !== "expense") continue;
-    if (ruleBucket === "needs") needs += Math.max(0, -v);
-    else if (ruleBucket === "wants") wants += Math.max(0, -v);
+    if (ruleBucket === "needs") needs += -v;
+    else if (ruleBucket === "wants") wants += -v;
   }
 
   return {
