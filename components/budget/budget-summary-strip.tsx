@@ -8,7 +8,7 @@ import {
 } from "@/components/budget/budget-progress-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatSignedCurrency } from "@/lib/utils";
 import type { BudgetSummary } from "@/types";
 
 export function BudgetSummaryStrip({
@@ -117,8 +117,15 @@ export function BudgetSummaryStrip({
                 <span className="text-sm font-medium">Spending</span>
               </div>
               <div className="flex items-baseline gap-2 tabular-nums whitespace-nowrap text-sm">
-                <span className="text-foreground font-semibold">
-                  {formatCurrency(summary.totalSpent, homeCurrency)}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    summary.totalSpent < -0.005
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-foreground",
+                  )}
+                >
+                  {formatSignedCurrency(summary.totalSpent, homeCurrency)}
                 </span>
                 <span className="text-muted-foreground/60">/</span>
                 <span className="text-muted-foreground">

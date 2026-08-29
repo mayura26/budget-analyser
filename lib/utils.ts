@@ -13,6 +13,12 @@ export function formatCurrency(amount: number, currency = "AUD"): string {
   }).format(Math.abs(amount));
 }
 
+export function formatSignedCurrency(amount: number, currency = "AUD"): string {
+  return amount < -0.005
+    ? `-${formatCurrency(amount, currency)}`
+    : formatCurrency(amount, currency);
+}
+
 export function currencySymbol(currency: string): string {
   try {
     const parts = new Intl.NumberFormat("en", {

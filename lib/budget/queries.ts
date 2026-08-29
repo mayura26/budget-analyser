@@ -198,9 +198,9 @@ function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Net cash out of category: debits minus credits, clamped at zero. */
+/** Net cash out of category: debits minus credits, signed so refunds can exceed spend. */
 export function netOutflowFromSignedSum(signedSumConverted: number): number {
-  return Math.max(0, -signedSumConverted);
+  return -signedSumConverted;
 }
 
 export async function getActualIncomeForMonth(

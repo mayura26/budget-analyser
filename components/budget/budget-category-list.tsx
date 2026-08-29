@@ -28,6 +28,7 @@ import {
   cn,
   currencySymbol,
   formatCurrency,
+  formatSignedCurrency,
 } from "@/lib/utils";
 import type {
   AnalyticsBudgetTransactionLine,
@@ -416,15 +417,19 @@ function CategoryRow({
               {row.actualSpent < 0 ? "−" : ""}
               {formatCurrency(Math.abs(row.actualSpent), homeCurrency)}
             </span>
-          ) : row.actualSpent > 0 ? (
+          ) : Math.abs(row.actualSpent) > 0.005 ? (
             <span
               className={
                 row.categoryKind === "savings"
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-foreground"
+                  ? row.actualSpent < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-emerald-600 dark:text-emerald-400"
+                  : row.actualSpent < 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-foreground"
               }
             >
-              {formatCurrency(row.actualSpent, homeCurrency)}
+              {formatSignedCurrency(row.actualSpent, homeCurrency)}
             </span>
           ) : (
             <span className="text-muted-foreground">
@@ -784,8 +789,14 @@ export function BudgetCategoryList({
                     </span>
                   </button>
                   <div className="text-right text-sm tabular-nums whitespace-nowrap flex items-center justify-end gap-1.5">
-                    <span className="text-foreground">
-                      {formatCurrency(groupSpent, homeCurrency)}
+                    <span
+                      className={
+                        groupSpent < -0.005
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-foreground"
+                      }
+                    >
+                      {formatSignedCurrency(groupSpent, homeCurrency)}
                     </span>
                     <span className="text-muted-foreground/60">/</span>
                     <span className="text-muted-foreground">

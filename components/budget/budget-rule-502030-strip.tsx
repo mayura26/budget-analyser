@@ -7,7 +7,7 @@ import {
 } from "@/components/budget/budget-progress-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatSignedCurrency } from "@/lib/utils";
 import type { BudgetRule502030Band, BudgetSummary } from "@/types";
 
 const SCALE = 130;
@@ -158,7 +158,7 @@ function BandHorizontalBar({
       {/* numbers row — full strip only */}
       {size === "lg" && (
         <p className="text-xs tabular-nums text-muted-foreground mt-1">
-          {formatCurrency(band.actualTotal, homeCurrency)} actual &middot;{" "}
+          {formatSignedCurrency(band.actualTotal, homeCurrency)} actual &middot;{" "}
           {band.targetTotal > 0
             ? `${formatCurrency(band.targetTotal, homeCurrency)} budget · `
             : ""}

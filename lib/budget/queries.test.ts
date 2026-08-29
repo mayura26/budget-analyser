@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { test } from "node:test";
 import type { BudgetCategoryRow } from "@/types";
-import { buildBudgetSummary } from "./queries";
+import { buildBudgetSummary, netOutflowFromSignedSum } from "./queries";
 
 function budgetRow(
   overrides: Partial<BudgetCategoryRow> &
@@ -86,4 +86,31 @@ test("50/30/20 savings only includes unallocated surplus after close", () => {
   assert.equal(openSummary.rule502030.savings.actualTotal, 1000);
   assert.equal(closedSummary.implicitSurplusAsSavings, 5000);
   assert.equal(closedSummary.rule502030.savings.actualTotal, 6000);
+});
+
+test("net outflow stays signed when refunds exceed expense spend", () => {
+  assert.equal(netOutflowFromSignedSum(-125), 125);
+  assert.equal(netOutflowFromSignedSum(3791.56), -3791.56);
+});
+
+test("expense refunds can make budget spending negative", () => {
+  const summary = buildBudgetSummary(
+    [
+      budgetRow({
+        categoryId: 1,
+        categoryKind: "expense",
+        ruleBucket: "wants",
+        targetAmount: 500,
+        actualSpent: -3791.56,
+      }),
+    ],
+    "2026-09",
+    5000,
+    5000,
+    false,
+  );
+
+  assert.equal(summary.totalSpent, -3791.56);
+  assert.equal(summary.totalRemaining, 4291.56);
+  assert.equal(summary.rule502030.wants.actualTotal, -3791.56);
 });

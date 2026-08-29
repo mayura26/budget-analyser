@@ -133,6 +133,128 @@ type NearGuideSeed = {
   previousParentBudgetRuleBucket: string | null;
 };
 
+type ExpenseRefundSeed = {
+  month: string;
+  accountId: number;
+  categoryId: number;
+  categoryName: string;
+  transactionId: number;
+  budgetId: number;
+};
+
+function seedExpenseRefundBudgetRow(): ExpenseRefundSeed {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    sqlite
+      .prepare("DELETE FROM accounts WHERE name LIKE 'E2E Expense Refund %'")
+      .run();
+    sqlite
+      .prepare(
+        `DELETE FROM transactions
+         WHERE category_id IN (
+           SELECT id FROM categories WHERE name LIKE 'E2E Refund Offset %'
+         )`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `DELETE FROM budgets
+         WHERE category_id IN (
+           SELECT id FROM categories WHERE name LIKE 'E2E Refund Offset %'
+         )`,
+      )
+      .run();
+    sqlite
+      .prepare("DELETE FROM categories WHERE name LIKE 'E2E Refund Offset %'")
+      .run();
+
+    const parent = sqlite
+      .prepare(
+        `SELECT id
+         FROM categories
+         WHERE parent_id IS NULL
+           AND name = 'Special'
+         LIMIT 1`,
+      )
+      .get() as { id: number } | undefined;
+
+    if (!parent) {
+      throw new Error("Special expense group not found");
+    }
+
+    const categoryName = `E2E Refund Offset ${Date.now()}`;
+    const category = sqlite
+      .prepare(
+        `INSERT INTO categories
+           (name, color, icon, parent_id, type, is_system, created_at)
+         VALUES (?, '#fb923c', 'Plane', ?, 'expense', 0, unixepoch())`,
+      )
+      .run(categoryName, parent.id);
+    const categoryId = Number(category.lastInsertRowid);
+
+    const account = sqlite
+      .prepare(
+        `INSERT INTO accounts (name, currency, color, color_custom, created_at)
+         VALUES (?, 'AUD', '#14b8a6', 1, unixepoch())`,
+      )
+      .run(`E2E Expense Refund ${Date.now()}`);
+
+    const accountId = Number(account.lastInsertRowid);
+    const month = currentBudgetTestMonth();
+    const transaction = sqlite
+      .prepare(
+        `INSERT INTO transactions
+           (account_id, fingerprint, date, description, normalised, amount, category_id, category_source, category_confirmed, is_manual, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 3791.56, ?, 'manual', 1, 1, unixepoch(), unixepoch())`,
+      )
+      .run(
+        accountId,
+        `e2e-expense-refund-${accountId}`,
+        `${month}-02`,
+        "E2E travel refund",
+        "e2e travel refund",
+        categoryId,
+      );
+
+    const budget = sqlite
+      .prepare(
+        `INSERT INTO budgets
+           (month, category_id, target_amount, created_at, updated_at)
+         VALUES (?, ?, 500, unixepoch(), unixepoch())`,
+      )
+      .run(month, categoryId);
+
+    return {
+      month,
+      accountId,
+      categoryId,
+      categoryName,
+      transactionId: Number(transaction.lastInsertRowid),
+      budgetId: Number(budget.lastInsertRowid),
+    };
+  } finally {
+    sqlite.close();
+  }
+}
+
+function cleanupExpenseRefundBudgetRow(seed: ExpenseRefundSeed) {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    sqlite
+      .prepare("DELETE FROM transactions WHERE id = ?")
+      .run(seed.transactionId);
+    sqlite.prepare("DELETE FROM budgets WHERE id = ?").run(seed.budgetId);
+    sqlite.prepare("DELETE FROM categories WHERE id = ?").run(seed.categoryId);
+    sqlite.prepare("DELETE FROM accounts WHERE id = ?").run(seed.accountId);
+  } finally {
+    sqlite.close();
+  }
+}
+
 function seedNearGuideNeedsTarget(): NearGuideSeed {
   const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
   const sqlite = new Database(dbPath);
@@ -451,6 +573,28 @@ test.describe("Budget", () => {
       await expect(surplusRow).toContainText("$5,000.00");
     } finally {
       await deleteBudgetTestAccount(page, accountName);
+    }
+  });
+
+  test("expense refunds can make category spend negative", async ({ page }) => {
+    test.slow();
+    const seed = seedExpenseRefundBudgetRow();
+
+    try {
+      await page.goto(`/budget?month=${seed.month}`, { waitUntil: "commit" });
+
+      const refundRow = page
+        .getByTestId("budget-category-row")
+        .filter({ hasText: seed.categoryName })
+        .first();
+      await expect(refundRow).toBeVisible({ timeout: 10000 });
+      await expect(refundRow).toContainText("-$3,791.56");
+      await expect(refundRow).toContainText("$4,291.56");
+
+      const summary = page.getByTestId("summary-spending-progress");
+      await expect(summary).toContainText("-$3,791.56");
+    } finally {
+      cleanupExpenseRefundBudgetRow(seed);
     }
   });
 

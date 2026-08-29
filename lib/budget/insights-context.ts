@@ -1,5 +1,5 @@
 import type { SupportedCurrency } from "@/lib/currency/supported";
-import { formatCurrency } from "@/lib/utils";
+import { formatSignedCurrency } from "@/lib/utils";
 import type { BudgetCategoryRow } from "@/types";
 
 /** Aggregated per-parent-group data fed to the AI budget insights prompt. */
@@ -32,7 +32,7 @@ export function buildParentGroupLine(
     groupTarget > 0 ? Math.round((groupActual / groupTarget) * 100) : 0;
   const groupProjected = groupActual + schedRemaining;
   const bucket = rows[0]?.ruleBucket ?? null;
-  const money = (n: number) => formatCurrency(n, homeCurrency);
+  const money = (n: number) => formatSignedCurrency(n, homeCurrency);
 
   if (bucket === "savings") {
     // Inverse: ahead of plan is good, short of plan is the concern.
