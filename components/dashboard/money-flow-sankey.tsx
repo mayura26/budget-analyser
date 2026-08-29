@@ -407,6 +407,7 @@ export function MoneyFlowSankey({
             )}
 
             <rect
+              data-testid="flow-source-income"
               x={LEFT_X}
               y={TOP_PAD}
               width={BAR_W}
@@ -416,6 +417,7 @@ export function MoneyFlowSankey({
             />
             {overspent && (
               <rect
+                data-testid="flow-source-shortfall"
                 x={LEFT_X}
                 y={TOP_PAD + incomeH}
                 width={BAR_W}

@@ -361,6 +361,70 @@ test.describe("Dashboard", () => {
     }
   });
 
+  test("money flow nets refunds so the income source reaches the outflow stack", async ({
+    page,
+  }) => {
+    await page.request.delete("/api/test-cleanup?transactions=1");
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+    const seedRows = [
+      {
+        categoryName: "Activities (dining, events, hobbies)",
+        amount: -9000,
+        addIncome: true,
+      },
+      { categoryName: "Activities (dining, events, hobbies)", amount: 4000 },
+      {
+        categoryName: "Long-term savings (house, emergency fund)",
+        amount: -5500,
+      },
+    ];
+
+    try {
+      for (const [index, row] of seedRows.entries()) {
+        const seed = await page.request.post("/api/test-seed-transactions", {
+          data: {
+            accountName,
+            count: 1,
+            reset: index === 0,
+            seedMonth,
+            addIncome: row.addIncome === true,
+            categoryName: row.categoryName,
+            amount: row.amount,
+          },
+        });
+        expect(seed.ok()).toBeTruthy();
+      }
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const flow = page.getByTestId("money-flow");
+      await expect(flow).toBeVisible();
+      await expect(flow.getByText("Over $500.00")).toBeVisible();
+      await expect(flow.getByTestId("flow-node-wants")).toContainText(
+        "$5,000.00",
+      );
+      await expect(flow.getByTestId("flow-node-savings")).toContainText(
+        "$5,500.00",
+      );
+
+      const sourceGap = await flow.evaluate((node) => {
+        const source = node.querySelector(
+          '[data-testid="flow-source-shortfall"]',
+        );
+        const nodeBars = Array.from(node.querySelectorAll(".node-bar"));
+        const sourceBottom = source?.getBoundingClientRect().bottom ?? 0;
+        const outflowBottom = Math.max(
+          ...nodeBars.map((bar) => bar.getBoundingClientRect().bottom),
+        );
+        return outflowBottom - sourceBottom;
+      });
+      expect(sourceGap).toBeLessThanOrEqual(2);
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
+  });
+
   test("money flow buckets expand into category detail", async ({ page }) => {
     test.setTimeout(60_000);
     await page.request.delete("/api/test-cleanup?transactions=1");

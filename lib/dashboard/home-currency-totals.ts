@@ -305,10 +305,11 @@ export async function getDailyNeedsWantsForMonth(
 }
 
 /**
- * Full-month Needs / Wants expense totals in home currency (no "today" cutoff, unlike
- * {@link getDailyNeedsWantsForMonth}). Computed the same way as the expense total in
- * {@link getMonthlyTotalsInHomeCurrency}, so `expenses - needs - wants` is a consistent
- * "Other" (expenses with no 50/30/20 bucket) — used by the dashboard money-flow graphic.
+ * Full-month Needs / Wants net expense totals in home currency (no "today"
+ * cutoff, unlike {@link getDailyNeedsWantsForMonth}). Computed the same way as
+ * the expense total in {@link getMonthlyTotalsInHomeCurrency}, so refunds inside
+ * expense categories reduce the visible cash outflow and the Sankey reconciles
+ * with income/net.
  */
 export async function getRuleBucketTotalsForMonth(
   month: string,
@@ -358,8 +359,8 @@ export async function getRuleBucketTotalsForMonth(
     homeCurrency,
   );
 
-  let needs = 0;
-  let wants = 0;
+  let needsSigned = 0;
+  let wantsSigned = 0;
   for (const row of rows) {
     const cur = parseAccountCurrency(row.currency, homeCurrency);
     const v = convertToHome(db, row.amount, cur, homeCurrency, row.date);
@@ -367,13 +368,13 @@ export async function getRuleBucketTotalsForMonth(
     const catType = meta?.type ?? row.categoryType;
     const ruleBucket = meta?.ruleBucket ?? null;
     if (catType !== "expense") continue;
-    if (ruleBucket === "needs") needs += Math.max(0, -v);
-    else if (ruleBucket === "wants") wants += Math.max(0, -v);
+    if (ruleBucket === "needs") needsSigned += v;
+    else if (ruleBucket === "wants") wantsSigned += v;
   }
 
   return {
-    needs: Math.round(needs * 100) / 100,
-    wants: Math.round(wants * 100) / 100,
+    needs: Math.round(Math.max(0, -needsSigned) * 100) / 100,
+    wants: Math.round(Math.max(0, -wantsSigned) * 100) / 100,
   };
 }
 
@@ -386,7 +387,7 @@ function emptyMoneyFlowBreakdown(): MoneyFlowBreakdown {
   };
 }
 
-/** Category slices for the expandable dashboard money-flow graphic. */
+/** Net category slices for the expandable dashboard money-flow graphic. */
 export async function getMoneyFlowBreakdownForMonth(
   month: string,
   homeCurrency: SupportedCurrency,
@@ -437,29 +438,28 @@ export async function getMoneyFlowBreakdownForMonth(
       key: string;
       label: string;
       color: string;
-      value: number;
+      signed: number;
       count: number;
     }
   >();
 
-  function addSlice(
+  function addSignedSlice(
     bucket: MoneyFlowBreakdownBucket,
     key: string,
     label: string,
     color: string,
-    value: number,
+    signed: number,
   ) {
-    if (value <= 0) return;
     const mapKey = `${bucket}:${key}`;
     const existing = byBucketAndCategory.get(mapKey) ?? {
       bucket,
       key,
       label,
       color,
-      value: 0,
+      signed: 0,
       count: 0,
     };
-    existing.value += value;
+    existing.signed += signed;
     existing.count += 1;
     byBucketAndCategory.set(mapKey, existing);
   }
@@ -474,7 +474,7 @@ export async function getMoneyFlowBreakdownForMonth(
     const color = row.categoryColor;
 
     if (row.categoryType === "savings") {
-      addSlice("savings", key, label, color, -v);
+      addSignedSlice("savings", key, label, color, v);
       continue;
     }
 
@@ -483,17 +483,19 @@ export async function getMoneyFlowBreakdownForMonth(
     if (!isExpense) continue;
 
     if (ruleBucket === "needs" || ruleBucket === "wants") {
-      addSlice(ruleBucket, key, label, color, -v);
+      addSignedSlice(ruleBucket, key, label, color, v);
     } else {
-      addSlice("other", key, label, color, -v);
+      addSignedSlice("other", key, label, color, v);
     }
   }
 
   for (const slice of byBucketAndCategory.values()) {
+    const value = Math.round(Math.max(0, -slice.signed) * 100) / 100;
+    if (value <= 0) continue;
     buckets[slice.bucket].push({
       key: slice.key,
       label: slice.label,
-      value: Math.round(slice.value * 100) / 100,
+      value,
       color: slice.color,
       count: slice.count,
     });
