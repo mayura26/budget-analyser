@@ -50,6 +50,8 @@ const BAR_W = 10;
 const LEFT_X = 5;
 const RIGHT_LABEL_W = 100;
 const DETAIL_LABEL_W = 220;
+const NODE_HIT_W = 150;
+const NODE_HIT_H = 44;
 const TOP_PAD = 8;
 const BOT_PAD = 8;
 const NODE_GAP = 1.5;
@@ -58,6 +60,8 @@ const EXPANDED_ROW = 58;
 const DETAIL_ROW = 64;
 const COMPACT_MIN_PLOT_H = 110;
 const EXPANDED_MIN_PLOT_H = 360;
+const LABEL_TOP_INSET = 18;
+const LABEL_BOTTOM_INSET = 22;
 
 /** Cubic-bezier flow ribbon between a left slice and a right node. */
 function ribbonPath(
@@ -95,11 +99,22 @@ function detailSlices(
 function spreadLabels<T extends { labelYc: number }>(
   items: T[],
   minRow: number,
+  minY: number,
+  maxY: number,
 ) {
+  if (items.length === 0) return;
+
   let prev = -Infinity;
   for (const item of items) {
-    if (item.labelYc < prev + minRow) item.labelYc = prev + minRow;
+    item.labelYc = Math.max(item.labelYc, minY, prev + minRow);
     prev = item.labelYc;
+  }
+
+  let next = Infinity;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    item.labelYc = Math.min(item.labelYc, maxY, next - minRow);
+    next = item.labelYc;
   }
 }
 
@@ -234,7 +249,12 @@ export function MoneyFlowSankey({
       expandable: bucketBreakdown(n.key).length > 0,
     };
   });
-  spreadLabels(laidOut, hasActiveDetail ? EXPANDED_ROW : COMPACT_ROW);
+  spreadLabels(
+    laidOut,
+    hasActiveDetail ? EXPANDED_ROW : COMPACT_ROW,
+    TOP_PAD + LABEL_TOP_INSET,
+    TOP_PAD + plotH - LABEL_BOTTOM_INSET,
+  );
 
   const selectedNode = laidOut.find((n) => n.key === activeKey);
   const activeTotal = activeSlices.reduce((sum, s) => sum + s.value, 0);
@@ -273,7 +293,12 @@ export function MoneyFlowSankey({
       labelYc: rightY + h / 2,
     };
   });
-  spreadLabels(laidOutChildren, DETAIL_ROW);
+  spreadLabels(
+    laidOutChildren,
+    DETAIL_ROW,
+    childStartY + LABEL_TOP_INSET,
+    childStartY + childPlotH - LABEL_BOTTOM_INSET,
+  );
 
   function toggleNode(key: FlowKey) {
     if (key === "net" || bucketBreakdown(key).length === 0) return;
@@ -458,12 +483,17 @@ export function MoneyFlowSankey({
                   tabIndex={0}
                   aria-label={`${active ? "Collapse" : "Expand"} ${n.label} breakdown`}
                   aria-expanded={active}
-                  onPointerDown={(event) => {
-                    event.preventDefault();
-                    toggleNode(n.key);
-                  }}
+                  onClick={() => toggleNode(n.key)}
                   onKeyDown={(event) => handleNodeKeyDown(event, n.key)}
                 >
+                  <rect
+                    x={rightBarX - 5}
+                    y={n.labelYc - NODE_HIT_H / 2}
+                    width={NODE_HIT_W}
+                    height={NODE_HIT_H}
+                    rx={4}
+                    fill="transparent"
+                  />
                   {content}
                 </g>
               );

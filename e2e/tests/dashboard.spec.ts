@@ -362,24 +362,35 @@ test.describe("Dashboard", () => {
   });
 
   test("money flow buckets expand into category detail", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.request.delete("/api/test-cleanup?transactions=1");
     const now = new Date();
     const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const accountName = await createDashboardTestAccount(page);
+    const wantsCategories = [
+      { name: "Shopping (clothes, random purchases)", amount: -970 },
+      { name: "Activities (dining, events, hobbies)", amount: -595 },
+      { name: "Subscriptions (Netflix, apps, SaaS)", amount: -420 },
+      { name: "Holidays", amount: -385 },
+      { name: "Travel (flights, transport)", amount: -300 },
+      { name: "Accommodation", amount: -200 },
+    ];
 
     try {
-      const seed = await page.request.post("/api/test-seed-transactions", {
-        data: {
-          accountName,
-          count: 1,
-          reset: true,
-          seedMonth,
-          addIncome: true,
-          categoryName: "Activities (dining, events, hobbies)",
-          amount: -250,
-        },
-      });
-      expect(seed.ok()).toBeTruthy();
+      for (const [index, category] of wantsCategories.entries()) {
+        const seed = await page.request.post("/api/test-seed-transactions", {
+          data: {
+            accountName,
+            count: 1,
+            reset: index === 0,
+            seedMonth,
+            addIncome: index === 0,
+            categoryName: category.name,
+            amount: category.amount,
+          },
+        });
+        expect(seed.ok()).toBeTruthy();
+      }
 
       await page.goto(`/dashboard?month=${seedMonth}`);
       const flow = page.getByTestId("money-flow");
@@ -389,10 +400,8 @@ test.describe("Dashboard", () => {
         .locator('svg[role="img"]')
         .evaluate((node) => node.getBoundingClientRect().height);
 
-      await flow
-        .getByRole("button", { name: "Expand Wants breakdown" })
-        .click();
-      await expect(flow.getByTestId("flow-detail-panel-wants")).toBeVisible();
+      await flow.getByTestId("flow-node-wants").click();
+      await expect(flow.getByTestId("flow-detail-panel-wants")).toHaveCount(1);
       const expandedHeight = await flow
         .locator('svg[role="img"]')
         .evaluate((node) => node.getBoundingClientRect().height);
@@ -400,12 +409,29 @@ test.describe("Dashboard", () => {
       await expect(
         flow
           .locator("svg text")
-          .filter({ hasText: /Activities/ })
+          .filter({ hasText: /Shopping/ })
           .first(),
       ).toBeVisible();
       await expect(
-        flow.locator("svg text").filter({ hasText: "$250.00" }).first(),
+        flow.locator("svg text").filter({ hasText: "$970.00" }),
       ).toBeVisible();
+      const labelBounds = await flow
+        .locator('[data-testid^="flow-detail-wants-"] text')
+        .evaluateAll((nodes) => {
+          const svgRect = nodes[0]?.closest("svg")?.getBoundingClientRect();
+          return nodes.map((node) => {
+            const rect = node.getBoundingClientRect();
+            return {
+              clipped:
+                !svgRect ||
+                rect.top < svgRect.top ||
+                rect.bottom > svgRect.bottom ||
+                rect.left < svgRect.left ||
+                rect.right > svgRect.right,
+            };
+          });
+        });
+      expect(labelBounds.filter((label) => label.clipped)).toEqual([]);
 
       await flow
         .getByRole("button", { name: "Collapse Wants breakdown" })
