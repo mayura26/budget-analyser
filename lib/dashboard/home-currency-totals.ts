@@ -10,6 +10,8 @@ import type {
   Category,
   CategoryTotal,
   DailyNeedsWants,
+  MoneyFlowBreakdown,
+  MoneyFlowBreakdownBucket,
   MonthlyTotal,
 } from "@/types";
 
@@ -355,4 +357,138 @@ export async function getRuleBucketTotalsForMonth(
     needs: Math.round(needs * 100) / 100,
     wants: Math.round(wants * 100) / 100,
   };
+}
+
+function emptyMoneyFlowBreakdown(): MoneyFlowBreakdown {
+  return {
+    needs: [],
+    wants: [],
+    other: [],
+    savings: [],
+  };
+}
+
+/** Category slices for the expandable dashboard money-flow graphic. */
+export async function getMoneyFlowBreakdownForMonth(
+  month: string,
+  homeCurrency: SupportedCurrency,
+): Promise<MoneyFlowBreakdown> {
+  const allCats = db.select().from(categories).all() as Category[];
+  const mainById = new Map(
+    allCats.filter((c) => c.parentId === null).map((c) => [c.id, c]),
+  );
+  const catById = new Map(allCats.map((c) => [c.id, c]));
+
+  const { start, end } = getMonthRange(month);
+  const rows = db
+    .select({
+      amount: transactions.amount,
+      date: transactions.date,
+      currency: accounts.currency,
+      categoryId: transactions.categoryId,
+      categoryName: sql<string>`COALESCE(${categories.name}, 'Not processed')`,
+      categoryColor: sql<string>`COALESCE(${categories.color}, '#9ca3af')`,
+      categoryType: categories.type,
+    })
+    .from(transactions)
+    .innerJoin(accounts, eq(transactions.accountId, accounts.id))
+    .leftJoin(categories, eq(transactions.categoryId, categories.id))
+    .where(
+      and(
+        gte(transactions.date, start),
+        lte(transactions.date, end),
+        or(isNull(categories.type), ne(categories.type, "transfer")),
+      ),
+    )
+    .all();
+
+  await prefetchRatesToHome(
+    db,
+    rows.map((r) => ({
+      date: r.date,
+      from: parseAccountCurrency(r.currency, homeCurrency),
+    })),
+    homeCurrency,
+  );
+
+  const buckets = emptyMoneyFlowBreakdown();
+  const byBucketAndCategory = new Map<
+    string,
+    {
+      bucket: MoneyFlowBreakdownBucket;
+      key: string;
+      label: string;
+      color: string;
+      value: number;
+      count: number;
+    }
+  >();
+
+  function addSlice(
+    bucket: MoneyFlowBreakdownBucket,
+    key: string,
+    label: string,
+    color: string,
+    value: number,
+  ) {
+    if (value <= 0) return;
+    const mapKey = `${bucket}:${key}`;
+    const existing = byBucketAndCategory.get(mapKey) ?? {
+      bucket,
+      key,
+      label,
+      color,
+      value: 0,
+      count: 0,
+    };
+    existing.value += value;
+    existing.count += 1;
+    byBucketAndCategory.set(mapKey, existing);
+  }
+
+  for (const row of rows) {
+    const cur = parseAccountCurrency(row.currency, homeCurrency);
+    const v = convertToHome(db, row.amount, cur, homeCurrency, row.date);
+    const category =
+      row.categoryId != null ? catById.get(row.categoryId) : undefined;
+    const parentMain =
+      category?.parentId != null ? mainById.get(category.parentId) : undefined;
+    const ruleBucket =
+      category?.parentId == null ? null : ruleBucketForSubcategory(parentMain);
+    const key =
+      row.categoryId == null ? "uncategorised" : `cat-${row.categoryId}`;
+    const label = row.categoryName;
+    const color = row.categoryColor;
+
+    if (row.categoryType === "savings") {
+      addSlice("savings", key, label, color, -v);
+      continue;
+    }
+
+    const isExpense =
+      row.categoryType === "expense" || (row.categoryType == null && v < 0);
+    if (!isExpense) continue;
+
+    if (ruleBucket === "needs" || ruleBucket === "wants") {
+      addSlice(ruleBucket, key, label, color, -v);
+    } else {
+      addSlice("other", key, label, color, -v);
+    }
+  }
+
+  for (const slice of byBucketAndCategory.values()) {
+    buckets[slice.bucket].push({
+      key: slice.key,
+      label: slice.label,
+      value: Math.round(slice.value * 100) / 100,
+      color: slice.color,
+      count: slice.count,
+    });
+  }
+
+  for (const bucket of Object.keys(buckets) as MoneyFlowBreakdownBucket[]) {
+    buckets[bucket].sort((a, b) => b.value - a.value);
+  }
+
+  return buckets;
 }

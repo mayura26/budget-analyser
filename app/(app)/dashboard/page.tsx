@@ -26,6 +26,7 @@ import { getHomeCurrency } from "@/lib/currency/home";
 import {
   getCategoryBreakdownInHomeCurrency,
   getDailyNeedsWantsForMonth,
+  getMoneyFlowBreakdownForMonth,
   getMonthlyTotalsInHomeCurrency,
   getRuleBucketTotalsForMonth,
 } from "@/lib/dashboard/home-currency-totals";
@@ -275,6 +276,10 @@ export default async function DashboardPage({
   // "Other" = expenses with no 50/30/20 bucket.
   const { needs: monthNeeds, wants: monthWants } =
     await getRuleBucketTotalsForMonth(selectedMonth, homeCurrency);
+  const moneyFlowBreakdown = await getMoneyFlowBreakdownForMonth(
+    selectedMonth,
+    homeCurrency,
+  );
   const otherExpenses = Math.max(
     0,
     currentMonthData.expenses - monthNeeds - monthWants,
@@ -317,6 +322,7 @@ export default async function DashboardPage({
         savings={currentMonthData.savings}
         net={currentMonthData.net}
         homeCurrency={homeCurrency}
+        breakdown={moneyFlowBreakdown}
       />
 
       {/* Budget + 50/30/20 */}

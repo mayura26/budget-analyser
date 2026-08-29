@@ -361,6 +361,53 @@ test.describe("Dashboard", () => {
     }
   });
 
+  test("money flow buckets expand into category detail", async ({ page }) => {
+    await page.request.delete("/api/test-cleanup?transactions=1");
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+
+    try {
+      const seed = await page.request.post("/api/test-seed-transactions", {
+        data: {
+          accountName,
+          count: 1,
+          reset: true,
+          seedMonth,
+          addIncome: true,
+          categoryName: "Activities (dining, events, hobbies)",
+          amount: -250,
+        },
+      });
+      expect(seed.ok()).toBeTruthy();
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const flow = page.getByTestId("money-flow");
+      await expect(flow).toBeVisible();
+
+      await flow
+        .getByRole("button", { name: "Expand Wants breakdown" })
+        .click();
+      await expect(flow.getByTestId("flow-detail-panel-wants")).toBeVisible();
+      await expect(
+        flow
+          .locator("svg text")
+          .filter({ hasText: /Activities/ })
+          .first(),
+      ).toBeVisible();
+      await expect(
+        flow.locator("svg text").filter({ hasText: "$250.00" }).first(),
+      ).toBeVisible();
+
+      await flow
+        .getByRole("button", { name: "Collapse Wants breakdown" })
+        .press("Enter");
+      await expect(flow.getByTestId("flow-detail-panel-wants")).toHaveCount(0);
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
+  });
+
   test("money flow svg renders before container width is measured", async ({
     page,
   }) => {

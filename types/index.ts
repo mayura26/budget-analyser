@@ -347,6 +347,21 @@ export type CategoryTotal = {
   count: number;
 };
 
+export type MoneyFlowBreakdownBucket = "needs" | "wants" | "other" | "savings";
+
+export type MoneyFlowBreakdownSlice = {
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+  count: number;
+};
+
+export type MoneyFlowBreakdown = Record<
+  MoneyFlowBreakdownBucket,
+  MoneyFlowBreakdownSlice[]
+>;
+
 export type AccountCashflowRow = {
   accountId: number;
   accountName: string;
