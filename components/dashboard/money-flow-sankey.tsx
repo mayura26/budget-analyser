@@ -185,7 +185,17 @@ export function MoneyFlowSankey({
   const needsFlow = Math.max(needs, sliceTotal(breakdown?.needs));
   const wantsFlow = Math.max(wants, sliceTotal(breakdown?.wants));
   const otherFlow = Math.max(other, sliceTotal(breakdown?.other));
-  const savingsFlow = Math.max(savings, sliceTotal(breakdown?.savings));
+  const savingsRawFlow = Math.max(savings, sliceTotal(breakdown?.savings));
+  const sourceTotal = income + (overspent ? Math.abs(net) : 0);
+  const spendingFlow = needsFlow + wantsFlow + otherFlow;
+  const remainingAfterSpending = Math.max(0, sourceTotal - spendingFlow);
+  const savingsFlow = Math.min(
+    savingsRawFlow,
+    Math.max(0, remainingAfterSpending - (overspent ? 0 : Math.max(0, net))),
+  );
+  const netFlow = overspent
+    ? 0
+    : Math.max(0, sourceTotal - spendingFlow - savingsFlow);
 
   const baseUses: FlowNode[] = [
     { key: "needs", label: "Needs", value: needsFlow, color: COLORS.needs },
@@ -199,7 +209,14 @@ export function MoneyFlowSankey({
     },
     ...(overspent
       ? []
-      : [{ key: "net" as const, label: "Net", value: net, color: COLORS.net }]),
+      : [
+          {
+            key: "net" as const,
+            label: "Net",
+            value: netFlow,
+            color: COLORS.net,
+          },
+        ]),
   ];
   const uses = baseUses.filter((n) => n.value > 0);
 
@@ -359,7 +376,7 @@ export function MoneyFlowSankey({
             <style>{`
               .flow-ribbon{transition:fill-opacity .15s}
               .flow-ribbon:hover{fill-opacity:.55}
-              .flow-clickable{cursor:pointer}
+              .flow-clickable{cursor:pointer;outline:none}
               .flow-clickable:hover .node-bar{filter:brightness(1.04)}
               .flow-clickable:focus-visible .node-bar{stroke:var(--color-foreground);stroke-width:1.5}
             `}</style>
