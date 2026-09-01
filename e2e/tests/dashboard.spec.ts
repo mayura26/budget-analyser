@@ -350,12 +350,122 @@ test.describe("Dashboard", () => {
       await expect(flow).toBeVisible();
       // Income $1,000 → Savings $300 (30%) + Net $700 (70%).
       await expect(flow.getByText("$1,000.00")).toBeVisible();
+      const desktopLayout = await flow.evaluate((node) => {
+        const income = node
+          .querySelector('[data-testid="flow-source-income"]')
+          ?.getBoundingClientRect();
+        const savings = node
+          .querySelector('[data-testid="flow-node-savings"] .node-bar')
+          ?.getBoundingClientRect();
+        return {
+          incomeRight: income?.right ?? 0,
+          savingsLeft: savings?.left ?? 0,
+        };
+      });
+      expect(desktopLayout.incomeRight).toBeLessThanOrEqual(
+        desktopLayout.savingsLeft,
+      );
+      const chartSizing = await flow.evaluate((node) => {
+        const scroller = node.querySelector(".overflow-x-auto");
+        const svg = node.querySelector('svg[role="img"]');
+        return {
+          scrollerWidth: scroller?.getBoundingClientRect().width ?? 0,
+          svgWidth: svg?.getBoundingClientRect().width ?? 0,
+        };
+      });
+      expect(chartSizing.svgWidth).toBeGreaterThanOrEqual(
+        chartSizing.scrollerWidth - 2,
+      );
+      await expect(flow.getByTestId("flow-node-income")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await flow.getByTestId("flow-node-income").click();
+      await expect(flow.getByTestId("flow-detail-panel-income")).toHaveCount(1);
+      await expect(
+        flow
+          .locator('[data-testid^="flow-detail-income-"]')
+          .filter({ hasText: "$1,000.00" })
+          .first(),
+      ).toBeVisible();
+      const incomeExpansion = await flow.evaluate((node) => {
+        const source = node
+          .querySelector('[data-testid^="flow-detail-income-"] rect')
+          ?.getBoundingClientRect();
+        const income = node
+          .querySelector('[data-testid="flow-source-income"]')
+          ?.getBoundingClientRect();
+        return {
+          sourceRight: source?.right ?? 0,
+          incomeLeft: income?.left ?? 0,
+        };
+      });
+      expect(incomeExpansion.sourceRight).toBeLessThanOrEqual(
+        incomeExpansion.incomeLeft,
+      );
+
       const savings = page.getByTestId("flow-node-savings");
       await expect(savings.getByText("$300.00")).toBeVisible();
       await expect(savings.getByText(/Savings\b/)).toBeVisible();
       const net = page.getByTestId("flow-node-net");
       await expect(net.getByText("$700.00")).toBeVisible();
       await expect(net.getByText(/Net\b/)).toBeVisible();
+    } finally {
+      await deleteDashboardTestAccount(page, accountName);
+    }
+  });
+
+  test("money flow keeps income as the left input on mobile", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.request.delete("/api/test-cleanup?transactions=1");
+    const now = new Date();
+    const seedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const accountName = await createDashboardTestAccount(page);
+
+    try {
+      await addManualDashboardTransaction({
+        page,
+        accountName,
+        date: `${seedMonth}-01`,
+        description: "E2E mobile salary",
+        amount: "1000",
+        categoryText: /^Income/,
+      });
+      await addManualDashboardTransaction({
+        page,
+        accountName,
+        date: `${seedMonth}-02`,
+        description: "E2E mobile spending",
+        amount: "-250",
+        categoryText: "Activities",
+      });
+
+      await page.goto(`/dashboard?month=${seedMonth}`);
+      const flow = page.getByTestId("money-flow");
+      await expect(flow).toBeVisible();
+      const mobileLayout = await flow.evaluate((node) => {
+        const income = node
+          .querySelector('[data-testid="flow-source-income"]')
+          ?.getBoundingClientRect();
+        const wants = node
+          .querySelector('[data-testid="flow-node-wants"] .node-bar')
+          ?.getBoundingClientRect();
+        const scroller = node.querySelector(".overflow-x-auto");
+        return {
+          incomeRight: income?.right ?? 0,
+          wantsLeft: wants?.left ?? 0,
+          clientWidth: scroller?.clientWidth ?? 0,
+          scrollWidth: scroller?.scrollWidth ?? 0,
+        };
+      });
+      expect(mobileLayout.incomeRight).toBeLessThanOrEqual(
+        mobileLayout.wantsLeft,
+      );
+      expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(
+        mobileLayout.clientWidth + 1,
+      );
     } finally {
       await deleteDashboardTestAccount(page, accountName);
     }
@@ -588,7 +698,7 @@ test.describe("Dashboard", () => {
       const flow = page.getByTestId("money-flow");
       const graphic = flow.locator('svg[role="img"]');
       await expect(graphic).toBeVisible();
-      await expect(graphic).toHaveAttribute("width", "260");
+      await expect(graphic).toHaveAttribute("width", "420");
       await expect(flow.locator(".flow-ribbon")).toHaveCount(2);
     } finally {
       await deleteDashboardTestAccount(page, accountName);

@@ -35,6 +35,29 @@ export function BudgetSummaryStrip({
 
   const incomeVariance = summary.actualIncome - summary.expectedIncome;
   const incomeMatchesExpected = Math.abs(incomeVariance) < 0.01;
+  const incomeProgressPct =
+    summary.expectedIncome > 0
+      ? Math.max(
+          0,
+          Math.min((summary.actualIncome / summary.expectedIncome) * 100, 100),
+        )
+      : summary.actualIncome > 0
+        ? 100
+        : 0;
+  const incomeGapLabel = incomeMatchesExpected
+    ? "On expected"
+    : incomeVariance > 0
+      ? `+${formatCurrency(incomeVariance, homeCurrency)} over expected`
+      : summary.monthClosed
+        ? `${formatCurrency(Math.abs(incomeVariance), homeCurrency)} under expected`
+        : `${formatCurrency(Math.abs(incomeVariance), homeCurrency)} still expected`;
+  const incomeGapClass = incomeMatchesExpected
+    ? "text-muted-foreground"
+    : incomeVariance > 0
+      ? "text-emerald-600 dark:text-emerald-400"
+      : summary.monthClosed
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-sky-600 dark:text-sky-400";
 
   const spendStatus = getBudgetStatus(
     summary.totalSpent,
@@ -56,51 +79,55 @@ export function BudgetSummaryStrip({
       <Card className="lg:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 sm:p-6 sm:pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {summary.monthClosed ? "Income" : "Expected Income"}
+            Income
           </CardTitle>
           <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center">
             <ArrowUpCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
           </div>
         </CardHeader>
-        <CardContent className="px-3 pt-0 pb-3 sm:px-6 sm:pb-6 space-y-1">
-          {summary.monthClosed ? (
-            <>
-              <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
+        <CardContent
+          className="px-3 pt-0 pb-3 sm:px-6 sm:pb-6 space-y-3"
+          data-testid="summary-income-card"
+        >
+          <div
+            className="rounded-md border border-border/70 bg-muted/20 px-3 py-2"
+            data-testid="summary-income-actual"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-xs font-medium text-muted-foreground">
+                Actual received
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                 {formatCurrency(summary.actualIncome, homeCurrency)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Realised &middot; expected{" "}
-                {formatCurrency(summary.expectedIncome, homeCurrency)}
-              </p>
-              {incomeMatchesExpected ? (
-                <p className="text-xs text-muted-foreground">
-                  Matches scheduled income
-                </p>
-              ) : (
-                <p
-                  className={cn(
-                    "text-xs font-medium",
-                    incomeVariance > 0
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-amber-600 dark:text-amber-400",
-                  )}
-                >
-                  {incomeVariance > 0
-                    ? `+${formatCurrency(incomeVariance, homeCurrency)} over expected`
-                    : `${formatCurrency(Math.abs(incomeVariance), homeCurrency)} under expected`}
-                </p>
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
+                style={{ width: `${incomeProgressPct}%` }}
+              />
+            </div>
+            <p
+              className={cn(
+                "mt-1.5 text-xs font-medium tabular-nums",
+                incomeGapClass,
               )}
-            </>
-          ) : (
-            <>
-              <p className="text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
-                {formatCurrency(summary.expectedIncome, homeCurrency)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                From scheduled income
-              </p>
-            </>
-          )}
+            >
+              {incomeGapLabel}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">
+              Expected income
+            </p>
+            <p className="mt-0.5 text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
+              {formatCurrency(summary.expectedIncome, homeCurrency)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              From scheduled income
+            </p>
+          </div>
         </CardContent>
       </Card>
 

@@ -1,8 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { formatCurrency } from "@/lib/utils";
 import type {
@@ -22,10 +21,11 @@ const COLORS = {
   shortfall: "#ef4444",
 } as const;
 
-type FlowKey = MoneyFlowBreakdownBucket | "net";
+type OutputFlowKey = Exclude<MoneyFlowBreakdownBucket, "income"> | "net";
+type DetailFlowKey = MoneyFlowBreakdownBucket;
 
 type FlowNode = {
-  key: FlowKey;
+  key: OutputFlowKey;
   label: string;
   value: number;
   color: string;
@@ -48,17 +48,21 @@ type LaidOutSlice = MoneyFlowBreakdownSlice & {
 
 const BAR_W = 10;
 const LEFT_X = 5;
-const RIGHT_LABEL_W = 100;
+const RIGHT_LABEL_W = 112;
 const DETAIL_LABEL_W = 220;
+const SOURCE_LABEL_W = 146;
 const NODE_HIT_W = 150;
 const NODE_HIT_H = 44;
-const TOP_PAD = 8;
-const BOT_PAD = 8;
+const TOP_PAD = 10;
+const BOT_PAD = 10;
 const NODE_GAP = 1.5;
-const COMPACT_ROW = 30;
+const COMPACT_ROW = 38;
 const EXPANDED_ROW = 58;
 const DETAIL_ROW = 64;
-const COMPACT_MIN_PLOT_H = 110;
+const COMPACT_MIN_W = 320;
+const OUTPUT_EXPANDED_MIN_W = 860;
+const INCOME_EXPANDED_MIN_W = 720;
+const COMPACT_MIN_PLOT_H = 160;
 const EXPANDED_MIN_PLOT_H = 360;
 const LABEL_TOP_INSET = 18;
 const LABEL_BOTTOM_INSET = 22;
@@ -90,7 +94,7 @@ function pctOf(value: number, total: number): number {
 
 function detailSlices(
   slices: MoneyFlowBreakdownSlice[],
-  parent: FlowNode | undefined,
+  parent: { value: number } | undefined,
 ): MoneyFlowBreakdownSlice[] {
   if (!parent) return [];
   return slices.filter((s) => s.value > 0);
@@ -149,9 +153,7 @@ export function MoneyFlowSankey({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  const [activeKey, setActiveKey] = useState<MoneyFlowBreakdownBucket | null>(
-    null,
-  );
+  const [activeKey, setActiveKey] = useState<DetailFlowKey | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -220,27 +222,39 @@ export function MoneyFlowSankey({
   ];
   const uses = baseUses.filter((n) => n.value > 0);
 
-  const bucketBreakdown = (key: FlowKey): MoneyFlowBreakdownSlice[] =>
-    key === "net" ? [] : (breakdown?.[key] ?? []);
+  const detailBreakdown = (key: DetailFlowKey): MoneyFlowBreakdownSlice[] =>
+    breakdown?.[key] ?? [];
 
-  const activeParent = uses.find((n) => n.key === activeKey);
   const activeSlices = detailSlices(
-    activeKey ? (breakdown?.[activeKey] ?? []) : [],
-    activeParent,
+    activeKey ? detailBreakdown(activeKey) : [],
+    activeKey ? { value: 1 } : undefined,
   );
-  const hasActiveDetail = Boolean(activeParent && activeSlices.length > 0);
+  const hasActiveDetail = Boolean(activeKey && activeSlices.length > 0);
+  const hasIncomeDetail = hasActiveDetail && activeKey === "income";
+  const hasOutputDetail = hasActiveDetail && activeKey !== "income";
   const total = uses.reduce((sum, n) => sum + n.value, 0) || income;
 
-  const W = Math.max(width, hasActiveDetail ? 760 : 260);
-  const ribbonL = LEFT_X + BAR_W;
-  const rightBarX = hasActiveDetail
+  const W = Math.max(
+    width,
+    hasIncomeDetail
+      ? INCOME_EXPANDED_MIN_W
+      : hasOutputDetail
+        ? OUTPUT_EXPANDED_MIN_W
+        : COMPACT_MIN_W,
+  );
+  const incomeBarX = hasIncomeDetail
+    ? Math.max(SOURCE_LABEL_W + BAR_W + 90, Math.round(W * 0.39))
+    : LEFT_X;
+  const sourceBarX = SOURCE_LABEL_W;
+  const ribbonL = incomeBarX + BAR_W;
+  const rightBarX = hasOutputDetail
     ? Math.min(Math.max(118, Math.round(W * 0.12)), W - DETAIL_LABEL_W - 360)
     : W - RIGHT_LABEL_W - BAR_W;
   const detailBarX = W - DETAIL_LABEL_W - BAR_W;
-  const detailPlotH = hasActiveDetail
+  const detailPlotH = hasOutputDetail
     ? Math.max(activeSlices.length * DETAIL_ROW, EXPANDED_MIN_PLOT_H)
     : 0;
-  const plotH = hasActiveDetail
+  const plotH = hasOutputDetail
     ? Math.max(uses.length * EXPANDED_ROW, detailPlotH, EXPANDED_MIN_PLOT_H)
     : Math.max(uses.length * COMPACT_ROW, COMPACT_MIN_PLOT_H);
   const H = plotH + TOP_PAD + BOT_PAD;
@@ -263,33 +277,50 @@ export function MoneyFlowSankey({
       rightY,
       leftY,
       labelYc: rightY + h / 2,
-      expandable: bucketBreakdown(n.key).length > 0,
+      expandable: n.key !== "net" && detailBreakdown(n.key).length > 0,
     };
   });
   spreadLabels(
     laidOut,
-    hasActiveDetail ? EXPANDED_ROW : COMPACT_ROW,
+    hasOutputDetail ? EXPANDED_ROW : COMPACT_ROW,
     TOP_PAD + LABEL_TOP_INSET,
     TOP_PAD + plotH - LABEL_BOTTOM_INSET,
   );
 
-  const selectedNode = laidOut.find((n) => n.key === activeKey);
+  const selectedNode =
+    activeKey === "income" ? null : laidOut.find((n) => n.key === activeKey);
+  const activeParent =
+    activeKey === "income"
+      ? {
+          key: "income" as const,
+          label: "Income",
+          value: income,
+          color: COLORS.income,
+          h: incomeH,
+          labelYc: TOP_PAD + incomeH / 2,
+        }
+      : selectedNode;
   const activeTotal = activeSlices.reduce((sum, s) => sum + s.value, 0);
-  const childPlotH = hasActiveDetail
+  const childPlotH = hasOutputDetail
     ? Math.max(
         activeSlices.length * DETAIL_ROW,
-        Math.min(plotH, (selectedNode?.h ?? 0) * 1.6),
+        Math.min(plotH, (activeParent?.h ?? 0) * 1.6),
       )
-    : 0;
+    : hasIncomeDetail
+      ? incomeH
+      : 0;
   const childStartY =
-    hasActiveDetail && selectedNode
+    hasOutputDetail && activeParent
       ? Math.min(
-          Math.max(TOP_PAD, selectedNode.labelYc - childPlotH / 2),
+          Math.max(TOP_PAD, activeParent.labelYc - childPlotH / 2),
           TOP_PAD + plotH - childPlotH,
         )
-      : TOP_PAD;
-  const childScale =
-    activeTotal > 0
+      : hasIncomeDetail
+        ? TOP_PAD
+        : TOP_PAD;
+  const childScale = hasIncomeDetail
+    ? scale
+    : activeTotal > 0
       ? (childPlotH - NODE_GAP * Math.max(activeSlices.length - 1, 0)) /
         activeTotal
       : 0;
@@ -312,17 +343,22 @@ export function MoneyFlowSankey({
   });
   spreadLabels(
     laidOutChildren,
-    DETAIL_ROW,
+    hasIncomeDetail ? COMPACT_ROW : DETAIL_ROW,
     childStartY + LABEL_TOP_INSET,
     childStartY + childPlotH - LABEL_BOTTOM_INSET,
   );
 
-  function toggleNode(key: FlowKey) {
-    if (key === "net" || bucketBreakdown(key).length === 0) return;
+  const incomeExpandable = detailBreakdown("income").length > 0;
+
+  function toggleNode(key: DetailFlowKey) {
+    if (detailBreakdown(key).length === 0) return;
     setActiveKey((current) => (current === key ? null : key));
   }
 
-  function handleNodeKeyDown(event: KeyboardEvent<SVGGElement>, key: FlowKey) {
+  function handleNodeKeyDown(
+    event: KeyboardEvent<SVGGElement>,
+    key: DetailFlowKey,
+  ) {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     toggleNode(key);
@@ -330,46 +366,14 @@ export function MoneyFlowSankey({
 
   return (
     <Card data-testid="money-flow">
-      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 p-4 pb-2">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-xs text-muted-foreground">Income</span>
-          <span
-            className="text-sm font-bold tabular-nums"
-            style={{ color: COLORS.income }}
-          >
-            {formatCurrency(income, homeCurrency)}
-          </span>
-          {activeParent && (
-            <span className="text-[11px] font-semibold text-muted-foreground">
-              {activeParent.label} breakdown
-            </span>
-          )}
-          {overspent && (
-            <span
-              className="text-[11px] font-semibold tabular-nums"
-              style={{ color: COLORS.shortfall }}
-            >
-              Over {formatCurrency(Math.abs(net), homeCurrency)}
-            </span>
-          )}
-        </div>
-        {activeParent && (
-          <button
-            type="button"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Collapse money flow breakdown"
-            onClick={() => setActiveKey(null)}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        )}
-      </CardHeader>
-      <CardContent className="px-4 pb-3 pt-0">
+      <CardContent className="p-4">
         <div ref={containerRef} className="w-full overflow-x-auto">
           <svg
             width={W}
             height={H}
             viewBox={`0 0 ${W} ${H}`}
+            className="block w-full"
+            style={{ minWidth: W }}
             role="img"
             aria-label="Money flow from income to spending, savings and net"
           >
@@ -399,16 +403,16 @@ export function MoneyFlowSankey({
               );
             })}
 
-            {selectedNode && hasActiveDetail && (
-              <g data-testid={`flow-detail-panel-${selectedNode.key}`}>
+            {activeParent && hasActiveDetail && (
+              <g data-testid={`flow-detail-panel-${activeParent.key}`}>
                 {laidOutChildren.map((child) => (
                   <path
                     key={`detail-ribbon-${child.key}`}
                     className="flow-ribbon"
                     d={ribbonPath(
-                      rightBarX + BAR_W,
+                      hasIncomeDetail ? sourceBarX + BAR_W : rightBarX + BAR_W,
                       child.leftY,
-                      detailBarX,
+                      hasIncomeDetail ? incomeBarX : detailBarX,
                       child.rightY,
                       child.h,
                     )}
@@ -416,26 +420,103 @@ export function MoneyFlowSankey({
                     fillOpacity={0.28}
                   >
                     <title>
-                      {`${child.label}: ${formatCurrency(child.value, homeCurrency)} (${pctOf(child.value, selectedNode.value)}% of ${selectedNode.label})`}
+                      {`${child.label}: ${formatCurrency(child.value, homeCurrency)} (${pctOf(child.value, activeParent.value)}% of ${activeParent.label})`}
                     </title>
                   </path>
                 ))}
               </g>
             )}
 
-            <rect
-              data-testid="flow-source-income"
-              x={LEFT_X}
-              y={TOP_PAD}
-              width={BAR_W}
-              height={incomeH}
-              rx={2}
-              fill={COLORS.income}
-            />
+            {incomeExpandable ? (
+              // biome-ignore lint/a11y/useSemanticElements: SVG nodes are the interactive chart target; an HTML button cannot wrap this geometry.
+              <g
+                data-testid="flow-node-income"
+                className="flow-clickable"
+                role="button"
+                tabIndex={0}
+                aria-label={`${activeKey === "income" ? "Collapse" : "Expand"} Income breakdown`}
+                aria-expanded={activeKey === "income"}
+                onClick={() => toggleNode("income")}
+                onKeyDown={(event) => handleNodeKeyDown(event, "income")}
+              >
+                <rect
+                  x={Math.max(0, incomeBarX - 4)}
+                  y={TOP_PAD}
+                  width={Math.max(120, W - incomeBarX - rightBarX + 90)}
+                  height={Math.max(incomeH, NODE_HIT_H)}
+                  rx={4}
+                  fill="transparent"
+                />
+                <rect
+                  className="node-bar"
+                  data-testid="flow-source-income"
+                  x={incomeBarX}
+                  y={TOP_PAD}
+                  width={BAR_W}
+                  height={incomeH}
+                  rx={2}
+                  fill={COLORS.income}
+                  stroke={
+                    activeKey === "income"
+                      ? "var(--color-foreground)"
+                      : "transparent"
+                  }
+                  strokeWidth={activeKey === "income" ? 1.5 : 0}
+                />
+                <text
+                  x={incomeBarX + BAR_W + 6}
+                  y={TOP_PAD + 14}
+                  fontSize={11}
+                  fontWeight={700}
+                  fill="var(--color-foreground)"
+                >
+                  Income
+                </text>
+                <text
+                  x={incomeBarX + BAR_W + 6}
+                  y={TOP_PAD + 27}
+                  fontSize={11}
+                  fontWeight={700}
+                  fill={COLORS.income}
+                >
+                  {formatCurrency(income, homeCurrency)}
+                </text>
+              </g>
+            ) : (
+              <g data-testid="flow-node-income">
+                <rect
+                  data-testid="flow-source-income"
+                  x={incomeBarX}
+                  y={TOP_PAD}
+                  width={BAR_W}
+                  height={incomeH}
+                  rx={2}
+                  fill={COLORS.income}
+                />
+                <text
+                  x={incomeBarX + BAR_W + 6}
+                  y={TOP_PAD + 14}
+                  fontSize={11}
+                  fontWeight={700}
+                  fill="var(--color-foreground)"
+                >
+                  Income
+                </text>
+                <text
+                  x={incomeBarX + BAR_W + 6}
+                  y={TOP_PAD + 27}
+                  fontSize={11}
+                  fontWeight={700}
+                  fill={COLORS.income}
+                >
+                  {formatCurrency(income, homeCurrency)}
+                </text>
+              </g>
+            )}
             {overspent && (
               <rect
                 data-testid="flow-source-shortfall"
-                x={LEFT_X}
+                x={incomeBarX}
                 y={TOP_PAD + incomeH}
                 width={BAR_W}
                 height={shortfallH}
@@ -484,13 +565,15 @@ export function MoneyFlowSankey({
                 </>
               );
 
-              if (!n.expandable) {
+              if (n.key === "net" || !n.expandable) {
                 return (
                   <g key={n.key} data-testid={`flow-node-${n.key}`}>
                     {content}
                   </g>
                 );
               }
+
+              const detailKey: DetailFlowKey = n.key;
 
               return (
                 // biome-ignore lint/a11y/useSemanticElements: SVG nodes are the interactive chart target; an HTML button cannot wrap this geometry.
@@ -502,8 +585,8 @@ export function MoneyFlowSankey({
                   tabIndex={0}
                   aria-label={`${active ? "Collapse" : "Expand"} ${n.label} breakdown`}
                   aria-expanded={active}
-                  onClick={() => toggleNode(n.key)}
-                  onKeyDown={(event) => handleNodeKeyDown(event, n.key)}
+                  onClick={() => toggleNode(detailKey)}
+                  onKeyDown={(event) => handleNodeKeyDown(event, detailKey)}
                 >
                   <rect
                     x={rightBarX - 5}
@@ -518,15 +601,15 @@ export function MoneyFlowSankey({
               );
             })}
 
-            {selectedNode &&
+            {activeParent &&
               hasActiveDetail &&
               laidOutChildren.map((child) => (
                 <g
                   key={child.key}
-                  data-testid={`flow-detail-${selectedNode.key}-${child.key}`}
+                  data-testid={`flow-detail-${activeParent.key}-${child.key}`}
                 >
                   <rect
-                    x={detailBarX}
+                    x={hasIncomeDetail ? sourceBarX : detailBarX}
                     y={child.rightY}
                     width={BAR_W}
                     height={Math.max(child.h, 2)}
@@ -534,25 +617,31 @@ export function MoneyFlowSankey({
                     fill={child.color}
                   />
                   <text
-                    x={detailBarX + BAR_W + 5}
+                    x={
+                      hasIncomeDetail ? sourceBarX - 6 : detailBarX + BAR_W + 5
+                    }
                     y={child.labelYc - 2}
                     fontSize={11}
                     fontWeight={700}
+                    textAnchor={hasIncomeDetail ? "end" : undefined}
                     fill="var(--color-foreground)"
                   >
-                    {shortLabel(child.label, 22)}
+                    {shortLabel(child.label, hasIncomeDetail ? 18 : 22)}
                   </text>
                   <text
-                    x={detailBarX + BAR_W + 5}
+                    x={
+                      hasIncomeDetail ? sourceBarX - 6 : detailBarX + BAR_W + 5
+                    }
                     y={child.labelYc + 10}
                     fontSize={11}
+                    textAnchor={hasIncomeDetail ? "end" : undefined}
                   >
                     <tspan fontWeight={700} fill={child.color}>
                       {formatCurrency(child.value, homeCurrency)}
                     </tspan>
                     <tspan fill="var(--color-muted-foreground)">
                       {" "}
-                      &middot; {pctOf(child.value, selectedNode.value)}%
+                      &middot; {pctOf(child.value, activeParent.value)}%
                     </tspan>
                   </text>
                 </g>

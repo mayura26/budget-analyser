@@ -347,7 +347,12 @@ export type CategoryTotal = {
   count: number;
 };
 
-export type MoneyFlowBreakdownBucket = "needs" | "wants" | "other" | "savings";
+export type MoneyFlowBreakdownBucket =
+  | "income"
+  | "needs"
+  | "wants"
+  | "other"
+  | "savings";
 
 export type MoneyFlowBreakdownSlice = {
   key: string;

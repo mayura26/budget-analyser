@@ -155,6 +155,15 @@ type NegativeSurplusTargetSeed = {
   previousBudgets: BudgetSnapshotRow[];
 };
 
+type IncomeComparisonSeed = {
+  month: string;
+  accountId: number;
+  transactionId: number;
+  scheduleId: number;
+  budgetId: number;
+  previousBudgets: BudgetSnapshotRow[];
+};
+
 type ExpenseRefundSeed = {
   month: string;
   accountId: number;
@@ -346,6 +355,138 @@ function cleanupNegativeSurplusTarget(seed: NegativeSurplusTargetSeed) {
   const sqlite = new Database(dbPath);
 
   try {
+    sqlite
+      .prepare("DELETE FROM scheduled_transactions WHERE id = ?")
+      .run(seed.scheduleId);
+    sqlite.prepare("DELETE FROM budgets WHERE month = ?").run(seed.month);
+
+    const restore = sqlite.prepare(
+      `INSERT INTO budgets
+         (id, month, category_id, target_amount, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    for (const row of seed.previousBudgets) {
+      restore.run(
+        row.id,
+        row.month,
+        row.categoryId,
+        row.targetAmount,
+        row.createdAt,
+        row.updatedAt,
+      );
+    }
+  } finally {
+    sqlite.close();
+  }
+}
+
+function seedIncomeComparisonSummary(): IncomeComparisonSeed {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    const month = nextBudgetTestMonth();
+    const previousBudgets = sqlite
+      .prepare(
+        `SELECT
+           id,
+           month,
+           category_id AS categoryId,
+           target_amount AS targetAmount,
+           created_at AS createdAt,
+           updated_at AS updatedAt
+         FROM budgets
+         WHERE month = ?`,
+      )
+      .all(month) as BudgetSnapshotRow[];
+
+    sqlite.prepare("DELETE FROM budgets WHERE month = ?").run(month);
+
+    const expenseCategory = sqlite
+      .prepare(
+        `SELECT id
+         FROM categories
+         WHERE parent_id IS NOT NULL
+           AND type = 'expense'
+         ORDER BY id
+         LIMIT 1`,
+      )
+      .get() as { id: number } | undefined;
+    const incomeCategory = sqlite
+      .prepare(
+        `SELECT id
+         FROM categories
+         WHERE type = 'income'
+         ORDER BY id
+         LIMIT 1`,
+      )
+      .get() as { id: number } | undefined;
+
+    if (!expenseCategory || !incomeCategory) {
+      throw new Error("Required categories not found for income summary test");
+    }
+
+    const account = sqlite
+      .prepare(
+        `INSERT INTO accounts (name, currency, color, color_custom, created_at)
+         VALUES (?, 'AUD', '#14b8a6', 1, unixepoch())`,
+      )
+      .run(`E2E Income Summary ${Date.now()}`);
+    const accountId = Number(account.lastInsertRowid);
+
+    const schedule = sqlite
+      .prepare(
+        `INSERT INTO scheduled_transactions
+           (name, amount, frequency, start_date, is_active, created_at, updated_at)
+         VALUES (?, 1000, 'monthly', ?, 1, unixepoch(), unixepoch())`,
+      )
+      .run(`E2E expected income ${Date.now()}`, `${month}-01`);
+
+    const transaction = sqlite
+      .prepare(
+        `INSERT INTO transactions
+           (account_id, fingerprint, date, description, normalised, amount, category_id, category_source, category_confirmed, is_manual, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 650, ?, 'manual', 1, 1, unixepoch(), unixepoch())`,
+      )
+      .run(
+        accountId,
+        `e2e-income-summary-${accountId}`,
+        `${month}-02`,
+        "E2E partial salary",
+        "e2e partial salary",
+        incomeCategory.id,
+      );
+
+    const budget = sqlite
+      .prepare(
+        `INSERT INTO budgets
+           (month, category_id, target_amount, created_at, updated_at)
+         VALUES (?, ?, 500, unixepoch(), unixepoch())`,
+      )
+      .run(month, expenseCategory.id);
+
+    return {
+      month,
+      accountId,
+      transactionId: Number(transaction.lastInsertRowid),
+      scheduleId: Number(schedule.lastInsertRowid),
+      budgetId: Number(budget.lastInsertRowid),
+      previousBudgets,
+    };
+  } finally {
+    sqlite.close();
+  }
+}
+
+function cleanupIncomeComparisonSummary(seed: IncomeComparisonSeed) {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    sqlite
+      .prepare("DELETE FROM transactions WHERE id = ?")
+      .run(seed.transactionId);
+    sqlite.prepare("DELETE FROM accounts WHERE id = ?").run(seed.accountId);
     sqlite
       .prepare("DELETE FROM scheduled_transactions WHERE id = ?")
       .run(seed.scheduleId);
@@ -730,6 +871,27 @@ test.describe("Budget", () => {
     }
   });
 
+  test("income summary shows actual, expected, and remaining income", async ({
+    page,
+  }) => {
+    const seed = seedIncomeComparisonSummary();
+
+    try {
+      await page.goto(`/budget?month=${seed.month}`);
+      const incomeCard = page.getByTestId("summary-income-card");
+      await expect(incomeCard).toBeVisible({ timeout: 10000 });
+      await expect(incomeCard.getByText("Actual received")).toBeVisible();
+      await expect(incomeCard.getByText("$650.00")).toBeVisible();
+      await expect(incomeCard.getByText("Expected income")).toBeVisible();
+      await expect(incomeCard.getByText("$1,000.00")).toBeVisible();
+      await expect(
+        incomeCard.getByText("$350.00 still expected"),
+      ).toBeVisible();
+    } finally {
+      cleanupIncomeComparisonSummary(seed);
+    }
+  });
+
   test("closed past month shows realised vs scheduled income when budget exists", async ({
     page,
   }) => {
@@ -755,7 +917,9 @@ test.describe("Budget", () => {
       timeout: 8000,
     });
 
-    await expect(page.getByText(/Realised .*expected/)).toBeVisible();
+    const incomeCard = page.getByTestId("summary-income-card");
+    await expect(incomeCard.getByText("Actual received")).toBeVisible();
+    await expect(incomeCard.getByText("Expected income")).toBeVisible();
   });
 
   test("closed month unlocks review page with quick and deep formats", async ({

@@ -380,6 +380,7 @@ export async function getRuleBucketTotalsForMonth(
 
 function emptyMoneyFlowBreakdown(): MoneyFlowBreakdown {
   return {
+    income: [],
     needs: [],
     wants: [],
     other: [],
@@ -473,6 +474,11 @@ export async function getMoneyFlowBreakdownForMonth(
     const label = row.categoryName;
     const color = row.categoryColor;
 
+    if (row.categoryType === "income" || (row.categoryType == null && v > 0)) {
+      addSignedSlice("income", key, label, color, v);
+      continue;
+    }
+
     if (row.categoryType === "savings") {
       addSignedSlice("savings", key, label, color, v);
       continue;
@@ -490,7 +496,11 @@ export async function getMoneyFlowBreakdownForMonth(
   }
 
   for (const slice of byBucketAndCategory.values()) {
-    const value = Math.round(Math.max(0, -slice.signed) * 100) / 100;
+    const rawValue =
+      slice.bucket === "income"
+        ? Math.max(0, slice.signed)
+        : Math.max(0, -slice.signed);
+    const value = Math.round(rawValue * 100) / 100;
     if (value <= 0) continue;
     buckets[slice.bucket].push({
       key: slice.key,
