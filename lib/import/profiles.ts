@@ -88,6 +88,20 @@ export const BUILT_IN_PROFILES: BankProfileTemplate[] = [
     isSystem: true,
   },
   {
+    name: "ING",
+    dateColumn: "Date",
+    descriptionColumn: "Description",
+    amountColumn: null,
+    debitColumn: "Debit",
+    creditColumn: "Credit",
+    dateFormat: "DD/MM/YYYY",
+    skipRows: 0,
+    delimiter: ",",
+    negativeIsDebit: true,
+    extraMappings: null,
+    isSystem: true,
+  },
+  {
     name: "Coles",
     dateColumn: "Date",
     descriptionColumn: "Transaction Details",
@@ -217,7 +231,15 @@ export function detectBankProfile(
     const descMatch = lowerHeaders.includes(
       profile.descriptionColumn.toLowerCase(),
     );
-    if (dateMatch && descMatch) {
+    const amountMatch = profile.amountColumn
+      ? lowerHeaders.includes(profile.amountColumn.toLowerCase())
+      : Boolean(
+          profile.debitColumn &&
+            profile.creditColumn &&
+            lowerHeaders.includes(profile.debitColumn.toLowerCase()) &&
+            lowerHeaders.includes(profile.creditColumn.toLowerCase()),
+        );
+    if (dateMatch && descMatch && amountMatch) {
       return profile;
     }
   }

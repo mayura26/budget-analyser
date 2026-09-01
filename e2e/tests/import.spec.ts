@@ -17,6 +17,7 @@ const commbank105Csv = path.join(__dirname, "../fixtures/commbank-105.csv");
 const wiseCsv = path.join(__dirname, "../fixtures/wise.csv");
 const amexCsv = path.join(__dirname, "../fixtures/amex.csv");
 const kiwiBankCsv = path.join(__dirname, "../fixtures/kiwi-bank.csv");
+const ingCsv = path.join(__dirname, "../fixtures/ing.csv");
 
 function namedCsvUpload(filePath: string, name: string) {
   return {
@@ -53,6 +54,7 @@ test.describe("Import", () => {
     const page = await context.newPage();
     await createImportAccountIfMissing(page, "Import Test Account", "CommBank");
     await createImportAccountIfMissing(page, "Import Amex Account", "Amex");
+    await createImportAccountIfMissing(page, "Import ING Account", "ING");
     await context.close();
   });
 
@@ -569,6 +571,56 @@ test.describe("Import", () => {
     await page.getByRole("button", { name: "Preview import" }).click();
 
     await expect(page.getByText("3 new")).toBeVisible();
+    await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
+  });
+
+  test("ING CSV shows preview with split debit and credit columns", async ({
+    page,
+  }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import ING Account" }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "ING" }).click();
+    await page.locator("#csv-file").setInputFiles(ingCsv);
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.getByText("2 new")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(2);
+    const incomingRow = page
+      .locator("tbody tr")
+      .filter({ hasText: "E2E ING incoming transfer" });
+    const debitRow = page
+      .locator("tbody tr")
+      .filter({ hasText: "E2E ING cafe purchase" });
+    await expect(incomingRow.locator("td").nth(3)).toHaveClass(
+      /text-green-600/,
+    );
+    await expect(debitRow.locator("td").nth(3)).toHaveClass(/text-red-600/);
+  });
+
+  test("ING CSV auto-detects by headers when filename looks like Coles", async ({
+    page,
+  }) => {
+    await page.goto("/import");
+
+    await page.getByRole("combobox").nth(0).click();
+    await page.getByRole("option", { name: "Import Test Account" }).click();
+
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "CommBank" }).click();
+
+    await page
+      .locator("#csv-file")
+      .setInputFiles(namedCsvUpload(ingCsv, "Transactions (25).csv"));
+    await expect(page.getByRole("combobox").nth(1)).toContainText("ING");
+    await expect(page.getByTestId("filename-profile-match")).toContainText(
+      "Header match: ING",
+    );
+    await page.getByRole("button", { name: "Preview import" }).click();
+
+    await expect(page.locator("tbody tr")).toHaveCount(2);
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 

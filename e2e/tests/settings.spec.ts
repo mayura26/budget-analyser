@@ -60,7 +60,7 @@ test.describe("Settings", () => {
 
   test("bank profiles section renders built-in profiles", async ({ page }) => {
     await page.goto("/settings");
-    for (const name of ["CommBank", "Monzo", "Coles", "Kiwi Bank"]) {
+    for (const name of ["CommBank", "Monzo", "ING", "Coles", "Kiwi Bank"]) {
       await expect(page.getByText(name, { exact: true })).toBeVisible();
     }
     await expect(page.getByText("built-in").first()).toBeVisible();

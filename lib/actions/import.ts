@@ -89,6 +89,19 @@ const PreviewSchema = z.object({
 
 const PREVIEW_TABLE_ROW_LIMIT = 100;
 
+function csvHeaders(csvContent: string): string[] {
+  const firstNonEmptyLine =
+    csvContent
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)[0] ?? "";
+
+  if (!firstNonEmptyLine) return [];
+
+  const delimiter = detectDelimiter(csvContent);
+  return firstNonEmptyLine.split(delimiter).map((header) => header.trim());
+}
+
 type BuiltImportPreview = {
   accountId: number;
   filename: string;
@@ -151,12 +164,25 @@ async function buildImportPreview(
       .get();
     if (!profile) return { success: false, error: "Bank profile not found" };
 
+    const headerDetected = detectBankProfile(csvHeaders(csvContent));
+    const headerProfile = headerDetected
+      ? db
+          .select()
+          .from(bankProfiles)
+          .where(eq(bankProfiles.name, headerDetected.name))
+          .get()
+      : null;
     const filenameProfile = db
       .select()
       .from(bankProfiles)
       .all()
       .find((candidate) => bankProfileMatchesFilename(candidate, filename));
-    const activeProfile = filenameProfile ?? profile;
+    const activeProfile =
+      headerProfile &&
+      filenameProfile &&
+      headerProfile.name !== filenameProfile.name
+        ? headerProfile
+        : (filenameProfile ?? profile);
 
     const mapping = profileToColumnMapping(activeProfile);
     mapping.accountCurrency = account.currency;
@@ -165,17 +191,7 @@ async function buildImportPreview(
     errors = csvResult.errors;
 
     if (rows.length === 0) {
-      const firstNonEmptyLine =
-        csvContent
-          .split(/\r?\n/)
-          .map((l) => l.trim())
-          .filter(Boolean)[0] ?? "";
-
-      const delimiter = detectDelimiter(csvContent);
-      const headers = firstNonEmptyLine
-        ? firstNonEmptyLine.split(delimiter).map((h) => h.trim())
-        : [];
-      const detected = detectBankProfile(headers);
+      const detected = detectBankProfile(csvHeaders(csvContent));
       if (detected) {
         const detectedProfile = db
           .select()

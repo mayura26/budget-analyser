@@ -46,3 +46,21 @@ test("profile filename patterns are read from extra mappings", () => {
   assert.strictEqual(bankProfileMatchesFilename(profile, "foo-jan.csv"), true);
   assert.strictEqual(bankProfileMatchesFilename(profile, "bar-jan.csv"), false);
 });
+
+test("ING profile is detected from split debit and credit headers", () => {
+  const detected = detectBankProfile([
+    "Date",
+    "Description",
+    "Credit",
+    "Debit",
+    "Balance",
+  ]);
+
+  assert.strictEqual(detected?.name, "ING");
+});
+
+test("Amex profile is not confused with ING Date and Description headers", () => {
+  const detected = detectBankProfile(["Date", "Description", "Amount"]);
+
+  assert.strictEqual(detected?.name, "Amex");
+});

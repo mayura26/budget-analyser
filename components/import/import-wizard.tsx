@@ -24,15 +24,21 @@ import {
 import { confirmImport, previewImport } from "@/lib/actions/import";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { DEFAULT_HOME_CURRENCY } from "@/lib/currency/supported";
+import { detectDelimiter } from "@/lib/import/parser";
 import {
   bankProfileFilenamePatterns,
   bankProfileMatchesFilename,
+  detectBankProfile,
   filenameMatchesWildcard,
 } from "@/lib/import/profiles";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Account, BankProfile, ImportPreview } from "@/types";
 
 type Step = "upload" | "preview" | "done";
+type FileProfileMatch = {
+  kind: "header" | "filename";
+  profileId: string;
+};
 
 function resolveDefaultProfileIdForAccount(
   accounts: Account[],
@@ -88,6 +94,8 @@ export function ImportWizard({
       : null) ?? (bankProfiles[0] ? String(bankProfiles[0].id) : ""),
   );
   const [file, setFile] = useState<File | null>(null);
+  const [fileProfileMatch, setFileProfileMatch] =
+    useState<FileProfileMatch | null>(null);
   const lastAccountIdRef = useRef<string>(accountId);
 
   useEffect(() => {
@@ -130,33 +138,71 @@ export function ImportWizard({
     accounts.find((a) => String(a.id) === accountId)?.currency,
     DEFAULT_HOME_CURRENCY,
   );
-  const filenameMatchedProfile = file
-    ? (bankProfiles.find((profile) =>
-        bankProfileMatchesFilename(profile, file.name),
+  const fileMatchedProfile = fileProfileMatch
+    ? (bankProfiles.find(
+        (profile) => String(profile.id) === fileProfileMatch.profileId,
       ) ?? null)
     : null;
-  const filenameMatchedPatterns = filenameMatchedProfile
-    ? bankProfileFilenamePatterns(filenameMatchedProfile).filter((pattern) =>
-        filenameMatchesWildcard(file?.name ?? "", pattern),
-      )
-    : [];
-  const filenameMatchedAccount = filenameMatchedProfile
+  const filenameMatchedPatterns =
+    fileProfileMatch?.kind === "filename" && fileMatchedProfile
+      ? bankProfileFilenamePatterns(fileMatchedProfile).filter((pattern) =>
+          filenameMatchesWildcard(file?.name ?? "", pattern),
+        )
+      : [];
+  const fileMatchedAccount = fileMatchedProfile
     ? (accounts.find((account) =>
-        accountUsesProfile(account, filenameMatchedProfile),
+        accountUsesProfile(account, fileMatchedProfile),
       ) ?? null)
     : null;
 
-  function selectFile(nextFile: File | null) {
+  async function profileFromCsvHeader(
+    nextFile: File,
+  ): Promise<BankProfile | null> {
+    try {
+      const csvContent = await nextFile.text();
+      const firstNonEmptyLine =
+        csvContent
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)[0] ?? "";
+      if (!firstNonEmptyLine) return null;
+
+      const delimiter = detectDelimiter(csvContent);
+      const headers = firstNonEmptyLine
+        .split(delimiter)
+        .map((header) => header.trim());
+      const detected = detectBankProfile(headers);
+      if (!detected) return null;
+
+      return (
+        bankProfiles.find((profile) => profile.name === detected.name) ?? null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  async function selectFile(nextFile: File | null) {
     setFile(nextFile);
+    setFileProfileMatch(null);
     setError(null);
     if (!nextFile || !nextFile.name.toLowerCase().endsWith(".csv")) return;
 
-    const matchedProfile = bankProfiles.find((profile) =>
+    const filenameProfile = bankProfiles.find((profile) =>
       bankProfileMatchesFilename(profile, nextFile.name),
     );
+    const headerProfile = await profileFromCsvHeader(nextFile);
+    const matchedProfile =
+      headerProfile && headerProfile.name !== filenameProfile?.name
+        ? headerProfile
+        : (filenameProfile ?? headerProfile);
     if (!matchedProfile) return;
 
     setProfileId(String(matchedProfile.id));
+    setFileProfileMatch({
+      kind: matchedProfile === filenameProfile ? "filename" : "header",
+      profileId: String(matchedProfile.id),
+    });
     const matchedAccount = accounts.find((account) =>
       accountUsesProfile(account, matchedProfile),
     );
@@ -514,7 +560,7 @@ export function ImportWizard({
               const dropped = e.dataTransfer.files[0];
               const name = dropped?.name.toLowerCase() ?? "";
               if (name.endsWith(".csv") || name.endsWith(".pdf"))
-                selectFile(dropped);
+                void selectFile(dropped);
             }}
           >
             <Upload className="h-8 w-8 text-muted-foreground mb-2" />
@@ -529,20 +575,23 @@ export function ImportWizard({
               type="file"
               accept=".csv,.pdf"
               className="hidden"
-              onChange={(e) => selectFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => void selectFile(e.target.files?.[0] ?? null)}
             />
           </label>
-          {filenameMatchedProfile && (
+          {fileMatchedProfile && (
             <div
               className="flex flex-wrap items-center gap-1.5 rounded-md border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs text-sky-700 dark:text-sky-300"
               data-testid="filename-profile-match"
             >
               <CheckCircle className="h-3.5 w-3.5" />
               <span className="font-medium">
-                Filename match: {filenameMatchedProfile.name}
+                {fileProfileMatch?.kind === "header"
+                  ? "Header match"
+                  : "Filename match"}
+                : {fileMatchedProfile.name}
               </span>
-              {filenameMatchedAccount ? (
-                <span>Account: {filenameMatchedAccount.name}</span>
+              {fileMatchedAccount ? (
+                <span>Account: {fileMatchedAccount.name}</span>
               ) : (
                 <span>No account uses this profile yet</span>
               )}

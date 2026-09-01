@@ -37,6 +37,34 @@ function wiseMapping(extras?: Partial<ColumnMapping>): ColumnMapping {
   };
 }
 
+function ingMapping(extras?: Partial<ColumnMapping>): ColumnMapping {
+  return {
+    dateColumn: "Date",
+    descriptionColumn: "Description",
+    debitColumn: "Debit",
+    creditColumn: "Credit",
+    dateFormat: "DD/MM/YYYY",
+    skipRows: 0,
+    delimiter: ",",
+    hasHeader: true,
+    negativeIsDebit: true,
+    ...extras,
+  };
+}
+
+test("ING split debit and credit columns parse with correct signs", () => {
+  const csv = `Date,Description,Credit,Debit,Balance
+01/09/2026,Incoming transfer,200.00,,200.00
+02/09/2026,Cafe purchase,,12.35,187.65`;
+  const { rows } = parseCSV(csv, ingMapping());
+
+  assert.strictEqual(rows.length, 2);
+  assert.strictEqual(rows[0]?.date, "2026-09-01");
+  assert.strictEqual(rows[0]?.amount, 200);
+  assert.strictEqual(rows[1]?.date, "2026-09-02");
+  assert.strictEqual(rows[1]?.amount, -12.35);
+});
+
 test("Amex-style card payment row becomes positive credit", () => {
   const csv = `Date,Description,Amount
 07/05/2026,ONLINE PAYMENT RECEIVED - THANKYOU W8295,-1500.00
