@@ -124,6 +124,12 @@ function currentBudgetTestMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function nextBudgetTestMonth(): string {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+}
+
 type NearGuideSeed = {
   month: string;
   scheduleId: number;
@@ -131,6 +137,22 @@ type NearGuideSeed = {
   previousBudgetAmount: number | null;
   parentCategoryId: number;
   previousParentBudgetRuleBucket: string | null;
+};
+
+type BudgetSnapshotRow = {
+  id: number;
+  month: string;
+  categoryId: number;
+  targetAmount: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+type NegativeSurplusTargetSeed = {
+  month: string;
+  scheduleId: number;
+  budgetId: number;
+  previousBudgets: BudgetSnapshotRow[];
 };
 
 type ExpenseRefundSeed = {
@@ -250,6 +272,100 @@ function cleanupExpenseRefundBudgetRow(seed: ExpenseRefundSeed) {
     sqlite.prepare("DELETE FROM budgets WHERE id = ?").run(seed.budgetId);
     sqlite.prepare("DELETE FROM categories WHERE id = ?").run(seed.categoryId);
     sqlite.prepare("DELETE FROM accounts WHERE id = ?").run(seed.accountId);
+  } finally {
+    sqlite.close();
+  }
+}
+
+function seedNegativeSurplusTarget(): NegativeSurplusTargetSeed {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    const month = nextBudgetTestMonth();
+    const previousBudgets = sqlite
+      .prepare(
+        `SELECT
+           id,
+           month,
+           category_id AS categoryId,
+           target_amount AS targetAmount,
+           created_at AS createdAt,
+           updated_at AS updatedAt
+         FROM budgets
+         WHERE month = ?`,
+      )
+      .all(month) as BudgetSnapshotRow[];
+
+    sqlite.prepare("DELETE FROM budgets WHERE month = ?").run(month);
+
+    const category = sqlite
+      .prepare(
+        `SELECT id
+         FROM categories
+         WHERE parent_id IS NOT NULL
+           AND type = 'expense'
+         ORDER BY id
+         LIMIT 1`,
+      )
+      .get() as { id: number } | undefined;
+
+    if (!category) {
+      throw new Error("No expense category found for surplus target test");
+    }
+
+    const schedule = sqlite
+      .prepare(
+        `INSERT INTO scheduled_transactions
+           (name, amount, frequency, start_date, is_active, created_at, updated_at)
+         VALUES (?, 1000, 'monthly', ?, 1, unixepoch(), unixepoch())`,
+      )
+      .run(`E2E signed surplus income ${Date.now()}`, `${month}-01`);
+
+    const budget = sqlite
+      .prepare(
+        `INSERT INTO budgets
+           (month, category_id, target_amount, created_at, updated_at)
+         VALUES (?, ?, 1100, unixepoch(), unixepoch())`,
+      )
+      .run(month, category.id);
+
+    return {
+      month,
+      scheduleId: Number(schedule.lastInsertRowid),
+      budgetId: Number(budget.lastInsertRowid),
+      previousBudgets,
+    };
+  } finally {
+    sqlite.close();
+  }
+}
+
+function cleanupNegativeSurplusTarget(seed: NegativeSurplusTargetSeed) {
+  const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+  const sqlite = new Database(dbPath);
+
+  try {
+    sqlite
+      .prepare("DELETE FROM scheduled_transactions WHERE id = ?")
+      .run(seed.scheduleId);
+    sqlite.prepare("DELETE FROM budgets WHERE month = ?").run(seed.month);
+
+    const restore = sqlite.prepare(
+      `INSERT INTO budgets
+         (id, month, category_id, target_amount, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    for (const row of seed.previousBudgets) {
+      restore.run(
+        row.id,
+        row.month,
+        row.categoryId,
+        row.targetAmount,
+        row.createdAt,
+        row.updatedAt,
+      );
+    }
   } finally {
     sqlite.close();
   }
@@ -551,7 +667,23 @@ test.describe("Budget", () => {
     });
   });
 
-  test("income surplus row shows a deficit state when savings are overallocated", async ({
+  test("income surplus row shows minus sign for negative planned surplus", async ({
+    page,
+  }) => {
+    const seed = seedNegativeSurplusTarget();
+
+    try {
+      await page.goto(`/budget?month=${seed.month}`);
+      const surplusRow = page.getByTestId("budget-row-income-surplus");
+      await expect(surplusRow).toBeVisible({ timeout: 10000 });
+      await expect(surplusRow).toContainText("-$100.00");
+      await expect(surplusRow).toContainText("+$100.00");
+    } finally {
+      cleanupNegativeSurplusTarget(seed);
+    }
+  });
+
+  test("income surplus row shows signed negative actual when savings are overallocated", async ({
     page,
   }) => {
     const now = new Date();
@@ -569,7 +701,7 @@ test.describe("Budget", () => {
       await page.goto(`/budget?month=${month}`);
       const surplusRow = page.getByTestId("budget-row-income-surplus");
       await expect(surplusRow).toBeVisible({ timeout: 10000 });
-      await expect(surplusRow).toContainText("Deficit");
+      await expect(surplusRow).toContainText("-$5,000.00");
       await expect(surplusRow).toContainText("$5,000.00");
     } finally {
       await deleteBudgetTestAccount(page, accountName);

@@ -76,41 +76,23 @@ function syntheticSurplusRemainingDisplay(
   row: BudgetCategoryRow,
   homeCurrency: SupportedCurrency,
 ) {
-  if (row.actualSpent < -0.005) {
-    return (
-      <span className="text-red-600 dark:text-red-400">
-        Deficit {formatCurrency(Math.abs(row.actualSpent), homeCurrency)}
-      </span>
-    );
-  }
+  const variance = row.actualSpent - row.targetAmount;
 
-  if (row.targetAmount > 0) {
-    const ahead = row.actualSpent - row.targetAmount;
-    if (ahead >= -0.005) {
-      return (
-        <span className="text-emerald-600 dark:text-emerald-400">
-          {ahead > 0.005 ? "+" : ""}
-          {formatCurrency(Math.max(0, ahead), homeCurrency)}
-        </span>
-      );
-    }
-
-    return (
-      <span className="text-red-600 dark:text-red-400">
-        {formatCurrency(row.targetAmount - row.actualSpent, homeCurrency)}
-      </span>
-    );
-  }
-
-  if (row.actualSpent > 0.005) {
+  if (variance >= -0.005) {
+    const v = variance <= 0.005 ? 0 : variance;
     return (
       <span className="text-emerald-600 dark:text-emerald-400">
-        +{formatCurrency(row.actualSpent, homeCurrency)}
+        {v > 0 ? "+" : ""}
+        {formatCurrency(v, homeCurrency)}
       </span>
     );
   }
 
-  return <span className="text-muted-foreground">&mdash;</span>;
+  return (
+    <span className="text-red-600 dark:text-red-400">
+      {formatSignedCurrency(variance, homeCurrency)}
+    </span>
+  );
 }
 
 function renderRemaining(
@@ -414,8 +396,7 @@ function CategoryRow({
                     : "text-muted-foreground"
               }
             >
-              {row.actualSpent < 0 ? "−" : ""}
-              {formatCurrency(Math.abs(row.actualSpent), homeCurrency)}
+              {formatSignedCurrency(row.actualSpent, homeCurrency)}
             </span>
           ) : Math.abs(row.actualSpent) > 0.005 ? (
             <span
@@ -448,7 +429,7 @@ function CategoryRow({
                   : "text-muted-foreground",
               )}
             >
-              {formatCurrency(row.targetAmount, homeCurrency)}
+              {formatSignedCurrency(row.targetAmount, homeCurrency)}
             </span>
           ) : isEditing && !readOnly ? (
             <span className="relative inline-block">
