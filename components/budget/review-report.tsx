@@ -384,6 +384,21 @@ function MetricTile({
   );
 }
 
+function incomeVarianceForMetrics(metrics: ReviewMetrics): number {
+  if (Number.isFinite(metrics.incomeVariance)) {
+    return metrics.incomeVariance;
+  }
+  return metrics.actualIncome - metrics.expectedIncome;
+}
+
+function signedCurrency(
+  value: number,
+  homeCurrency: SupportedCurrency,
+): string {
+  const prefix = value >= 0 ? "+" : "-";
+  return `${prefix}${formatCurrency(Math.abs(value), homeCurrency)}`;
+}
+
 /** Y-axis label: leading segment before optional " (detail)" parenthetical. */
 function leanCategoryLabel(fullName: string): string {
   const idx = fullName.indexOf("(");
@@ -583,6 +598,13 @@ export const ReviewReport = forwardRef<
         ? data.review.executiveSummary
         : "";
   const topWantsMerchants = data.metrics.topWantsMerchants ?? [];
+  const incomeVariance = incomeVarianceForMetrics(data.metrics);
+  const incomeVarianceTone =
+    Math.abs(incomeVariance) <= 0.01
+      ? "default"
+      : incomeVariance > 0
+        ? "good"
+        : "bad";
 
   return (
     <div ref={ref} className="space-y-6 bg-background p-1">
@@ -641,7 +663,7 @@ export const ReviewReport = forwardRef<
           </Card>
         )}
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
         <MetricTile
           label="Budgeted"
           value={formatCurrency(data.metrics.totalBudgeted, homeCurrency)}
@@ -682,6 +704,19 @@ export const ReviewReport = forwardRef<
           hint={`${data.metrics.savingsRate.toFixed(1)}% of income`}
           icon={<Activity className="h-4 w-4" />}
           tone={data.metrics.savingsRate >= 20 ? "good" : "default"}
+        />
+        <MetricTile
+          label="Income variance"
+          value={signedCurrency(incomeVariance, homeCurrency)}
+          hint={`${formatCurrency(data.metrics.actualIncome, homeCurrency)} actual vs ${formatCurrency(data.metrics.expectedIncome, homeCurrency)} scheduled`}
+          icon={
+            incomeVariance >= 0 ? (
+              <TrendingUp className="h-4 w-4" />
+            ) : (
+              <TrendingDown className="h-4 w-4" />
+            )
+          }
+          tone={incomeVarianceTone}
         />
       </div>
 

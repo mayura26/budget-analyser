@@ -736,6 +736,17 @@ test.describe("Budget", () => {
       page.getByText("Budget", { exact: true }).first(),
     ).toBeVisible();
     await expect(page.getByText("Progress").first()).toBeVisible();
+    await expect(page.getByTestId("budget-section-needs")).toBeVisible();
+    await expect(page.getByTestId("budget-section-wants")).toBeVisible();
+    await expect(page.getByTestId("budget-section-savings")).toBeVisible();
+
+    await page
+      .getByRole("button", { name: "Collapse Needs budget section" })
+      .click();
+    await expect(page.getByTestId("budget-section-body-needs")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Expand Needs budget section" }),
+    ).toBeVisible();
   });
 
   test("50/30/20 strip renders three mini grouped bar charts when budget exists", async ({
@@ -922,7 +933,7 @@ test.describe("Budget", () => {
     await expect(incomeCard.getByText("Expected income")).toBeVisible();
   });
 
-  test("closed month unlocks review page with quick and deep formats", async ({
+  test("closed month review page shows quick and deep formats", async ({
     page,
   }) => {
     let regenerateCalls = 0;
@@ -1089,26 +1100,18 @@ test.describe("Budget", () => {
     const now = new Date();
     const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    await page.goto(`/budget?month=${prevMonth}`);
+    const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
+    const sqlite = new Database(dbPath);
+    sqlite
+      .prepare(
+        `INSERT INTO budget_month_status (month, is_closed, closed_at, created_at, updated_at)
+         VALUES (?, 1, unixepoch(), unixepoch(), unixepoch())
+         ON CONFLICT(month) DO UPDATE SET is_closed = 1, closed_at = unixepoch(), updated_at = unixepoch()`,
+      )
+      .run(prevMonth);
+    sqlite.close();
 
-    const closeButton = page.getByRole("button", { name: "Close Month" });
-    const isOpen = await closeButton
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    if (isOpen) {
-      // Review Month button should not exist while the month is still open.
-      await expect(
-        page.getByRole("button", { name: "Review Month" }),
-      ).toHaveCount(0);
-      await closeButton.click();
-      await expect(
-        page.getByRole("button", { name: "Month Closed" }),
-      ).toBeVisible();
-    }
-
-    const reviewButton = page.getByRole("button", { name: "Review Month" });
-    await expect(reviewButton).toBeVisible();
-    await reviewButton.click();
+    await page.goto(`/budget/review?month=${prevMonth}`);
 
     // Hero band + tabs render
     await expect(page.getByText("Monthly review")).toBeVisible();
@@ -1152,6 +1155,13 @@ test.describe("Budget", () => {
     await expect(effectiveSavingsTile.getByText("$1,100.00")).toBeVisible();
     await expect(
       effectiveSavingsTile.getByText("36.7% of income"),
+    ).toBeVisible();
+    const incomeVarianceTile = page.locator(".rounded-xl").filter({
+      hasText: "Income variance",
+    });
+    await expect(incomeVarianceTile.getByText("-$100.00")).toBeVisible();
+    await expect(
+      incomeVarianceTile.getByText("$3,000.00 actual vs $3,100.00 scheduled"),
     ).toBeVisible();
 
     // Regenerate button triggers a POST with regenerate=true

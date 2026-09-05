@@ -1,7 +1,16 @@
 "use client";
 
-import { AlertTriangle, ChevronDown, ChevronRight, Info } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  HeartHandshake,
+  Home,
+  Info,
+  ShoppingBag,
+} from "lucide-react";
 import Link from "next/link";
+import type { ComponentType } from "react";
 import { useActionState, useRef, useState, useTransition } from "react";
 import {
   BudgetProgressBar,
@@ -33,20 +42,72 @@ import {
 import type {
   AnalyticsBudgetTransactionLine,
   BudgetCategoryRow,
+  BudgetRuleBucket,
 } from "@/types";
 
-type GroupedRows = { group: string; rows: BudgetCategoryRow[] }[];
+type BudgetSectionBucket = Extract<
+  BudgetRuleBucket,
+  "needs" | "wants" | "savings"
+>;
+
+type BudgetSectionDefinition = {
+  bucket: BudgetSectionBucket;
+  label: string;
+  guide: string;
+  Icon: ComponentType<{ className?: string }>;
+  accentClass: string;
+};
+
+type GroupedRows = (BudgetSectionDefinition & {
+  rows: BudgetCategoryRow[];
+})[];
+
+const BUDGET_SECTIONS: BudgetSectionDefinition[] = [
+  {
+    bucket: "needs",
+    label: "Needs",
+    guide: "~50%",
+    Icon: Home,
+    accentClass: "bg-blue-500",
+  },
+  {
+    bucket: "wants",
+    label: "Wants",
+    guide: "~30%",
+    Icon: ShoppingBag,
+    accentClass: "bg-orange-500",
+  },
+  {
+    bucket: "savings",
+    label: "Savings",
+    guide: "~20%",
+    Icon: HeartHandshake,
+    accentClass: "bg-emerald-500",
+  },
+];
+
+function sectionBucketForRow(row: BudgetCategoryRow): BudgetSectionBucket {
+  if (
+    row.ruleBucket === "needs" ||
+    row.ruleBucket === "wants" ||
+    row.ruleBucket === "savings"
+  ) {
+    return row.ruleBucket;
+  }
+  return row.categoryKind === "savings" ? "savings" : "wants";
+}
 
 function groupRows(rows: BudgetCategoryRow[]): GroupedRows {
-  const map = new Map<string, BudgetCategoryRow[]>();
+  const map = new Map<BudgetSectionBucket, BudgetCategoryRow[]>(
+    BUDGET_SECTIONS.map((section) => [section.bucket, []]),
+  );
   for (const row of rows) {
-    const group = row.parentName;
-    if (!map.has(group)) map.set(group, []);
-    map.get(group)?.push(row);
+    map.get(sectionBucketForRow(row))?.push(row);
   }
-  return [...map.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([group, rows]) => ({ group, rows }));
+  return BUDGET_SECTIONS.map((section) => ({
+    ...section,
+    rows: map.get(section.bucket) ?? [],
+  }));
 }
 
 /** Savings "Left": ahead of target = positive + green; under target = red shortfall. */
@@ -622,7 +683,7 @@ export function BudgetCategoryList({
 }) {
   const groups = groupRows(rows);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(groups.map((g) => g.group)),
+    new Set(groups.map((g) => g.bucket)),
   );
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(
     () => new Set(),
@@ -635,7 +696,7 @@ export function BudgetCategoryList({
   const drilldownContext = expenseTransactionsByCategory != null;
   const headerGrid = drilldownContext ? gridColsDrilldown : gridColsBase;
 
-  const toggleGroup = (group: string) => {
+  const toggleGroup = (group: BudgetSectionBucket) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
@@ -701,152 +762,170 @@ export function BudgetCategoryList({
             <div className="hidden sm:block">Progress</div>
           </div>
 
-          {groups.map(({ group, rows: groupRows }) => {
-            const isExpanded = expandedGroups.has(group);
-            const groupBudgeted = groupRows.reduce(
-              (s, r) => s + r.targetAmount,
-              0,
-            );
-            const rawGroupSpent = groupRows.reduce(
-              (s, r) => s + r.actualSpent,
-              0,
-            );
-            const isSavingsGroup = groupRows.some(
-              (r) => r.categoryKind === "savings",
-            );
-            const groupSpent = isSavingsGroup
-              ? Math.max(0, rawGroupSpent)
-              : rawGroupSpent;
+          {groups.map(
+            ({ bucket, label, guide, Icon, accentClass, rows: groupRows }) => {
+              const isExpanded = expandedGroups.has(bucket);
+              const groupBudgeted = groupRows.reduce(
+                (s, r) => s + r.targetAmount,
+                0,
+              );
+              const rawGroupSpent = groupRows.reduce(
+                (s, r) => s + r.actualSpent,
+                0,
+              );
+              const isSavingsGroup = bucket === "savings";
+              const groupSpent = isSavingsGroup
+                ? Math.max(0, rawGroupSpent)
+                : rawGroupSpent;
 
-            const groupVariant: "default" | "savings" = isSavingsGroup
-              ? "savings"
-              : "default";
-            const groupStatus = getBudgetStatus(
-              groupSpent,
-              groupBudgeted,
-              groupVariant,
-            );
-            const groupPct =
-              groupBudgeted > 0
-                ? Math.round((groupSpent / groupBudgeted) * 100)
-                : 0;
-            const groupRemaining = groupBudgeted - groupSpent;
-            const groupRemainingClass = isSavingsGroup
-              ? groupSpent - groupBudgeted >= -0.005
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-red-600 dark:text-red-400"
-              : groupRemaining >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-red-600 dark:text-red-400";
-            const groupRemainingLabel = isSavingsGroup
-              ? groupSpent - groupBudgeted >= -0.005
-                ? `+${formatCurrency(Math.max(0, groupSpent - groupBudgeted), homeCurrency)}`
-                : formatCurrency(groupBudgeted - groupSpent, homeCurrency)
-              : `${groupRemaining >= 0 ? "" : "−"}${formatCurrency(Math.abs(groupRemaining), homeCurrency)}`;
-            return (
-              <div key={group} className="mt-2">
+              const groupVariant: "default" | "savings" = isSavingsGroup
+                ? "savings"
+                : "default";
+              const groupStatus = getBudgetStatus(
+                groupSpent,
+                groupBudgeted,
+                groupVariant,
+              );
+              const groupPct =
+                groupBudgeted > 0
+                  ? Math.round((groupSpent / groupBudgeted) * 100)
+                  : 0;
+              const groupRemaining = groupBudgeted - groupSpent;
+              const groupRemainingClass = isSavingsGroup
+                ? groupSpent - groupBudgeted >= -0.005
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-red-600 dark:text-red-400"
+                : groupRemaining >= 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-red-600 dark:text-red-400";
+              const groupRemainingLabel = isSavingsGroup
+                ? groupSpent - groupBudgeted >= -0.005
+                  ? `+${formatCurrency(Math.max(0, groupSpent - groupBudgeted), homeCurrency)}`
+                  : formatCurrency(groupBudgeted - groupSpent, homeCurrency)
+                : `${groupRemaining >= 0 ? "" : "−"}${formatCurrency(Math.abs(groupRemaining), homeCurrency)}`;
+              return (
                 <div
-                  className={cn(
-                    "grid items-center gap-x-2 sm:gap-x-3 px-2 sm:px-3 py-1.5 hover:bg-muted/50 rounded-md transition-colors",
-                    headerGrid,
-                  )}
+                  key={bucket}
+                  className="mt-2"
+                  data-testid={`budget-section-${bucket}`}
                 >
-                  {drilldownContext ? <div /> : null}
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group)}
-                    className="col-span-2 flex items-center gap-2 text-sm font-semibold text-left min-w-0"
+                  <div
+                    className={cn(
+                      "grid items-center gap-x-2 sm:gap-x-3 px-2 sm:px-3 py-2 hover:bg-muted/50 rounded-md transition-colors",
+                      headerGrid,
+                    )}
                   >
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    )}
-                    <span title={group} className="min-w-0 truncate">
-                      <span className="sm:hidden">
-                        {budgetCategoryShortTitle(group)}
-                      </span>
-                      <span className="hidden sm:inline">{group}</span>
-                    </span>
-                  </button>
-                  <div className="text-right text-sm tabular-nums whitespace-nowrap flex items-center justify-end gap-1.5">
-                    <span
-                      className={
-                        groupSpent < -0.005
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-foreground"
-                      }
+                    {drilldownContext ? <div /> : null}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(bucket)}
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label} budget section`}
+                      className="col-span-2 flex items-center gap-2 text-sm font-semibold text-left min-w-0"
                     >
-                      {formatSignedCurrency(groupSpent, homeCurrency)}
-                    </span>
-                    <span className="text-muted-foreground/60">/</span>
-                    <span className="text-muted-foreground">
-                      {formatCurrency(groupBudgeted, homeCurrency)}
-                    </span>
-                    <span className="hidden sm:inline text-muted-foreground/60">
-                      ·
-                    </span>
-                    <span
-                      className={cn(
-                        "hidden sm:inline min-w-[4.5rem] text-right",
-                        groupRemainingClass,
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                       )}
-                    >
-                      {groupRemainingLabel}
-                    </span>
+                      <span
+                        className={cn(
+                          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white",
+                          accentClass,
+                        )}
+                        aria-hidden
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span title={label} className="min-w-0 truncate">
+                        {label}
+                      </span>
+                      <span className="hidden sm:inline text-xs font-medium text-muted-foreground">
+                        {guide}
+                      </span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        {groupRows.length}
+                      </span>
+                    </button>
+                    <div className="text-right text-sm tabular-nums whitespace-nowrap flex items-center justify-end gap-1.5">
+                      <span
+                        className={
+                          groupSpent < -0.005
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-foreground"
+                        }
+                      >
+                        {formatSignedCurrency(groupSpent, homeCurrency)}
+                      </span>
+                      <span className="text-muted-foreground/60">/</span>
+                      <span className="text-muted-foreground">
+                        {formatCurrency(groupBudgeted, homeCurrency)}
+                      </span>
+                      <span className="hidden sm:inline text-muted-foreground/60">
+                        ·
+                      </span>
+                      <span
+                        className={cn(
+                          "hidden sm:inline min-w-[4.5rem] text-right",
+                          groupRemainingClass,
+                        )}
+                      >
+                        {groupRemainingLabel}
+                      </span>
+                    </div>
+                    <div className="hidden sm:block">
+                      {groupBudgeted > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <BudgetProgressBar
+                            spent={groupSpent}
+                            target={groupBudgeted}
+                            className="flex-1"
+                            variant={groupVariant}
+                            size="lg"
+                          />
+                          <span
+                            className={cn(
+                              "text-xs tabular-nums w-9 text-right font-medium",
+                              statusTextClass(groupStatus),
+                            )}
+                          >
+                            {groupPct}%
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="h-3" />
+                      )}
+                    </div>
                   </div>
-                  <div className="hidden sm:block">
-                    {groupBudgeted > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <BudgetProgressBar
-                          spent={groupSpent}
-                          target={groupBudgeted}
-                          className="flex-1"
-                          variant={groupVariant}
-                          size="lg"
-                        />
-                        <span
-                          className={cn(
-                            "text-xs tabular-nums w-9 text-right font-medium",
-                            statusTextClass(groupStatus),
-                          )}
-                        >
-                          {groupPct}%
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="h-3" />
-                    )}
-                  </div>
-                </div>
 
-                {isExpanded && (
-                  <div>
-                    {groupRows.map((row) => (
-                      <CategoryRow
-                        key={row.categoryId}
-                        row={row}
-                        editingId={editingId}
-                        onEdit={setEditingId}
-                        onBlur={handleBlur}
-                        readOnly={readOnly}
-                        homeCurrency={homeCurrency}
-                        expenseTransactionsByCategory={
-                          expenseTransactionsByCategory
-                        }
-                        monthRangeStart={monthRangeStart}
-                        monthRangeEnd={monthRangeEnd}
-                        expanded={expandedCategories.has(row.categoryId)}
-                        onToggleExpand={() =>
-                          toggleCategoryExpand(row.categoryId)
-                        }
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  {isExpanded && (
+                    <div data-testid={`budget-section-body-${bucket}`}>
+                      {groupRows.map((row) => (
+                        <CategoryRow
+                          key={row.categoryId}
+                          row={row}
+                          editingId={editingId}
+                          onEdit={setEditingId}
+                          onBlur={handleBlur}
+                          readOnly={readOnly}
+                          homeCurrency={homeCurrency}
+                          expenseTransactionsByCategory={
+                            expenseTransactionsByCategory
+                          }
+                          monthRangeStart={monthRangeStart}
+                          monthRangeEnd={monthRangeEnd}
+                          expanded={expandedCategories.has(row.categoryId)}
+                          onToggleExpand={() =>
+                            toggleCategoryExpand(row.categoryId)
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          )}
         </form>
       </CardContent>
     </Card>
