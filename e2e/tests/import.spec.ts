@@ -47,6 +47,78 @@ async function createImportAccountIfMissing(
 }
 
 test.describe("Import", () => {
+  for (const profile of ["Amex", "CommBank"]) {
+    test(`${profile} preserves repeated transactions and matches reimports by occurrence`, async ({
+      page,
+    }) => {
+      const accountName = `Repeated ${profile} ${Date.now()}`;
+      await createImportAccountIfMissing(page, accountName, profile);
+      const description = `CLOCK HOTEL ${profile} ${Date.now()}`;
+      const header =
+        profile === "Amex"
+          ? "Date,Date Processed,Description,Card Member,Account #,Amount\n"
+          : "";
+      const row =
+        profile === "Amex"
+          ? `05/09/2026,07/09/2026,${description},K VIVEKANANDA,-61003,10.11\n`
+          : `05/09/2026,-10.11,${description},1000.00\n`;
+      const preview = async (
+        count: number,
+        newCount: number,
+        duplicates: number,
+      ) => {
+        await page.goto("/import");
+        await page.getByRole("combobox").nth(0).click();
+        await page
+          .getByRole("option", { name: accountName, exact: true })
+          .click();
+        await page.locator("#csv-file").setInputFiles({
+          name: "repeated.csv",
+          mimeType: "text/csv",
+          buffer: Buffer.from(header + row.repeat(count)),
+        });
+        await page.getByRole("button", { name: "Preview import" }).click();
+        await expect(
+          page.getByText(`${newCount} new`, { exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.getByText(`${duplicates} duplicate`, { exact: true }),
+        ).toBeVisible();
+      };
+      const confirm = async (count: number) => {
+        await page
+          .getByRole("button", {
+            name: `Import ${count} transactions`,
+            exact: true,
+          })
+          .click();
+        await expect(page.getByText("Import complete!")).toBeVisible();
+        await expect(
+          page.getByText(`${count} transactions imported`, { exact: false }),
+        ).toBeVisible();
+      };
+      // A single old-style row must not hide the other three bank transactions.
+      await preview(1, 1, 0);
+      await confirm(1);
+      await preview(4, 3, 1);
+      await confirm(3);
+      await preview(4, 0, 4);
+      await page.getByLabel(/Overwrite duplicates/i).check();
+      await page
+        .getByRole("button", { name: "Import 4 transactions", exact: true })
+        .click();
+      await expect(page.getByText(/4 duplicates overwritten/i)).toBeVisible();
+      await preview(2, 0, 2);
+      await preview(5, 1, 4);
+      await confirm(1);
+      await preview(5, 0, 5);
+      await page.goto("/transactions");
+      await expect(
+        page.locator("tbody tr").filter({ hasText: description }),
+      ).toHaveCount(5);
+    });
+  }
+
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({
       storageState: "e2e/.auth/user.json",

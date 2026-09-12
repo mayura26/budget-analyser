@@ -58,6 +58,7 @@ function amountWithinTolerance(a: number, b: number): boolean {
 function candidateFingerprintsForRow(
   accountId: number,
   row: PreviewRow,
+  occurrence: number,
 ): string[] {
   const dates = new Set([row.date]);
   if (row.legacyDate) dates.add(row.legacyDate);
@@ -70,7 +71,13 @@ function candidateFingerprintsForRow(
   for (const date of dates) {
     for (const normalised of normalisedValues) {
       candidates.add(
-        generateFingerprint(accountId, date, row.amount, normalised),
+        generateFingerprint(
+          accountId,
+          date,
+          row.amount,
+          normalised,
+          occurrence,
+        ),
       );
     }
   }
@@ -218,30 +225,41 @@ async function buildImportPreview(
     };
   }
 
+  // A bank export can contain several genuine payments with identical details.
+  // Match the nth occurrence against the nth saved occurrence, independently of
+  // filename and unrelated row order. A larger export then restores missing rows.
+  const occurrences = new Map<string, number>();
+  const candidateFingerprintsByPrimary = new Map<string, string[]>();
   const previewRows: PreviewRow[] = rows.map((row) => {
     const normalised = normaliseDescription(row.description);
-    const fingerprint = generateFingerprint(
+    const baseFingerprint = generateFingerprint(
       accountId,
       row.date,
       row.amount,
       normalised,
     );
-    return {
+    const occurrence = (occurrences.get(baseFingerprint) ?? 0) + 1;
+    occurrences.set(baseFingerprint, occurrence);
+    const fingerprint = generateFingerprint(
+      accountId,
+      row.date,
+      row.amount,
+      normalised,
+      occurrence,
+    );
+    const previewRow: PreviewRow = {
       ...row,
       normalised,
       fingerprint,
       status: "new" as const,
       isDuplicate: false,
     };
-  });
-
-  const candidateFingerprintsByPrimary = new Map<string, string[]>();
-  for (const row of previewRows) {
     candidateFingerprintsByPrimary.set(
-      row.fingerprint,
-      candidateFingerprintsForRow(accountId, row),
+      fingerprint,
+      candidateFingerprintsForRow(accountId, previewRow, occurrence),
     );
-  }
+    return previewRow;
+  });
 
   const fingerprints = Array.from(
     new Set([...candidateFingerprintsByPrimary.values()].flat()),
@@ -272,6 +290,7 @@ async function buildImportPreview(
       existingSet.has(fingerprint),
     );
     if (match) {
+      existingSet.delete(match);
       row.status = "duplicate";
       row.isDuplicate = true;
       row.duplicateMatchFingerprint = match;
