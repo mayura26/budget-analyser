@@ -740,6 +740,26 @@ test.describe("Budget", () => {
     await expect(page.getByTestId("budget-section-wants")).toBeVisible();
     await expect(page.getByTestId("budget-section-savings")).toBeVisible();
 
+    const parentGroup = page.getByTestId("budget-parent-group").first();
+    await expect(parentGroup.getByRole("heading", { level: 3 })).toBeVisible();
+    await expect(parentGroup.getByTestId("budget-parent-totals")).toContainText(
+      /left|over|ahead|short/,
+    );
+    await expect(
+      parentGroup.getByTestId("budget-category-row").first(),
+    ).toBeVisible();
+    await parentGroup
+      .getByRole("button", { name: /Collapse .* category group/ })
+      .click();
+    await expect(parentGroup.getByTestId("budget-parent-body")).toHaveCount(0);
+    await expect(parentGroup.getByTestId("budget-parent-totals")).toBeVisible();
+    await parentGroup
+      .getByRole("button", { name: /Expand .* category group/ })
+      .click();
+    await expect(
+      parentGroup.getByTestId("budget-category-row").first(),
+    ).toBeVisible();
+
     await page
       .getByRole("button", { name: "Collapse Needs budget section" })
       .click();

@@ -10,7 +10,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useActionState, useRef, useState, useTransition } from "react";
 import {
   BudgetProgressBar,
@@ -108,6 +108,101 @@ function groupRows(rows: BudgetCategoryRow[]): GroupedRows {
     ...section,
     rows: map.get(section.bucket) ?? [],
   }));
+}
+
+function parentGroups(rows: BudgetCategoryRow[]) {
+  const groups = new Map<string, BudgetCategoryRow[]>();
+  for (const row of rows) {
+    const name = row.parentName;
+    const children = groups.get(name) ?? [];
+    children.push(row);
+    groups.set(name, children);
+  }
+  return [...groups.entries()];
+}
+
+function CategoryGroup({
+  name,
+  rows,
+  savings,
+  homeCurrency,
+  children,
+}: {
+  name: string;
+  rows: BudgetCategoryRow[];
+  savings: boolean;
+  homeCurrency: SupportedCurrency;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const actual = rows.reduce((sum, row) => sum + row.actualSpent, 0);
+  const target = rows.reduce((sum, row) => sum + row.targetAmount, 0);
+  const difference = savings ? actual - target : target - actual;
+  const favorable = difference >= -0.005;
+  const label = savings
+    ? favorable
+      ? "ahead"
+      : "short"
+    : favorable
+      ? "left"
+      : "over";
+
+  return (
+    <div className="mt-2" data-testid="budget-parent-group">
+      <div className="grid gap-2 border-b px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(8rem,1fr)] sm:items-center sm:gap-3 sm:px-3">
+        <h3 className="min-w-0">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${name} category group`}
+            onClick={() => setExpanded((value) => !value)}
+            className="flex w-full items-center gap-2 text-left text-sm font-medium"
+          >
+            {expanded ? (
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <span className="min-w-0 break-words">{name}</span>
+          </button>
+        </h3>
+        <div
+          className="flex flex-wrap items-baseline gap-x-2 text-xs tabular-nums sm:justify-end"
+          data-testid="budget-parent-totals"
+        >
+          <span>
+            {formatCurrency(actual, homeCurrency)}{" "}
+            <span className="text-muted-foreground">
+              / {formatCurrency(target, homeCurrency)}
+            </span>
+          </span>
+          <span
+            className={
+              favorable
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400"
+            }
+          >
+            {formatCurrency(Math.abs(difference), homeCurrency)} {label}
+          </span>
+        </div>
+        <BudgetProgressBar
+          spent={actual}
+          target={target}
+          variant={savings ? "savings" : "default"}
+          className="w-full"
+        />
+      </div>
+      {expanded && (
+        <div
+          className="ml-2 border-l pl-1 sm:ml-4 sm:pl-2"
+          data-testid="budget-parent-body"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Savings "Left": ahead of target = positive + green; under target = red shortfall. */
@@ -900,25 +995,35 @@ export function BudgetCategoryList({
 
                   {isExpanded && (
                     <div data-testid={`budget-section-body-${bucket}`}>
-                      {groupRows.map((row) => (
-                        <CategoryRow
-                          key={row.categoryId}
-                          row={row}
-                          editingId={editingId}
-                          onEdit={setEditingId}
-                          onBlur={handleBlur}
-                          readOnly={readOnly}
+                      {parentGroups(groupRows).map(([name, categoryRows]) => (
+                        <CategoryGroup
+                          key={name}
+                          name={name}
+                          rows={categoryRows}
+                          savings={isSavingsGroup}
                           homeCurrency={homeCurrency}
-                          expenseTransactionsByCategory={
-                            expenseTransactionsByCategory
-                          }
-                          monthRangeStart={monthRangeStart}
-                          monthRangeEnd={monthRangeEnd}
-                          expanded={expandedCategories.has(row.categoryId)}
-                          onToggleExpand={() =>
-                            toggleCategoryExpand(row.categoryId)
-                          }
-                        />
+                        >
+                          {categoryRows.map((row) => (
+                            <CategoryRow
+                              key={row.categoryId}
+                              row={row}
+                              editingId={editingId}
+                              onEdit={setEditingId}
+                              onBlur={handleBlur}
+                              readOnly={readOnly}
+                              homeCurrency={homeCurrency}
+                              expenseTransactionsByCategory={
+                                expenseTransactionsByCategory
+                              }
+                              monthRangeStart={monthRangeStart}
+                              monthRangeEnd={monthRangeEnd}
+                              expanded={expandedCategories.has(row.categoryId)}
+                              onToggleExpand={() =>
+                                toggleCategoryExpand(row.categoryId)
+                              }
+                            />
+                          ))}
+                        </CategoryGroup>
                       ))}
                     </div>
                   )}
