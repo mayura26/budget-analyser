@@ -739,6 +739,24 @@ test.describe("Budget", () => {
     await expect(page.getByTestId("budget-section-needs")).toBeVisible();
     await expect(page.getByTestId("budget-section-wants")).toBeVisible();
     await expect(page.getByTestId("budget-section-savings")).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        level: 2,
+        name: /Collapse Needs budget section/,
+      }),
+    ).toBeVisible();
+    const sectionToggle = page.getByRole("button", {
+      name: "Collapse Needs budget section",
+    });
+    const parentToggle = page
+      .getByTestId("budget-section-needs")
+      .getByRole("button", { name: /Collapse .* category group/ })
+      .first();
+    const sectionBounds = await sectionToggle.boundingBox();
+    const parentBounds = await parentToggle.boundingBox();
+    if (!parentBounds || !sectionBounds)
+      throw new Error("Budget headings are not visible");
+    expect(parentBounds.x).toBeGreaterThan(sectionBounds.x);
 
     const parentGroup = page.getByTestId("budget-parent-group").first();
     await expect(parentGroup.getByRole("heading", { level: 3 })).toBeVisible();

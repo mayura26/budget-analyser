@@ -901,47 +901,43 @@ export function BudgetCategoryList({
               return (
                 <div
                   key={bucket}
-                  className="mt-2"
+                  className="mt-4 first:mt-2"
                   data-testid={`budget-section-${bucket}`}
                 >
-                  <div
-                    className={cn(
-                      "grid items-center gap-x-2 sm:gap-x-3 px-2 sm:px-3 py-2 hover:bg-muted/50 rounded-md transition-colors",
-                      headerGrid,
-                    )}
-                  >
-                    {drilldownContext ? <div /> : null}
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(bucket)}
-                      aria-expanded={isExpanded}
-                      aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label} budget section`}
-                      className="col-span-2 flex items-center gap-2 text-sm font-semibold text-left min-w-0"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      )}
-                      <span
-                        className={cn(
-                          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white",
-                          accentClass,
-                        )}
-                        aria-hidden
+                  <div className="grid grid-cols-1 items-center gap-2 rounded-md bg-muted/60 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)_minmax(8rem,1fr)] sm:gap-3 sm:px-3">
+                    <h2 className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(bucket)}
+                        aria-expanded={isExpanded}
+                        aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label} budget section`}
+                        className="flex w-full items-center gap-2 text-base font-semibold text-left min-w-0"
                       >
-                        <Icon className="h-3.5 w-3.5" />
-                      </span>
-                      <span title={label} className="min-w-0 truncate">
-                        {label}
-                      </span>
-                      <span className="hidden sm:inline text-xs font-medium text-muted-foreground">
-                        {guide}
-                      </span>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {groupRows.length}
-                      </span>
-                    </button>
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        )}
+                        <span
+                          className={cn(
+                            "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white",
+                            accentClass,
+                          )}
+                          aria-hidden
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <span title={label} className="min-w-0 truncate">
+                          {label}
+                        </span>
+                        <span className="hidden sm:inline text-xs font-medium text-muted-foreground">
+                          {guide}
+                        </span>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {groupRows.length}
+                        </span>
+                      </button>
+                    </h2>
                     <div className="text-right text-sm tabular-nums whitespace-nowrap flex items-center justify-end gap-1.5">
                       <span
                         className={
@@ -994,7 +990,10 @@ export function BudgetCategoryList({
                   </div>
 
                   {isExpanded && (
-                    <div data-testid={`budget-section-body-${bucket}`}>
+                    <div
+                      className="ml-3 sm:ml-5"
+                      data-testid={`budget-section-body-${bucket}`}
+                    >
                       {parentGroups(groupRows).map(([name, categoryRows]) => (
                         <CategoryGroup
                           key={name}
