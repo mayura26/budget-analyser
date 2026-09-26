@@ -380,12 +380,13 @@ function cleanupNegativeSurplusTarget(seed: NegativeSurplusTargetSeed) {
   }
 }
 
-function seedIncomeComparisonSummary(): IncomeComparisonSeed {
+function seedIncomeComparisonSummary(
+  month = nextBudgetTestMonth(),
+): IncomeComparisonSeed {
   const dbPath = process.env.DATABASE_PATH ?? "./data/test.db";
   const sqlite = new Database(dbPath);
 
   try {
-    const month = nextBudgetTestMonth();
     const previousBudgets = sqlite
       .prepare(
         `SELECT
@@ -929,12 +930,73 @@ test.describe("Budget", () => {
       await page.goto(`/budget?month=${seed.month}`);
       const incomeCard = page.getByTestId("summary-income-card");
       await expect(incomeCard).toBeVisible({ timeout: 10000 });
-      await expect(incomeCard.getByText("Actual received")).toBeVisible();
-      await expect(incomeCard.getByText("$650.00")).toBeVisible();
-      await expect(incomeCard.getByText("Expected income")).toBeVisible();
-      await expect(incomeCard.getByText("$1,000.00")).toBeVisible();
+      await expect(incomeCard.getByText("Received to date")).toBeVisible();
       await expect(
-        incomeCard.getByText("$350.00 still expected"),
+        incomeCard.getByText("$650.00", { exact: true }),
+      ).toBeVisible();
+      await expect(incomeCard.getByText("Expected income")).toBeVisible();
+      await expect(
+        incomeCard.getByText("$1,000.00", { exact: true }).last(),
+      ).toBeVisible();
+      await expect(
+        incomeCard.getByTestId("summary-income-upcoming"),
+      ).toBeVisible();
+      await expect(
+        incomeCard.getByTestId("income-projected-total"),
+      ).toBeVisible();
+      await expect(
+        incomeCard.getByText("+$650.00 over expected"),
+      ).toBeVisible();
+      await expect(incomeCard.getByTestId("income-projected-total")).toHaveText(
+        "$1,650.00",
+      );
+      await expect(
+        incomeCard.getByTestId("summary-income-upcoming"),
+      ).toContainText("$1,000.00");
+      await expect(
+        incomeCard.getByRole("img", {
+          name: "Income forecast: $650.00 received to date plus $1,000.00 still to come equals $1,650.00 expected at month end",
+          exact: true,
+        }),
+      ).toBeVisible();
+      const receivedWidth = await incomeCard
+        .getByTestId("income-received-segment")
+        .evaluate((element) => parseFloat(element.style.width));
+      const upcomingWidth = await incomeCard
+        .getByTestId("income-upcoming-segment")
+        .evaluate((element) => parseFloat(element.style.width));
+      expect(receivedWidth).toBeCloseTo((650 / 1650) * 100);
+      expect(receivedWidth + upcomingWidth).toBeCloseTo(100);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(incomeCard.getByText("Still to come")).toBeVisible();
+      expect(
+        await incomeCard.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth,
+        ),
+      ).toBe(true);
+    } finally {
+      cleanupIncomeComparisonSummary(seed);
+    }
+  });
+
+  test("past income schedules are not counted as still expected", async ({
+    page,
+  }) => {
+    const now = new Date();
+    const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const month = `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`;
+    const seed = seedIncomeComparisonSummary(month);
+    try {
+      await page.goto(`/budget?month=${month}`);
+      const incomeCard = page.getByTestId("summary-income-card");
+      await expect(
+        incomeCard.getByTestId("summary-income-upcoming").getByText("$0.00"),
+      ).toBeVisible();
+      await expect(incomeCard.getByTestId("income-projected-total")).toHaveText(
+        "$650.00",
+      );
+      await expect(
+        incomeCard.getByText("$350.00 under expected"),
       ).toBeVisible();
     } finally {
       cleanupIncomeComparisonSummary(seed);
@@ -967,7 +1029,7 @@ test.describe("Budget", () => {
     });
 
     const incomeCard = page.getByTestId("summary-income-card");
-    await expect(incomeCard.getByText("Actual received")).toBeVisible();
+    await expect(incomeCard.getByText("Received to date")).toBeVisible();
     await expect(incomeCard.getByText("Expected income")).toBeVisible();
   });
 

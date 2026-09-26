@@ -13,9 +13,11 @@ import type { BudgetSummary } from "@/types";
 
 export function BudgetSummaryStrip({
   summary,
+  remainingIncome,
   homeCurrency,
 }: {
   summary: BudgetSummary;
+  remainingIncome: number;
   homeCurrency: SupportedCurrency;
 }) {
   const pctExpenseUsed =
@@ -33,24 +35,20 @@ export function BudgetSummaryStrip({
         )
       : 0;
 
-  const incomeVariance = summary.actualIncome - summary.expectedIncome;
+  const projectedIncome = summary.actualIncome + remainingIncome;
+  const incomeVariance = projectedIncome - summary.expectedIncome;
   const incomeMatchesExpected = Math.abs(incomeVariance) < 0.01;
-  const incomeProgressPct =
-    summary.expectedIncome > 0
-      ? Math.max(
-          0,
-          Math.min((summary.actualIncome / summary.expectedIncome) * 100, 100),
-        )
-      : summary.actualIncome > 0
-        ? 100
-        : 0;
+  // Both segments share the projected total as their scale.
+  const receivedForBar = Math.max(0, summary.actualIncome);
+  const remainingForBar = Math.max(0, remainingIncome);
+  const barTotal = receivedForBar + remainingForBar;
+  const receivedPct = barTotal > 0 ? (receivedForBar / barTotal) * 100 : 0;
+  const remainingPct = barTotal > 0 ? (remainingForBar / barTotal) * 100 : 0;
   const incomeGapLabel = incomeMatchesExpected
     ? "On expected"
     : incomeVariance > 0
       ? `+${formatCurrency(incomeVariance, homeCurrency)} over expected`
-      : summary.monthClosed
-        ? `${formatCurrency(Math.abs(incomeVariance), homeCurrency)} under expected`
-        : `${formatCurrency(Math.abs(incomeVariance), homeCurrency)} still expected`;
+      : `${formatCurrency(Math.abs(incomeVariance), homeCurrency)} under expected`;
   const incomeGapClass = incomeMatchesExpected
     ? "text-muted-foreground"
     : incomeVariance > 0
@@ -89,43 +87,77 @@ export function BudgetSummaryStrip({
           className="px-3 pt-0 pb-3 sm:px-6 sm:pb-6 space-y-3"
           data-testid="summary-income-card"
         >
-          <div
-            className="rounded-md border border-border/70 bg-muted/20 px-3 py-2"
-            data-testid="summary-income-actual"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs font-medium text-muted-foreground">
-                Actual received
-              </span>
-              <span className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                {formatCurrency(summary.actualIncome, homeCurrency)}
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
-                style={{ width: `${incomeProgressPct}%` }}
-              />
-            </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">
+              Expected at month end
+            </p>
             <p
-              className={cn(
-                "mt-1.5 text-xs font-medium tabular-nums",
-                incomeGapClass,
-              )}
+              className="mt-1 text-3xl font-semibold tracking-tight tabular-nums"
+              data-testid="income-projected-total"
             >
-              {incomeGapLabel}
+              {formatCurrency(projectedIncome, homeCurrency)}
             </p>
           </div>
 
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">
-              Expected income
-            </p>
-            <p className="mt-0.5 text-xl sm:text-2xl font-semibold text-green-600 dark:text-green-400">
-              {formatCurrency(summary.expectedIncome, homeCurrency)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              From scheduled income
+          <div className="space-y-3">
+            <div
+              role="img"
+              aria-label={`Income forecast: ${formatCurrency(summary.actualIncome, homeCurrency)} received to date plus ${formatCurrency(remainingIncome, homeCurrency)} still to come equals ${formatCurrency(projectedIncome, homeCurrency)} expected at month end`}
+              className="flex h-3 overflow-hidden rounded-full bg-muted"
+              data-testid="income-forecast-bar"
+            >
+              <div
+                className="h-full bg-emerald-500 dark:bg-emerald-400"
+                style={{ width: `${receivedPct}%` }}
+                data-testid="income-received-segment"
+              />
+              <div
+                className="h-full bg-sky-500/45 dark:bg-sky-400/40"
+                style={{
+                  width: `${remainingPct}%`,
+                  backgroundImage:
+                    "repeating-linear-gradient(135deg, transparent, transparent 4px, rgb(255 255 255 / 0.25) 4px, rgb(255 255 255 / 0.25) 6px)",
+                }}
+                data-testid="income-upcoming-segment"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div data-testid="summary-income-actual">
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400"
+                  />
+                  Received to date
+                </p>
+                <p className="mt-1 text-base font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(summary.actualIncome, homeCurrency)}
+                </p>
+              </div>
+              <div data-testid="summary-income-upcoming">
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full border border-sky-500 bg-sky-500/30 dark:border-sky-400"
+                  />
+                  Still to come
+                </p>
+                <p className="mt-1 text-base font-semibold tabular-nums text-sky-600 dark:text-sky-400">
+                  {formatCurrency(remainingIncome, homeCurrency)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 border-t border-border/60 pt-3 text-xs">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-muted-foreground">
+              <span>Expected income</span>
+              <span className="font-medium tabular-nums">
+                {formatCurrency(summary.expectedIncome, homeCurrency)}
+              </span>
+            </div>
+            <p className={cn("font-medium tabular-nums", incomeGapClass)}>
+              {incomeGapLabel}
             </p>
           </div>
         </CardContent>

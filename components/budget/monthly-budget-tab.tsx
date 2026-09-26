@@ -36,6 +36,7 @@ export function MonthlyBudgetTab({
   rows,
   displayRows,
   summary,
+  remainingIncome,
   hasPreviousMonth,
   previousMonth,
   aiEnabled,
@@ -52,6 +53,7 @@ export function MonthlyBudgetTab({
   /** Real category rows plus computed surplus line for the grid only. */
   displayRows: BudgetCategoryRow[];
   summary: BudgetSummary;
+  remainingIncome: number;
   hasPreviousMonth: boolean;
   previousMonth: string;
   aiEnabled: boolean;
@@ -137,7 +139,11 @@ export function MonthlyBudgetTab({
             </Button>
           </div>
 
-          <BudgetSummaryStrip summary={summary} homeCurrency={homeCurrency} />
+          <BudgetSummaryStrip
+            summary={summary}
+            remainingIncome={remainingIncome}
+            homeCurrency={homeCurrency}
+          />
 
           <BudgetRule502030Strip
             summary={summary}
