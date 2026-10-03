@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { parseAccountCurrency } from "@/lib/currency/account-currency";
 import { convertToHome, prefetchRatesToHome } from "@/lib/currency/convert";
 import type { SupportedCurrency } from "@/lib/currency/supported";
@@ -11,9 +11,9 @@ export async function getTotalBalanceInHomeCurrency(
 ): Promise<number> {
   const rows = db
     .select({
-      amount: transactions.amount,
+      amount: sql<number>`COALESCE(${transactions.originalAmount}, ${transactions.amount})`,
       date: transactions.date,
-      currency: accounts.currency,
+      currency: sql<string>`COALESCE(${transactions.originalCurrency}, ${accounts.currency})`,
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))

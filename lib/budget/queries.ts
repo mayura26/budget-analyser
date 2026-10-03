@@ -210,9 +210,9 @@ export async function getActualIncomeForMonth(
   const { start, end } = getMonthRange(month);
   const rows = db
     .select({
-      amount: transactions.amount,
+      amount: sql<number>`COALESCE(${transactions.originalAmount}, ${transactions.amount})`,
       date: transactions.date,
-      currency: accounts.currency,
+      currency: sql<string>`COALESCE(${transactions.originalCurrency}, ${accounts.currency})`,
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -252,9 +252,9 @@ export async function getActualSpendingByCategory(
   const rows = db
     .select({
       categoryId: transactions.categoryId,
-      amount: transactions.amount,
+      amount: sql<number>`COALESCE(${transactions.originalAmount}, ${transactions.amount})`,
       date: transactions.date,
-      currency: accounts.currency,
+      currency: sql<string>`COALESCE(${transactions.originalCurrency}, ${accounts.currency})`,
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -309,9 +309,9 @@ export async function getHistoricalAverages(
   const rows = db
     .select({
       categoryId: transactions.categoryId,
-      amount: transactions.amount,
+      amount: sql<number>`COALESCE(${transactions.originalAmount}, ${transactions.amount})`,
       date: transactions.date,
-      currency: accounts.currency,
+      currency: sql<string>`COALESCE(${transactions.originalCurrency}, ${accounts.currency})`,
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))
@@ -376,9 +376,9 @@ export async function getMonthlySpendingByCategory(
   const rows = db
     .select({
       categoryId: transactions.categoryId,
-      amount: transactions.amount,
+      amount: sql<number>`COALESCE(${transactions.originalAmount}, ${transactions.amount})`,
       date: transactions.date,
-      currency: accounts.currency,
+      currency: sql<string>`COALESCE(${transactions.originalCurrency}, ${accounts.currency})`,
     })
     .from(transactions)
     .innerJoin(accounts, eq(transactions.accountId, accounts.id))

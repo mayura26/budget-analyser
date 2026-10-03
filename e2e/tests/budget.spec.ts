@@ -899,6 +899,94 @@ test.describe("Budget", () => {
     }
   });
 
+  test("budget converts mixed-currency transactions using their recorded currency", async ({
+    page,
+  }) => {
+    const seed = seedExpenseRefundBudgetRow();
+    const sqlite = new Database(process.env.DATABASE_PATH ?? "./data/test.db");
+    const date = `${seed.month}-02`;
+    const previousRate = sqlite
+      .prepare(
+        "SELECT rate FROM fx_rates WHERE rate_date = ? AND base_currency = 'USD' AND quote_currency = 'AUD'",
+      )
+      .get(date) as { rate: number } | undefined;
+
+    try {
+      sqlite
+        .prepare(
+          "UPDATE categories SET type = 'savings', parent_id = (SELECT id FROM categories WHERE name = 'Savings & Investing' AND parent_id IS NULL) WHERE id = ?",
+        )
+        .run(seed.categoryId);
+      sqlite
+        .prepare("UPDATE budgets SET target_amount = 1000 WHERE id = ?")
+        .run(seed.budgetId);
+      sqlite
+        .prepare(
+          "UPDATE transactions SET amount = -777, original_amount = -998.87, original_currency = 'USD', description = 'E2E USD investment' WHERE id = ?",
+        )
+        .run(seed.transactionId);
+      sqlite
+        .prepare(
+          `INSERT INTO fx_rates (rate_date, base_currency, quote_currency, rate)
+         VALUES (?, 'USD', 'AUD', ?)
+         ON CONFLICT (rate_date, base_currency, quote_currency) DO UPDATE SET rate = excluded.rate`,
+        )
+        .run(date, 1401.02 / 998.87);
+      const insert = sqlite.prepare(
+        `INSERT INTO transactions
+         (account_id, fingerprint, date, description, normalised, amount, category_id, category_source, category_confirmed, is_manual, created_at, updated_at)
+         VALUES (?, ?, ?, 'E2E AUD investment', 'e2e aud investment', ?, ?, 'manual', 1, 1, unixepoch(), unixepoch())`,
+      );
+      for (const amount of [-1000, -1500]) {
+        insert.run(
+          seed.accountId,
+          `e2e-local-currency-${seed.accountId}-${amount}`,
+          date,
+          amount,
+          seed.categoryId,
+        );
+      }
+
+      await page.goto(`/budget?month=${seed.month}`, { waitUntil: "commit" });
+      const row = page
+        .getByTestId("budget-category-row")
+        .filter({ hasText: seed.categoryName })
+        .first();
+      await expect(row).toContainText("$3,901.02");
+      await expect(row).toContainText("$2,901.02");
+      await row
+        .getByRole("button", {
+          name: `Show transactions for ${seed.categoryName}`,
+        })
+        .click();
+      const investment = page
+        .locator("div.grid")
+        .filter({ hasText: "E2E USD investment" })
+        .last();
+      await expect(investment).toContainText("$1,401.02");
+      await expect(investment).toContainText("36%");
+    } finally {
+      sqlite
+        .prepare("DELETE FROM transactions WHERE account_id = ?")
+        .run(seed.accountId);
+      if (previousRate) {
+        sqlite
+          .prepare(
+            "UPDATE fx_rates SET rate = ? WHERE rate_date = ? AND base_currency = 'USD' AND quote_currency = 'AUD'",
+          )
+          .run(previousRate.rate, date);
+      } else {
+        sqlite
+          .prepare(
+            "DELETE FROM fx_rates WHERE rate_date = ? AND base_currency = 'USD' AND quote_currency = 'AUD'",
+          )
+          .run(date);
+      }
+      sqlite.close();
+      cleanupExpenseRefundBudgetRow(seed);
+    }
+  });
+
   test("expense refunds can make category spend negative", async ({ page }) => {
     test.slow();
     const seed = seedExpenseRefundBudgetRow();

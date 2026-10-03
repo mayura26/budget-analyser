@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { monthsInDateRangeInclusive } from "@/lib/analytics/date-range";
 import { buildTreemapDatumForNodes } from "@/lib/analytics/treemap-helpers";
 import { generateOccurrences } from "@/lib/budget/generate";
@@ -67,12 +67,12 @@ async function loadConvertedRows(
   const rows = db
     .select({
       transactionId: transactions.id,
-      amount: transactions.amount,
+      amount: sql<number>`COALESCE(${transactions.originalAmount}, ${transactions.amount})`,
       date: transactions.date,
       description: transactions.description,
       normalised: transactions.normalised,
       merchant: transactions.merchant,
-      currency: accounts.currency,
+      currency: sql<string>`COALESCE(${transactions.originalCurrency}, ${accounts.currency})`,
       accountId: accounts.id,
       accountName: accounts.name,
       accountColor: accounts.color,
