@@ -1,5 +1,7 @@
+import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import Database from "better-sqlite3";
+import sharp from "sharp";
 
 async function createBudgetTestAccount(page: Page) {
   const accountName = `Budget Surplus ${Date.now()}`;
@@ -1125,6 +1127,7 @@ test.describe("Budget", () => {
     page,
   }) => {
     let regenerateCalls = 0;
+    let comparisonScenario = false;
     const baseMetrics = (month: string) => ({
       month,
       monthLabel: "January 2026",
@@ -1242,6 +1245,15 @@ test.describe("Budget", () => {
               format: "deep",
               metrics: {
                 ...baseMetrics(month),
+                ...(comparisonScenario
+                  ? {
+                      actualIncome: 4000,
+                      totalSpent: 2200,
+                      netVariance: 200,
+                      savingsRate: 10,
+                      effectiveSavings: 400,
+                    }
+                  : {}),
               },
               review: {
                 wins: [
@@ -1398,12 +1410,82 @@ test.describe("Budget", () => {
     await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
       "Focus on Takeout",
     );
+    await expect(
+      quickCard.getByRole("meter", { name: "Income", exact: true }),
+    ).toHaveAttribute("value", "3000");
+    await expect(
+      quickCard.getByText("$100.00 below expected", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      quickCard.getByText("$100.00 under budget", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      quickCard.getByText("16.7 percentage points above target", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(quickCard.getByTestId("comparison-target")).toHaveCount(3);
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Export image" }).click();
-    expect((await download).suggestedFilename()).toContain("quick-card.png");
+    const image = await download;
+    expect(image.suggestedFilename()).toContain("quick-card.png");
+    const path = await image.path();
+    if (!path) throw new Error("Export did not produce a file");
+    const png = await readFile(path);
+    const metadata = await sharp(png).metadata();
+    const bounds = await quickCard.boundingBox();
+    if (!bounds || !metadata.width) throw new Error("Missing image dimensions");
+    expect(metadata.width).toBe(Math.ceil(bounds.width) * 2);
+    expect(metadata.height).toBe(Math.ceil(bounds.height) * 2);
+    // The colored header must reach both edges: centered page margins used to clip the PNG.
+    for (const left of [24, metadata.width - 24]) {
+      const pixel = await sharp(png)
+        .extract({ left, top: 48, width: 1, height: 1 })
+        .removeAlpha()
+        .raw()
+        .toBuffer();
+      expect(pixel[1]).toBeGreaterThan(pixel[0] * 2);
+      expect(pixel[2]).toBeGreaterThan(pixel[0] * 2);
+    }
+    await image.saveAs("test-results/monthly-quick-card.png");
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.evaluate(() => document.documentElement.classList.add("dark"));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(quickCard).toBeVisible();
+    expect(
+      await quickCard.evaluate((node) => node.scrollWidth <= node.clientWidth),
+    ).toBe(true);
+    await quickCard.screenshot({
+      path: "test-results/monthly-quick-card-dark-mobile.png",
+    });
+    const mobileDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export image" }).click();
+    const mobileImage = await mobileDownload;
+    expect(await mobileImage.failure()).toBeNull();
+    await mobileImage.saveAs(
+      "test-results/monthly-quick-card-dark-mobile-export.png",
+    );
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.getByRole("button", { name: "View core summary" }).click();
     await expect(
       page.getByText("Variance drivers", { exact: true }),
+    ).toBeVisible();
+    comparisonScenario = true;
+    await page.getByRole("button", { name: "Regenerate", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Regenerate", exact: true }),
+    ).toBeEnabled();
+    await page.getByRole("button", { name: "Generate quick card" }).click();
+    await expect(
+      quickCard.getByText("$900.00 above expected", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      quickCard.getByText("$200.00 over budget", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      quickCard.getByText("10.0 percentage points below target", {
+        exact: true,
+      }),
     ).toBeVisible();
   });
 

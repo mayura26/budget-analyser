@@ -788,6 +788,83 @@ export const ReviewReport = forwardRef<
   );
 });
 
+function QuickComparison({
+  label,
+  actual,
+  target,
+  value,
+  targetLabel,
+  result,
+  good,
+  available = true,
+}: {
+  label: string;
+  actual: number;
+  target: number;
+  value: string;
+  targetLabel: string;
+  result: string;
+  good: boolean;
+  available?: boolean;
+}) {
+  // Share a scale between actual and target so overshoots remain visible.
+  const ceiling = Math.max(actual, target, 1) * 1.12;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+          {label}
+        </span>
+        <span className="text-xl font-semibold tracking-tight tabular-nums">
+          {value}
+        </span>
+      </div>
+      {available && (
+        <div className="relative my-3 h-3 rounded-full bg-slate-200 dark:bg-slate-700">
+          <meter
+            className="sr-only"
+            aria-label={label}
+            min={0}
+            max={ceiling}
+            value={Math.max(0, actual)}
+            aria-valuetext={`${value}; ${targetLabel}; ${result}`}
+          />
+          <div
+            className={cn(
+              "h-full rounded-full",
+              good ? "bg-teal-600 dark:bg-teal-400" : "bg-amber-500",
+            )}
+            style={{ width: `${(Math.max(0, actual) / ceiling) * 100}%` }}
+          />
+          {target > 0 && (
+            <span
+              data-testid="comparison-target"
+              aria-hidden="true"
+              className="absolute -top-1 h-5 w-0.5 bg-slate-700 dark:bg-slate-100"
+              style={{ left: `${(target / ceiling) * 100}%` }}
+            />
+          )}
+        </div>
+      )}
+      <div className="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs">
+        <span className="text-slate-500 dark:text-slate-400">
+          {targetLabel}
+        </span>
+        <span
+          className={cn(
+            "font-semibold",
+            good
+              ? "text-teal-800 dark:text-teal-200"
+              : "text-amber-800 dark:text-amber-200",
+          )}
+        >
+          {result}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export const QuickReviewCard = forwardRef<
   HTMLDivElement,
   { metrics: ReviewMetrics; homeCurrency: SupportedCurrency }
@@ -829,45 +906,118 @@ export const QuickReviewCard = forwardRef<
       ? "Keep your spending habits steady and continue setting money aside each month."
       : "Look for room in optional spending to build savings, and check that your budget matches your income.";
 
-  const values = [
-    ["Income", money(m.actualIncome)],
-    ["Budget", money(m.totalBudgeted)],
-
-    ["Spent", money(m.totalSpent)],
-    [over ? "Over budget" : "Under budget", money(Math.abs(m.netVariance))],
-
-    ["Savings incl. leftover", money(m.effectiveSavings)],
-    ["Savings rate", noIncome ? "Unavailable" : `${m.savingsRate.toFixed(1)}%`],
-  ];
+  const attention = noIncome || cashShortfall || over || !savingsOnTrack;
+  const incomeDifference = m.actualIncome - m.expectedIncome;
+  const savingsTarget = m.buckets.savings.targetPct;
+  const savingsDifference = m.savingsRate - savingsTarget;
 
   return (
     <section
       ref={ref}
       aria-label="Monthly quick card"
-      className="mx-auto max-w-2xl overflow-hidden rounded-2xl border bg-background shadow-sm"
+      style={{ fontFamily: '"Trebuchet MS", sans-serif' }}
+      className="mx-auto w-full min-w-0 max-w-2xl overflow-hidden rounded-2xl border border-teal-200 bg-white text-slate-900 shadow-sm dark:border-teal-900 dark:bg-slate-950 dark:text-slate-100"
     >
-      <div className="border-t-4 border-teal-600 p-6 sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-          <span>Monthly quick card</span>
-          <span>{m.monthLabel}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-teal-900 px-6 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-teal-50 sm:px-8">
+        <span>Monthly quick card</span>
+        <span className="text-teal-200">{m.monthLabel}</span>
+      </div>
+      <div className="p-5 sm:p-7">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <span
+            aria-hidden="true"
+            className={cn(
+              "h-2 w-2 rounded-full",
+              attention ? "bg-amber-500" : "bg-emerald-500",
+            )}
+          />
+          The month at a glance
         </div>
-        <h1 className="mt-5 text-2xl font-semibold tracking-tight">{status}</h1>
-        <dl className="my-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
-          {values.map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-xs text-muted-foreground">{label}</dt>
-              <dd className="mt-1 text-xl font-semibold tabular-nums">
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        <p
-          data-testid="quick-card-summary"
-          className="border-t pt-5 text-sm leading-relaxed"
+        <h1
+          className={cn(
+            "mt-2 text-2xl font-semibold tracking-tight",
+            attention
+              ? "text-amber-800 dark:text-amber-200"
+              : "text-teal-900 dark:text-teal-200",
+          )}
         >
-          {verdict} {savings} {next}
-        </p>
+          {status}
+        </h1>
+        <div className="my-5 space-y-3">
+          <QuickComparison
+            label="Income"
+            actual={m.actualIncome}
+            target={m.expectedIncome}
+            value={money(m.actualIncome)}
+            targetLabel={
+              m.expectedIncome > 0
+                ? `Expected ${money(m.expectedIncome)}`
+                : "No expected income set"
+            }
+            good={m.actualIncome > 0 && incomeDifference >= 0}
+            result={
+              m.expectedIncome <= 0
+                ? "Add expected income to compare"
+                : Math.abs(incomeDifference) < 0.01
+                  ? "As expected"
+                  : `${money(Math.abs(incomeDifference))} ${incomeDifference > 0 ? "above" : "below"} expected`
+            }
+          />
+          <QuickComparison
+            label="Spending"
+            actual={m.totalSpent}
+            target={m.totalBudgeted}
+            value={money(m.totalSpent)}
+            targetLabel={
+              m.totalBudgeted > 0
+                ? `Budget ${money(m.totalBudgeted)}`
+                : "No budget set"
+            }
+            good={!over}
+            result={
+              m.totalBudgeted <= 0
+                ? "Set a budget to compare"
+                : Math.abs(m.netVariance) < 0.01
+                  ? "Exactly on budget"
+                  : `${money(Math.abs(m.netVariance))} ${over ? "over" : "under"} budget`
+            }
+          />
+          <QuickComparison
+            label="Savings incl. leftover"
+            actual={m.savingsRate}
+            target={savingsTarget}
+            value={money(m.effectiveSavings)}
+            targetLabel={
+              noIncome
+                ? "No income recorded"
+                : `${m.savingsRate.toFixed(1)}% of income · ${savingsTarget}% guideline`
+            }
+            available={!noIncome}
+            good={savingsOnTrack}
+            result={
+              noIncome
+                ? "Rate unavailable"
+                : Math.abs(savingsDifference) < 0.05
+                  ? "On savings target"
+                  : `${Math.abs(savingsDifference).toFixed(1)} percentage points ${savingsDifference > 0 ? "above" : "below"} target`
+            }
+          />
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            The line marks the expected amount or target. Each bar uses its own
+            scale.
+          </p>
+        </div>
+        <div className="rounded-xl border-l-4 border-teal-600 bg-teal-50/70 p-4 dark:bg-teal-950/40">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-teal-800 dark:text-teal-300">
+            Your monthly headlines
+          </div>
+          <p
+            data-testid="quick-card-summary"
+            className="text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+          >
+            {verdict} {savings} {next}
+          </p>
+        </div>
       </div>
     </section>
   );

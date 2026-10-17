@@ -165,17 +165,43 @@ export function MonthlyReviewPanel({
     const target = quickCard ? quickCardRef.current : reportRef.current;
     if (!target) return;
     setExporting(true);
+    setError(null);
     try {
-      const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(target, {
+      await document.fonts.ready;
+      const { toBlob, getFontEmbedCSS } = await import("html-to-image");
+      const fontEmbedCSS = quickCard
+        ? ""
+        : await getFontEmbedCSS(target, {
+            preferredFontFormat: "woff2",
+          });
+      const width = Math.ceil(target.getBoundingClientRect().width);
+      const height = Math.ceil(target.getBoundingClientRect().height);
+      const blob = await toBlob(target, {
         pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: getComputedStyle(document.body).backgroundColor,
+        width,
+        height,
+        fontEmbedCSS,
+        backgroundColor: getComputedStyle(target).backgroundColor,
+        // Centering margins belong to the page, not the exported image.
+        style: {
+          fontFamily: getComputedStyle(target).fontFamily,
+          margin: "0",
+          width: `${width}px`,
+          maxWidth: "none",
+          transform: "none",
+        },
       });
+      if (!blob || blob.size === 0)
+        throw new Error("Could not create the image. Please try again.");
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = `budget-review-${month}-${quickCard ? "quick-card" : "summary"}.png`;
-      link.href = dataUrl;
+      link.href = url;
+      document.body.appendChild(link);
       link.click();
+      link.remove();
+      // Keep the object URL alive long enough for browsers to begin the download.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export image");
     } finally {
