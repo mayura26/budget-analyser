@@ -4,8 +4,8 @@ import { Check, Copy, Image as ImageIcon, Link2, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  QuickReviewCard,
   ReportSkeleton,
-  type ReviewFormat,
   type ReviewPayload,
   ReviewReport,
 } from "@/components/budget/review-report";
@@ -20,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createOrGetReviewShare,
   revokeReviewShare,
@@ -41,7 +40,9 @@ export function MonthlyReviewPanel({
   month: string;
   homeCurrency: SupportedCurrency;
 }) {
-  const [format, setFormat] = useState<ReviewFormat>("digest");
+  const format = "deep" as const;
+  const [quickCard, setQuickCard] = useState(false);
+  const quickCardRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,17 +162,18 @@ export function MonthlyReviewPanel({
   };
 
   const handleExportImage = async () => {
-    if (!reportRef.current) return;
+    const target = quickCard ? quickCardRef.current : reportRef.current;
+    if (!target) return;
     setExporting(true);
     try {
       const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(reportRef.current, {
+      const dataUrl = await toPng(target, {
         pixelRatio: 2,
         cacheBust: true,
         backgroundColor: getComputedStyle(document.body).backgroundColor,
       });
       const link = document.createElement("a");
-      link.download = `budget-review-${month}-${format}.png`;
+      link.download = `budget-review-${month}-${quickCard ? "quick-card" : "summary"}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -185,15 +187,7 @@ export function MonthlyReviewPanel({
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Tabs
-            value={format}
-            onValueChange={(value) => setFormat(value as ReviewFormat)}
-          >
-            <TabsList>
-              <TabsTrigger value="digest">Quick Digest</TabsTrigger>
-              <TabsTrigger value="deep">Deep Review</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <h2 className="text-lg font-semibold">Monthly summary</h2>
           {data?.cached && (
             <Badge
               variant="outline"
@@ -204,6 +198,14 @@ export function MonthlyReviewPanel({
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!data || loading}
+            onClick={() => setQuickCard(!quickCard)}
+          >
+            {quickCard ? "View core summary" : "Generate quick card"}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -267,15 +269,24 @@ export function MonthlyReviewPanel({
 
       {data && (
         <>
-          <ReviewReport
-            ref={reportRef}
-            data={{
-              format: data.format,
-              metrics: data.metrics,
-              review: data.review,
-            }}
-            homeCurrency={homeCurrency}
-          />
+          {quickCard && (
+            <QuickReviewCard
+              ref={quickCardRef}
+              metrics={data.metrics}
+              homeCurrency={homeCurrency}
+            />
+          )}
+          <div className={quickCard ? "hidden" : ""}>
+            <ReviewReport
+              ref={reportRef}
+              data={{
+                format: data.format,
+                metrics: data.metrics,
+                review: data.review,
+              }}
+              homeCurrency={homeCurrency}
+            />
+          </div>
 
           <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 pt-2">
             {data.generatedAt && (
@@ -294,8 +305,7 @@ export function MonthlyReviewPanel({
           <DialogHeader>
             <DialogTitle>Share this review</DialogTitle>
             <DialogDescription>
-              Anyone with this link can view the{" "}
-              {format === "deep" ? "deep" : "quick"} review for{" "}
+              Anyone with this link can view the monthly summary for{" "}
               {data?.metrics.monthLabel ?? month}. The link is read-only and
               stays active until you revoke it.
             </DialogDescription>

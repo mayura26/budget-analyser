@@ -84,6 +84,9 @@ type DigestReview = {
 };
 
 type DeepReview = {
+  wins?: ListItemTag[];
+  risks?: DigestRiskTag[];
+  actions?: ListItemTag[];
   executiveSummary: string;
   narrative: string;
   bucketCommentary: { needs: string; wants: string; savings: string };
@@ -230,7 +233,11 @@ export async function POST(request: Request) {
       month,
       format,
     );
-    if (cached && hasCurrentSavingsMath(cached.metrics)) {
+    if (
+      cached &&
+      hasCurrentSavingsMath(cached.metrics) &&
+      (format === "digest" || "wins" in cached.review)
+    ) {
       const topWantsMerchants =
         cached.metrics.topWantsMerchants ??
         (await getTopWantsMerchantsForRange(start, end, homeCurrency));
@@ -472,12 +479,15 @@ Return JSON shape:
 
 Counts: 2-3 risks, 2-3 wins, 2-3 actions.
 ${sharedRules}`
-      : `You are a personal finance analyst reviewing whether the user lived their 50/30/20 plan this month. Produce a detailed monthly review as JSON only.
+      : `You are a personal finance analyst reviewing whether the user lived their 50/30/20 plan this month. Produce one core monthly summary combining a quick digest and detailed review as JSON only. Use plain language for a non-expert.
 ${sharedContext}
 
 Return JSON shape:
 {
-  "executiveSummary": "string (1-2 sentences)",
+  "wins": [{ "bucket": "...", "text": "string" }],
+  "risks": [{ "severity": "high"|"medium"|"low", "bucket": "...", "text": "string" }],
+  "actions": [{ "bucket": "...", "text": "string" }],
+  "executiveSummary": "string (2-3 short plain-language sentences: verdict, key headline, what to improve or keep doing)",
   "narrative": "string (3-5 sentences leading with the 50/30/20 verdict)",
   "bucketCommentary": { "needs": "string", "wants": "string", "savings": "string" },
   "keyFindings": [{ "bucket": "...", "text": "string" }],
@@ -485,7 +495,7 @@ Return JSON shape:
   "recommendations": [{ "bucket": "...", "text": "string" }]
 }
 
-Counts: 3-5 keyFindings, 3-5 varianceDrivers, 3-5 recommendations.
+Counts: 2-3 wins, risks and actions; 2-3 keyFindings, varianceDrivers and recommendations. Avoid repeating the same point across sections.
 ${sharedRules}`;
 
   const client = new OpenAI({ apiKey });
@@ -520,6 +530,9 @@ ${sharedRules}`;
             actions: asListItems(parsed.actions),
           }
         : {
+            wins: asListItems(parsed.wins),
+            risks: asRiskItems(parsed.risks),
+            actions: asListItems(parsed.actions),
             executiveSummary:
               typeof parsed.executiveSummary === "string"
                 ? parsed.executiveSummary

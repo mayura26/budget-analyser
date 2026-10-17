@@ -88,6 +88,9 @@ export type DigestReview = {
 };
 
 export type DeepReview = {
+  wins?: ListItemTag[];
+  risks?: DigestRiskTag[];
+  actions?: ListItemTag[];
   executiveSummary: string;
   narrative: string;
   bucketCommentary: { needs: string; wants: string; savings: string };
@@ -729,20 +732,20 @@ export const ReviewReport = forwardRef<
         />
       )}
 
-      {data.format === "digest" && "headline" in data.review && (
+      {("headline" in data.review || "wins" in data.review) && (
         <div className="grid gap-3 md:grid-cols-3">
           <HighlightCard
             title="Wins"
             icon={<TrendingUp className="h-4 w-4" />}
             accent="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-            items={data.review.wins}
+            items={data.review.wins ?? []}
             emptyText="No standout wins this month."
           />
           <HighlightCard
             title="Risks"
             icon={<AlertTriangle className="h-4 w-4" />}
             accent="bg-amber-500/15 text-amber-700 dark:text-amber-300"
-            items={data.review.risks}
+            items={data.review.risks ?? []}
             emptyText="Nothing flagged as a risk."
             renderRiskSeverity
           />
@@ -750,7 +753,7 @@ export const ReviewReport = forwardRef<
             title="Actions for next month"
             icon={<ArrowRight className="h-4 w-4" />}
             accent="bg-sky-500/15 text-sky-700 dark:text-sky-300"
-            items={data.review.actions}
+            items={data.review.actions ?? []}
             emptyText="No specific actions called out."
           />
         </div>
@@ -782,6 +785,91 @@ export const ReviewReport = forwardRef<
         </div>
       )}
     </div>
+  );
+});
+
+export const QuickReviewCard = forwardRef<
+  HTMLDivElement,
+  { metrics: ReviewMetrics; homeCurrency: SupportedCurrency }
+>(function QuickReviewCard({ metrics: m, homeCurrency }, ref) {
+  const money = (value: number) => formatCurrency(value, homeCurrency);
+
+  const noIncome = m.actualIncome <= 0;
+
+  const over = m.netVariance > 0;
+
+  const cashShortfall = m.totalSpent + m.taggedSavings > m.actualIncome;
+
+  const savingsOnTrack =
+    !noIncome && m.savingsRate >= m.buckets.savings.targetPct;
+
+  const status = noIncome
+    ? "Income needs checking"
+    : cashShortfall
+      ? "Spending needs attention"
+      : over
+        ? "Over budget, with money saved"
+        : savingsOnTrack
+          ? "A strong month"
+          : "On budget, savings need a lift";
+
+  const verdict = noIncome
+    ? "No income was recorded, so check your income entries before judging this month."
+    : `You finished ${money(Math.abs(m.netVariance))} ${over ? "over" : "under"} budget${cashShortfall ? ", and spending plus savings allocations exceeded your income" : ""}.`;
+
+  const savings = noIncome
+    ? `Recorded spending was ${money(m.totalSpent)}, with ${money(m.taggedSavings)} set aside for savings.`
+    : `You saved ${money(m.effectiveSavings)} including money left over, or ${m.savingsRate.toFixed(1)}% of income${savingsOnTrack ? " — meeting your savings guideline" : " — below your savings guideline"}.`;
+
+  const pressure = m.topOverspend.find((item) => item.bucket !== "savings");
+
+  const next = pressure
+    ? `Focus on ${pressure.category.split("(")[0].trim()}, which was ${money(pressure.amount)} over its budget, while keeping the spending habits that helped elsewhere.`
+    : savingsOnTrack
+      ? "Keep your spending habits steady and continue setting money aside each month."
+      : "Look for room in optional spending to build savings, and check that your budget matches your income.";
+
+  const values = [
+    ["Income", money(m.actualIncome)],
+    ["Budget", money(m.totalBudgeted)],
+
+    ["Spent", money(m.totalSpent)],
+    [over ? "Over budget" : "Under budget", money(Math.abs(m.netVariance))],
+
+    ["Savings incl. leftover", money(m.effectiveSavings)],
+    ["Savings rate", noIncome ? "Unavailable" : `${m.savingsRate.toFixed(1)}%`],
+  ];
+
+  return (
+    <section
+      ref={ref}
+      aria-label="Monthly quick card"
+      className="mx-auto max-w-2xl overflow-hidden rounded-2xl border bg-background shadow-sm"
+    >
+      <div className="border-t-4 border-teal-600 p-6 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          <span>Monthly quick card</span>
+          <span>{m.monthLabel}</span>
+        </div>
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight">{status}</h1>
+        <dl className="my-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+          {values.map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs text-muted-foreground">{label}</dt>
+              <dd className="mt-1 text-xl font-semibold tabular-nums">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <p
+          data-testid="quick-card-summary"
+          className="border-t pt-5 text-sm leading-relaxed"
+        >
+          {verdict} {savings} {next}
+        </p>
+      </div>
+    </section>
   );
 });
 

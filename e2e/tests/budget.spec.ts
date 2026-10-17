@@ -1121,7 +1121,7 @@ test.describe("Budget", () => {
     await expect(incomeCard.getByText("Expected income")).toBeVisible();
   });
 
-  test("closed month review page shows quick and deep formats", async ({
+  test("closed month review combines the summary and generates a quick card", async ({
     page,
   }) => {
     let regenerateCalls = 0;
@@ -1242,12 +1242,25 @@ test.describe("Budget", () => {
               format: "deep",
               metrics: {
                 ...baseMetrics(month),
-                totalSpent: 2100,
-                netVariance: 100,
-                onTrack: false,
               },
               review: {
-                executiveSummary: "You closed slightly over budget.",
+                wins: [
+                  { bucket: "needs", text: "Groceries closed under target." },
+                ],
+                risks: [
+                  {
+                    severity: "medium",
+                    bucket: "wants",
+                    text: "Dining out is still near your limit.",
+                  },
+                ],
+                actions: [
+                  {
+                    bucket: "savings",
+                    text: "Sweep $50 surplus into your utilities buffer.",
+                  },
+                ],
+                executiveSummary: "Strong finish for the month.",
                 narrative:
                   "Wants and Needs both drifted close to their guidelines this month.",
                 bucketCommentary: {
@@ -1303,7 +1316,17 @@ test.describe("Budget", () => {
 
     // Hero band + tabs render
     await expect(page.getByText("Monthly review")).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Quick Digest" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Monthly summary" }),
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Quick Digest" })).toHaveCount(
+      0,
+    );
+    await expect(page.getByText("Wins", { exact: true })).toBeVisible();
+    await expect(page.getByText("Risks", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Variance drivers", { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText("Strong finish for the month.")).toBeVisible();
 
     // Category variance chart shows full long category labels (Y-axis space)
@@ -1357,12 +1380,31 @@ test.describe("Budget", () => {
     await page.getByRole("button", { name: /Regenerate/ }).click();
     await expect.poll(() => regenerateCalls).toBeGreaterThan(regenerateBefore);
 
-    // Switch to Deep Review and verify deep payload renders
-    await page.getByRole("tab", { name: "Deep Review" }).click();
+    await page.getByRole("button", { name: "Generate quick card" }).click();
+    const quickCard = page.getByRole("region", { name: "Monthly quick card" });
+    await expect(quickCard).toBeVisible();
     await expect(
-      page.getByText("You closed slightly over budget."),
+      quickCard.getByRole("heading", { name: "A strong month" }),
     ).toBeVisible();
-    await expect(page.getByText("Variance drivers")).toBeVisible();
+    await expect(
+      quickCard.getByText("$3,000.00", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      quickCard.getByText("$1,100.00", { exact: true }),
+    ).toBeVisible();
+    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
+      "$100.00 under budget",
+    );
+    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
+      "Focus on Takeout",
+    );
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export image" }).click();
+    expect((await download).suggestedFilename()).toContain("quick-card.png");
+    await page.getByRole("button", { name: "View core summary" }).click();
+    await expect(
+      page.getByText("Variance drivers", { exact: true }),
+    ).toBeVisible();
   });
 
   test("review report shows wants merchant concentration", async ({ page }) => {
@@ -1474,64 +1516,85 @@ test.describe("Budget", () => {
   }) => {
     // Mock the review API the same way the prior test does.
     await page.route("**/api/ai-budget-review", async (route) => {
+      const month = route.request().postDataJSON().month as string;
+      const payload = {
+        format: "deep",
+        metrics: {
+          month,
+          monthLabel: "January 2026",
+          totalBudgeted: 2000,
+          totalSpent: 1900,
+          projectedSpend: 1900,
+          netVariance: -100,
+          onTrack: true,
+          actualIncome: 3000,
+          expectedIncome: 3000,
+          incomeVariance: 0,
+          savingsRate: 36.7,
+          surplus: 1100,
+          taggedSavings: 0,
+          effectiveSavings: 1100,
+          buckets: {
+            needs: {
+              targetAmount: 1500,
+              actualAmount: 1450,
+              guidelineAmount: 1500,
+              targetPct: 50,
+              actualPct: 48.3,
+            },
+            wants: {
+              targetAmount: 500,
+              actualAmount: 450,
+              guidelineAmount: 900,
+              targetPct: 30,
+              actualPct: 15,
+            },
+            savings: {
+              targetAmount: 0,
+              actualAmount: 1100,
+              guidelineAmount: 600,
+              targetPct: 20,
+              actualPct: 36.7,
+            },
+          },
+          topOverspend: [],
+          topUnderspend: [],
+          categoriesOverTarget: 0,
+        },
+        review: {
+          executiveSummary: "Strong finish for the month.",
+          narrative: "Spending stayed within budget.",
+          keyFindings: [],
+          varianceDrivers: [],
+          recommendations: [],
+          bucketCommentary: { needs: "", wants: "", savings: "" },
+          risks: [],
+          wins: [],
+          actions: [],
+        },
+        cached: true,
+        model: "gpt-4o-mini",
+        generatedAt: Math.floor(Date.now() / 1000),
+      };
+      // The public page reads the saved review, so persist the mocked response too.
+      const sqlite = new Database(
+        process.env.DATABASE_PATH ?? "./data/test.db",
+      );
+      sqlite
+        .prepare(`INSERT INTO budget_month_reviews (month, format, review_json, metrics_json, model, generated_at)
+        VALUES (?, 'deep', ?, ?, ?, unixepoch())
+        ON CONFLICT(month, format) DO UPDATE SET review_json=excluded.review_json, metrics_json=excluded.metrics_json`)
+        .run(
+          month,
+          JSON.stringify(payload.review),
+          JSON.stringify(payload.metrics),
+          payload.model,
+        );
+      sqlite.close();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          format: "digest",
-          metrics: {
-            month: "2026-01",
-            monthLabel: "January 2026",
-            totalBudgeted: 2000,
-            totalSpent: 1900,
-            projectedSpend: 1900,
-            netVariance: -100,
-            onTrack: true,
-            actualIncome: 3000,
-            expectedIncome: 3000,
-            incomeVariance: 0,
-            savingsRate: 36.7,
-            surplus: 1100,
-            taggedSavings: 0,
-            effectiveSavings: 1100,
-            buckets: {
-              needs: {
-                targetAmount: 1500,
-                actualAmount: 1450,
-                guidelineAmount: 1500,
-                targetPct: 50,
-                actualPct: 48.3,
-              },
-              wants: {
-                targetAmount: 500,
-                actualAmount: 450,
-                guidelineAmount: 900,
-                targetPct: 30,
-                actualPct: 15,
-              },
-              savings: {
-                targetAmount: 0,
-                actualAmount: 1100,
-                guidelineAmount: 600,
-                targetPct: 20,
-                actualPct: 36.7,
-              },
-            },
-            topOverspend: [],
-            topUnderspend: [],
-            categoriesOverTarget: 0,
-          },
-          review: {
-            headline: "Strong finish for the month.",
-            bucketCommentary: { needs: "", wants: "", savings: "" },
-            risks: [],
-            wins: [],
-            actions: [],
-          },
-          cached: true,
-          model: "gpt-4o-mini",
-          generatedAt: Math.floor(Date.now() / 1000),
-        }),
+        body: JSON.stringify(payload),
       });
     });
 
