@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import Image from "next/image";
 import { forwardRef } from "react";
 import {
   Bar,
@@ -910,6 +911,27 @@ export const QuickReviewCard = forwardRef<
   const incomeDifference = m.actualIncome - m.expectedIncome;
   const savingsTarget = m.buckets.savings.targetPct;
   const savingsDifference = m.savingsRate - savingsTarget;
+  const score = noIncome
+    ? null
+    : cashShortfall
+      ? 1
+      : over && !savingsOnTrack
+        ? 2
+        : over || !savingsOnTrack
+          ? 3
+          : savingsDifference >= 10
+            ? 5
+            : 4;
+  const scoreMood = [
+    "",
+    "Crying",
+    "Worried",
+    "Indifferent",
+    "Happy",
+    "Cheering",
+  ];
+  const scoreExplanation =
+    "1: income shortfall; 2: over budget and below savings target; 3: meeting one target; 4: on budget and meeting savings target; 5: on budget and saving at least 10 percentage points above target.";
 
   return (
     <section
@@ -923,26 +945,53 @@ export const QuickReviewCard = forwardRef<
         <span className="text-teal-200">{m.monthLabel}</span>
       </div>
       <div className="p-5 sm:p-7">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          <span
-            aria-hidden="true"
-            className={cn(
-              "h-2 w-2 rounded-full",
-              attention ? "bg-amber-500" : "bg-emerald-500",
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  attention ? "bg-amber-500" : "bg-emerald-500",
+                )}
+              />
+              The month at a glance
+            </div>
+            <h1
+              className={cn(
+                "mt-2 text-2xl font-semibold tracking-tight",
+                attention
+                  ? "text-amber-800 dark:text-amber-200"
+                  : "text-teal-900 dark:text-teal-200",
+              )}
+            >
+              {status}
+            </h1>
+          </div>
+          <div
+            className="flex w-24 shrink-0 flex-col items-center sm:w-28"
+            title={scoreExplanation}
+            data-testid="quick-card-score"
+          >
+            <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-[9px] font-bold tracking-[0.14em] text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-200">
+              SCORE (1–5)
+            </span>
+            {score ? (
+              <Image
+                src={`/images/budget-score/score-${score}.png`}
+                alt={`${scoreMood[score]} teddy bear — budget score ${score} out of 5`}
+                width={112}
+                height={112}
+                unoptimized
+                className="mt-1 h-24 w-24 object-contain sm:h-28 sm:w-28"
+              />
+            ) : (
+              <span className="py-4 text-xs text-slate-500 dark:text-slate-400">
+                Unrated
+              </span>
             )}
-          />
-          The month at a glance
+          </div>
         </div>
-        <h1
-          className={cn(
-            "mt-2 text-2xl font-semibold tracking-tight",
-            attention
-              ? "text-amber-800 dark:text-amber-200"
-              : "text-teal-900 dark:text-teal-200",
-          )}
-        >
-          {status}
-        </h1>
         <div className="my-5 space-y-3">
           <QuickComparison
             label="Income"

@@ -1395,6 +1395,27 @@ test.describe("Budget", () => {
     await page.getByRole("button", { name: "Generate quick card" }).click();
     const quickCard = page.getByRole("region", { name: "Monthly quick card" });
     await expect(quickCard).toBeVisible();
+    await expect(quickCard.getByText("SCORE (1–5)")).toBeVisible();
+    // Every rating must have a transparent, decodable teddy asset.
+    for (const score of [1, 2, 3, 4, 5]) {
+      const asset = await page.request.get(
+        `/images/budget-score/score-${score}.png`,
+      );
+      expect(asset.ok()).toBe(true);
+      const metadata = await sharp(await asset.body()).metadata();
+      expect(metadata.format).toBe("png");
+      expect(metadata.hasAlpha).toBe(true);
+      expect(metadata.width).toBe(metadata.height);
+    }
+    const teddy = quickCard.getByRole("img", {
+      name: "Cheering teddy bear — budget score 5 out of 5",
+    });
+    await expect(teddy).toBeVisible();
+    await expect
+      .poll(() =>
+        teddy.evaluate((node) => (node as HTMLImageElement).naturalWidth),
+      )
+      .toBeGreaterThan(0);
     await expect(
       quickCard.getByRole("heading", { name: "A strong month" }),
     ).toBeVisible();
@@ -1481,6 +1502,11 @@ test.describe("Budget", () => {
     ).toBeVisible();
     await expect(
       quickCard.getByText("$200.00 over budget", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      quickCard.getByRole("img", {
+        name: "Worried teddy bear — budget score 2 out of 5",
+      }),
     ).toBeVisible();
     await expect(
       quickCard.getByText("10.0 percentage points below target", {
