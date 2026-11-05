@@ -107,6 +107,41 @@ test.describe("Categorise Dialog", () => {
     await expect(accountCell).toBeVisible();
   });
 
+  test("category picker orders groups and supports contains and wildcard search", async ({
+    page,
+  }) => {
+    await openAndWaitForReview(page);
+    await aiCategoriseDialog(page)
+      .locator("tbody tr")
+      .first()
+      .getByRole("combobox")
+      .click();
+    const groups = page.getByRole("group");
+    const names = await groups.allTextContents();
+    const incomeIndex = names.findIndex((name) => name.includes("Money IN"));
+    const specialIndex = names.findIndex((name) => name.includes("Special"));
+    expect(incomeIndex).toBeGreaterThan(0);
+    expect(specialIndex).toBeGreaterThan(incomeIndex);
+    const search = page.getByRole("textbox", { name: "Search categories" });
+    await search.fill("oCeR");
+    await expect(page.getByRole("option", { name: "Groceries" })).toBeVisible();
+    await search.fill("*gro*ies*");
+    await expect(page.getByRole("option", { name: "Groceries" })).toBeVisible();
+    await search.fill("no-such-category-xyz");
+    await expect(page.getByRole("status")).toHaveText("No categories found");
+    await search.fill("");
+    await expect(page.getByRole("option", { name: "Groceries" })).toBeVisible();
+    await search.pressSequentially("gro");
+    await expect(search).toHaveValue("gro");
+    await page.getByRole("option", { name: "Groceries" }).click();
+    await expect(
+      aiCategoriseDialog(page)
+        .locator("tbody tr")
+        .first()
+        .getByRole("combobox"),
+    ).toContainText("Groceries");
+  });
+
   test("cancel closes dialog without applying", async ({ page }) => {
     await openAndWaitForReview(page);
 
