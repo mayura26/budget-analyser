@@ -1143,6 +1143,7 @@ test.describe("Budget", () => {
       surplus: 800,
       taggedSavings: 300,
       effectiveSavings: 1100,
+      discretionary: { actual: 450, target: 500 },
       buckets: {
         needs: {
           targetAmount: 1500,
@@ -1252,6 +1253,7 @@ test.describe("Budget", () => {
                       netVariance: 200,
                       savingsRate: 10,
                       effectiveSavings: 400,
+                      discretionary: { actual: 800, target: 500 },
                     }
                   : {}),
               },
@@ -1396,6 +1398,11 @@ test.describe("Budget", () => {
     const quickCard = page.getByRole("region", { name: "Monthly quick card" });
     await expect(quickCard).toBeVisible();
     await expect(quickCard.getByText("SCORE (1–5)")).toBeVisible();
+    const scoreHeading = quickCard.getByText("SCORE (1–5)");
+    const scoreHeadingBounds = await scoreHeading.boundingBox();
+    expect(scoreHeadingBounds).not.toBeNull();
+    expect(scoreHeadingBounds?.height).toBeLessThanOrEqual(16);
+    expect(scoreHeadingBounds?.width).toBeGreaterThan(90);
     // Every rating must have a transparent, decodable teddy asset.
     for (const score of [1, 2, 3, 4, 5]) {
       const asset = await page.request.get(
@@ -1431,6 +1438,21 @@ test.describe("Budget", () => {
     await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
       "Focus on Takeout",
     );
+    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
+      "meeting the 20% rule",
+    );
+    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
+      "Needs used 48.3% of income against 50%",
+    );
+    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
+      "Discretionary spending was $450.00 against $500.00 targeted",
+    );
+    await expect(
+      quickCard.getByTestId("quick-card-score-breakdown"),
+    ).toContainText("Savings (40%): 100.0/100");
+    await expect(
+      quickCard.getByTestId("quick-card-score-breakdown"),
+    ).toContainText("Discretionary (30%): 90.0/100");
     await expect(
       quickCard.getByRole("meter", { name: "Income", exact: true }),
     ).toHaveAttribute("value", "3000");
@@ -1446,6 +1468,7 @@ test.describe("Budget", () => {
       }),
     ).toBeVisible();
     await expect(quickCard.getByTestId("comparison-target")).toHaveCount(3);
+    await expect(quickCard).not.toContainText("Each bar uses its own scale");
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Export image" }).click();
     const image = await download;
@@ -1508,6 +1531,14 @@ test.describe("Budget", () => {
         name: "Worried teddy bear — budget score 2 out of 5",
       }),
     ).toBeVisible();
+    await expect(
+      quickCard.getByRole("heading", {
+        name: "Discretionary spending needs attention",
+      }),
+    ).toBeVisible();
+    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
+      "Discretionary spending was $800.00 against $500.00 targeted — $300.00 over target",
+    );
     await expect(
       quickCard.getByText("10.0 percentage points below target", {
         exact: true,

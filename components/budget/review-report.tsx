@@ -26,6 +26,10 @@ import {
 import { TopMerchantsCard } from "@/components/analytics/top-merchants-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  calculateReviewScore,
+  type DiscretionaryMetrics,
+} from "@/lib/budget/review-score";
 import type { SupportedCurrency } from "@/lib/currency/supported";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { TopMerchantSpend } from "@/types";
@@ -42,6 +46,7 @@ export type BucketBand = {
 };
 
 export type ReviewMetrics = {
+  discretionary?: DiscretionaryMetrics;
   month: string;
   monthLabel: string;
   totalBudgeted: number;
@@ -873,6 +878,8 @@ export const QuickReviewCard = forwardRef<
   const money = (value: number) => formatCurrency(value, homeCurrency);
 
   const noIncome = m.actualIncome <= 0;
+  const performance = calculateReviewScore(m);
+  const score = performance?.score ?? null;
 
   const over = m.netVariance > 0;
 
@@ -881,15 +888,22 @@ export const QuickReviewCard = forwardRef<
   const savingsOnTrack =
     !noIncome && m.savingsRate >= m.buckets.savings.targetPct;
 
+  const weakest = performance
+    ? [
+        { label: "Savings", value: performance.savings },
+        { label: "Budget", value: performance.budget },
+        { label: "Discretionary spending", value: performance.discretionary },
+      ].sort((a, b) => a.value - b.value)[0]
+    : null;
   const status = noIncome
     ? "Income needs checking"
-    : cashShortfall
-      ? "Spending needs attention"
-      : over
-        ? "Over budget, with money saved"
-        : savingsOnTrack
+    : !performance
+      ? "Add targets to rate this month"
+      : weakest && weakest.value < 75
+        ? `${weakest.label} needs attention`
+        : score === 5
           ? "A strong month"
-          : "On budget, savings need a lift";
+          : "A steady month across your targets";
 
   const verdict = noIncome
     ? "No income was recorded, so check your income entries before judging this month."
@@ -897,7 +911,13 @@ export const QuickReviewCard = forwardRef<
 
   const savings = noIncome
     ? `Recorded spending was ${money(m.totalSpent)}, with ${money(m.taggedSavings)} set aside for savings.`
-    : `You saved ${money(m.effectiveSavings)} including money left over, or ${m.savingsRate.toFixed(1)}% of income${savingsOnTrack ? " — meeting your savings guideline" : " — below your savings guideline"}.`;
+    : `You saved ${money(m.effectiveSavings)} including money left over, or ${m.savingsRate.toFixed(1)}% of income — ${m.savingsRate >= 20 ? "meeting" : "below"} the 20% rule${m.buckets.savings.targetAmount > 0 ? ` and ${m.effectiveSavings >= m.buckets.savings.targetAmount ? "meeting" : "below"} your ${money(m.buckets.savings.targetAmount)} savings target` : "; no savings amount target set"}.`;
+  const budgetFit = noIncome
+    ? ""
+    : `Needs used ${m.buckets.needs.actualPct.toFixed(1)}% of income against 50%, and wants ${m.buckets.wants.actualPct.toFixed(1)}% against 30%.`;
+  const discretionaryHeadline = m.discretionary
+    ? `Discretionary spending was ${money(m.discretionary.actual)} against ${money(m.discretionary.target)} targeted${m.discretionary.target > 0 ? ` — ${money(Math.abs(m.discretionary.actual - m.discretionary.target))} ${m.discretionary.actual > m.discretionary.target ? "over" : "under"} target` : m.discretionary.actual > 0 ? " — add a target for this spending" : " — no discretionary spending"}.`
+    : "Discretionary spending data is unavailable; regenerate the review to rate this month.";
 
   const pressure = m.topOverspend.find((item) => item.bucket !== "savings");
 
@@ -907,21 +927,10 @@ export const QuickReviewCard = forwardRef<
       ? "Keep your spending habits steady and continue setting money aside each month."
       : "Look for room in optional spending to build savings, and check that your budget matches your income.";
 
-  const attention = noIncome || cashShortfall || over || !savingsOnTrack;
+  const attention = !performance || performance.score < 4;
   const incomeDifference = m.actualIncome - m.expectedIncome;
   const savingsTarget = m.buckets.savings.targetPct;
   const savingsDifference = m.savingsRate - savingsTarget;
-  const score = noIncome
-    ? null
-    : cashShortfall
-      ? 1
-      : over && !savingsOnTrack
-        ? 2
-        : over || !savingsOnTrack
-          ? 3
-          : savingsDifference >= 10
-            ? 5
-            : 4;
   const scoreMood = [
     "",
     "Crying",
@@ -931,7 +940,7 @@ export const QuickReviewCard = forwardRef<
     "Cheering",
   ];
   const scoreExplanation =
-    "1: income shortfall; 2: over budget and below savings target; 3: meeting one target; 4: on budget and meeting savings target; 5: on budget and saving at least 10 percentage points above target.";
+    "Savings 40% (amount target and 20% rule), budget 30% (total target and 50/30/20 fit), discretionary 30% (non-essential categories without scheduled fixed costs). Meeting targets earns 80/100. Weighted totals: 1 below 40; 2 from 40; 3 from 60; 4 from 75; 5 from 90.";
 
   return (
     <section
@@ -973,7 +982,7 @@ export const QuickReviewCard = forwardRef<
             title={scoreExplanation}
             data-testid="quick-card-score"
           >
-            <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-[9px] font-bold tracking-[0.14em] text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-200">
+            <span className="w-full rounded-sm border border-teal-200 bg-teal-50 px-2 py-0.5 text-center text-[9px] font-bold leading-none tracking-[0.14em] text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-200">
               SCORE (1–5)
             </span>
             {score ? (
@@ -1051,10 +1060,6 @@ export const QuickReviewCard = forwardRef<
                   : `${Math.abs(savingsDifference).toFixed(1)} percentage points ${savingsDifference > 0 ? "above" : "below"} target`
             }
           />
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            The line marks the expected amount or target. Each bar uses its own
-            scale.
-          </p>
         </div>
         <div className="rounded-xl border-l-4 border-teal-600 bg-teal-50/70 p-4 dark:bg-teal-950/40">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-teal-800 dark:text-teal-300">
@@ -1064,8 +1069,20 @@ export const QuickReviewCard = forwardRef<
             data-testid="quick-card-summary"
             className="text-sm leading-relaxed text-slate-700 dark:text-slate-200"
           >
-            {verdict} {savings} {next}
+            {verdict} {savings} {budgetFit} {discretionaryHeadline} {next}
           </p>
+          {performance && (
+            <p
+              data-testid="quick-card-score-breakdown"
+              className="mt-3 text-xs leading-relaxed text-teal-800 dark:text-teal-200"
+              title={scoreExplanation}
+            >
+              Savings (40%): {performance.savings.toFixed(1)}/100 · Budget
+              (30%): {performance.budget.toFixed(1)}/100 · Discretionary (30%):{" "}
+              {performance.discretionary.toFixed(1)}/100. Weighted result:{" "}
+              {performance.total.toFixed(1)}/100 → {score}/5.
+            </p>
+          )}
         </div>
       </div>
     </section>

@@ -15,6 +15,11 @@ import {
   calculateReviewSavingsMetrics,
   reviewSavingsMetricsMatch,
 } from "@/lib/budget/review-savings";
+import {
+  calculateReviewScore,
+  type DiscretionaryMetrics,
+  discretionaryMetrics,
+} from "@/lib/budget/review-score";
 import { getHomeCurrency } from "@/lib/currency/home";
 import { db } from "@/lib/db";
 import { categories, settings } from "@/lib/db/schema";
@@ -37,6 +42,7 @@ type BucketBand = {
 };
 
 type ReviewMetrics = {
+  discretionary?: DiscretionaryMetrics;
   month: string;
   monthLabel: string;
   totalBudgeted: number;
@@ -241,9 +247,18 @@ export async function POST(request: Request) {
       const topWantsMerchants =
         cached.metrics.topWantsMerchants ??
         (await getTopWantsMerchantsForRange(start, end, homeCurrency));
+      const discretionary =
+        cached.metrics.discretionary ??
+        discretionaryMetrics(
+          await buildBudgetCategoryRows(
+            month,
+            db.select().from(categories).all() as Category[],
+            homeCurrency,
+          ),
+        );
       return NextResponse.json({
         format,
-        metrics: { ...cached.metrics, topWantsMerchants },
+        metrics: { ...cached.metrics, topWantsMerchants, discretionary },
         review: cached.review,
         cached: true,
         model: cached.model,
@@ -382,6 +397,7 @@ export async function POST(request: Request) {
   );
 
   const metrics: ReviewMetrics = {
+    discretionary: discretionaryMetrics(rows),
     month,
     monthLabel: formatMonth(month),
     totalBudgeted: summary.totalBudgeted,
@@ -437,6 +453,8 @@ export async function POST(request: Request) {
     .join("\n");
 
   const sharedContext = `Month: ${metrics.monthLabel}
+Weighted performance: ${JSON.stringify(calculateReviewScore(metrics))} (savings 40%, budget including 50/30/20 fit 30%, discretionary 30%; component scores out of 100).
+Discretionary spending: ${formatCurrency(metrics.discretionary?.actual ?? 0, homeCurrency)} vs target ${formatCurrency(metrics.discretionary?.target ?? 0, homeCurrency)}. This includes Wants categories without scheduled fixed costs; Needs and categories containing scheduled fixed costs are excluded.
 Actual income: ${formatCurrency(actualIncome, homeCurrency)}
 Expected income (scheduled): ${formatCurrency(summary.expectedIncome, homeCurrency)} (variance ${formatCurrency(incomeVariance, homeCurrency)})
 Total spent: ${formatCurrency(summary.totalSpent, homeCurrency)}
@@ -456,6 +474,7 @@ Top wants merchant concentration (needs, scheduled calendar payments, transfers,
 ${merchantLines}`;
 
   const sharedRules = `Rules:
+- Base the headline and executive summary on all three weighted performance areas: savings against its budget target and the 20% guideline (40%), total budget and 50/30/20 fit (30%), and discretionary spending against target (30%). Mention mixed results rather than letting one strong area hide another weak area. Do not invent scores when performance is unavailable.
 - Frame the review as a 50/30/20 review. Treat only leftover surplus after expenses and tagged savings as additional effective savings.
 - Use ACTUAL income, not scheduled, for percentages. If actual differed materially from scheduled, call that out as its own point.
 - Every list item must be an object: { "bucket": "needs"|"wants"|"savings"|"overall", "text": "..." }.
