@@ -1430,29 +1430,45 @@ test.describe("Budget", () => {
       quickCard.getByText("$3,000.00", { exact: true }),
     ).toBeVisible();
     await expect(
-      quickCard.getByText("$1,100.00", { exact: true }),
+      quickCard.getByText("$1,100.00", { exact: true }).first(),
     ).toBeVisible();
     await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
-      "$100.00 under budget",
+      "Savings are on track.",
     );
     await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
       "Focus on Takeout",
     );
-    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
-      "meeting the 20% rule",
+    const scoreTiles = quickCard.getByTestId("quick-card-score-tiles");
+    await expect(scoreTiles.getByRole("meter")).toHaveCount(3);
+    await expect(
+      scoreTiles.getByRole("meter", { name: "Savings score", exact: true }),
+    ).toHaveAttribute("value", "10");
+    await expect(
+      scoreTiles.getByRole("meter", {
+        name: "Discretionary score",
+        exact: true,
+      }),
+    ).toHaveAttribute("value", "9");
+    await expect(quickCard.getByTestId("score-tile-savings")).toContainText(
+      "36.7% saved / 20% rule",
     );
-    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
-      "Needs used 48.3% of income against 50%",
-    );
-    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
-      "Discretionary spending was $450.00 against $500.00 targeted",
+    await expect(quickCard.getByTestId("score-tile-budget")).toContainText(
+      "Needs 48.3% / 50%",
     );
     await expect(
-      quickCard.getByTestId("quick-card-score-breakdown"),
-    ).toContainText("Savings (40%): 100.0/100");
+      quickCard.getByTestId("score-tile-discretionary"),
+    ).toContainText("$450.00");
+    await expect(
+      quickCard.getByTestId("score-tile-discretionary"),
+    ).toContainText("$500.00");
     await expect(
       quickCard.getByTestId("quick-card-score-breakdown"),
-    ).toContainText("Discretionary (30%): 90.0/100");
+    ).toHaveText("Overall 9.4 / 10");
+    expect(
+      (await quickCard.getByTestId("quick-card-summary").innerText()).split(
+        /\s+/,
+      ).length,
+    ).toBeLessThan(30);
     await expect(
       quickCard.getByRole("meter", { name: "Income", exact: true }),
     ).toHaveAttribute("value", "3000");
@@ -1536,9 +1552,15 @@ test.describe("Budget", () => {
         name: "Discretionary spending needs attention",
       }),
     ).toBeVisible();
-    await expect(quickCard.getByTestId("quick-card-summary")).toContainText(
-      "Discretionary spending was $800.00 against $500.00 targeted — $300.00 over target",
-    );
+    await expect(
+      quickCard.getByTestId("score-tile-discretionary"),
+    ).toContainText("$300.00 over target");
+    await expect(
+      scoreTiles.getByRole("meter", {
+        name: "Discretionary score",
+        exact: true,
+      }),
+    ).toHaveAttribute("value", "2");
     await expect(
       quickCard.getByText("10.0 percentage points below target", {
         exact: true,

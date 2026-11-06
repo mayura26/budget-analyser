@@ -871,6 +871,114 @@ function QuickComparison({
   );
 }
 
+function QuickScoreTile({
+  label,
+  weight,
+  points,
+  actual,
+  target,
+  detail,
+}: {
+  label: string;
+  weight: number;
+  points?: number;
+  actual: string;
+  target: string;
+  detail?: string;
+}) {
+  const good = points !== undefined && points >= 75;
+  return (
+    <div
+      data-testid={`score-tile-${label.toLowerCase()}`}
+      className="grid min-w-0 grid-cols-[1fr_auto] gap-x-3 rounded-xl border border-teal-900/10 bg-white/60 p-3 sm:block dark:border-teal-800/40 dark:bg-slate-950/40"
+    >
+      <div className="flex min-w-0 items-center gap-2 sm:flex-col sm:items-start">
+        <div
+          className={cn(
+            "relative h-12 w-12 shrink-0 sm:h-14 sm:w-14",
+            good
+              ? "text-teal-600 dark:text-teal-300"
+              : "text-amber-600 dark:text-amber-300",
+          )}
+        >
+          {points !== undefined ? (
+            <meter
+              className="sr-only"
+              aria-label={`${label} score`}
+              min={0}
+              max={10}
+              value={Number((points / 10).toFixed(1))}
+              aria-valuetext={`${(points / 10).toFixed(1)} out of 10; ${weight}% of overall score`}
+            />
+          ) : (
+            <span className="sr-only">{label} score: Unrated</span>
+          )}
+          <svg
+            viewBox="0 0 56 56"
+            className="h-full w-full -rotate-90"
+            aria-hidden="true"
+          >
+            <circle
+              cx="28"
+              cy="28"
+              r="24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              className="opacity-15"
+            />
+            <circle
+              cx="28"
+              cy="28"
+              r="24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              pathLength="100"
+              strokeDasharray={`${points ?? 0} 100`}
+              strokeLinecap="round"
+            />
+          </svg>
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 flex flex-col items-center justify-center font-bold tabular-nums"
+          >
+            <span className="text-sm leading-none sm:text-base">
+              {points === undefined ? "—" : (points / 10).toFixed(1)}
+            </span>
+            <span className="mt-0.5 text-[8px] font-medium opacity-70">
+              / 10
+            </span>
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-bold text-slate-800 sm:text-xs dark:text-slate-100">
+            {label}
+          </div>
+          <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+            {weight}% weight
+          </div>
+        </div>
+      </div>
+      <dl className="space-y-1 self-center whitespace-nowrap text-[11px] tabular-nums sm:mt-3 sm:text-xs">
+        <div className="flex justify-between gap-x-2">
+          <dt className="text-slate-500 dark:text-slate-400">Actual</dt>
+          <dd className="font-bold">{actual}</dd>
+        </div>
+        <div className="flex justify-between gap-x-2">
+          <dt className="text-slate-500 dark:text-slate-400">Target</dt>
+          <dd>{target}</dd>
+        </div>
+      </dl>
+      {detail && (
+        <p className="col-span-2 mt-2 border-t border-teal-900/10 pt-2 text-[10px] leading-relaxed text-slate-600 dark:border-teal-800/40 dark:text-slate-300">
+          {detail}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export const QuickReviewCard = forwardRef<
   HTMLDivElement,
   { metrics: ReviewMetrics; homeCurrency: SupportedCurrency }
@@ -906,26 +1014,24 @@ export const QuickReviewCard = forwardRef<
           : "A steady month across your targets";
 
   const verdict = noIncome
-    ? "No income was recorded, so check your income entries before judging this month."
-    : `You finished ${money(Math.abs(m.netVariance))} ${over ? "over" : "under"} budget${cashShortfall ? ", and spending plus savings allocations exceeded your income" : ""}.`;
-
-  const savings = noIncome
-    ? `Recorded spending was ${money(m.totalSpent)}, with ${money(m.taggedSavings)} set aside for savings.`
-    : `You saved ${money(m.effectiveSavings)} including money left over, or ${m.savingsRate.toFixed(1)}% of income — ${m.savingsRate >= 20 ? "meeting" : "below"} the 20% rule${m.buckets.savings.targetAmount > 0 ? ` and ${m.effectiveSavings >= m.buckets.savings.targetAmount ? "meeting" : "below"} your ${money(m.buckets.savings.targetAmount)} savings target` : "; no savings amount target set"}.`;
-  const budgetFit = noIncome
-    ? ""
-    : `Needs used ${m.buckets.needs.actualPct.toFixed(1)}% of income against 50%, and wants ${m.buckets.wants.actualPct.toFixed(1)}% against 30%.`;
-  const discretionaryHeadline = m.discretionary
-    ? `Discretionary spending was ${money(m.discretionary.actual)} against ${money(m.discretionary.target)} targeted${m.discretionary.target > 0 ? ` — ${money(Math.abs(m.discretionary.actual - m.discretionary.target))} ${m.discretionary.actual > m.discretionary.target ? "over" : "under"} target` : m.discretionary.actual > 0 ? " — add a target for this spending" : " — no discretionary spending"}.`
-    : "Discretionary spending data is unavailable; regenerate the review to rate this month.";
+    ? "Add income to rate this month."
+    : cashShortfall
+      ? "Spending and savings allocations exceeded income."
+      : performance && performance.savings >= 80
+        ? over
+          ? "Strong savings, but spending ran over budget."
+          : "Savings are on track."
+        : "Savings need a lift.";
 
   const pressure = m.topOverspend.find((item) => item.bucket !== "savings");
 
   const next = pressure
-    ? `Focus on ${pressure.category.split("(")[0].trim()}, which was ${money(pressure.amount)} over its budget, while keeping the spending habits that helped elsewhere.`
-    : savingsOnTrack
-      ? "Keep your spending habits steady and continue setting money aside each month."
-      : "Look for room in optional spending to build savings, and check that your budget matches your income.";
+    ? `Focus on ${pressure.category.split("(")[0].trim()} — ${money(pressure.amount)} over budget.`
+    : m.discretionary && m.discretionary.actual > m.discretionary.target
+      ? "Trim optional spending next month."
+      : savingsOnTrack
+        ? "Keep these habits going."
+        : "Look for room in optional spending.";
 
   const attention = !performance || performance.score < 4;
   const incomeDifference = m.actualIncome - m.expectedIncome;
@@ -1061,28 +1167,78 @@ export const QuickReviewCard = forwardRef<
             }
           />
         </div>
-        <div className="rounded-xl border-l-4 border-teal-600 bg-teal-50/70 p-4 dark:bg-teal-950/40">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-teal-800 dark:text-teal-300">
-            Your monthly headlines
+        <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-4 dark:border-teal-900/60 dark:bg-teal-950/40">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-teal-800 dark:text-teal-300">
+              Your monthly headlines
+            </h2>
+            {performance && (
+              <span
+                data-testid="quick-card-score-breakdown"
+                title={scoreExplanation}
+                className="rounded-md bg-teal-900 px-2 py-1 text-[10px] font-semibold text-teal-50"
+              >
+                Overall {(performance.total / 10).toFixed(1)} / 10
+              </span>
+            )}
+          </div>
+          <div
+            className="grid gap-2 sm:grid-cols-3"
+            data-testid="quick-card-score-tiles"
+          >
+            <QuickScoreTile
+              label="Savings"
+              weight={40}
+              points={performance?.savings}
+              actual={money(m.effectiveSavings)}
+              target={
+                m.buckets.savings.targetAmount > 0
+                  ? money(m.buckets.savings.targetAmount)
+                  : "Not set"
+              }
+              detail={
+                noIncome
+                  ? "Add income to compare"
+                  : `${m.savingsRate.toFixed(1)}% saved / 20% rule`
+              }
+            />
+            <QuickScoreTile
+              label="Budget"
+              weight={30}
+              points={performance?.budget}
+              actual={money(m.totalSpent)}
+              target={m.totalBudgeted > 0 ? money(m.totalBudgeted) : "Not set"}
+              detail={
+                noIncome
+                  ? "Add income to compare"
+                  : `Needs ${m.buckets.needs.actualPct.toFixed(1)}% / 50% · Wants ${m.buckets.wants.actualPct.toFixed(1)}% / 30%`
+              }
+            />
+            <QuickScoreTile
+              label="Discretionary"
+              weight={30}
+              points={performance?.discretionary}
+              actual={
+                m.discretionary ? money(m.discretionary.actual) : "Unavailable"
+              }
+              target={
+                m.discretionary && m.discretionary.target > 0
+                  ? money(m.discretionary.target)
+                  : "Not set"
+              }
+              detail={
+                m.discretionary && m.discretionary.target > 0
+                  ? `${money(Math.abs(m.discretionary.actual - m.discretionary.target))} ${m.discretionary.actual > m.discretionary.target ? "over" : "under"} target`
+                  : "Non-essential, non-fixed costs"
+              }
+            />
           </div>
           <p
             data-testid="quick-card-summary"
-            className="text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+            className="mt-4 border-t border-teal-900/10 pt-3 text-sm leading-relaxed text-slate-700 dark:border-teal-800/40 dark:text-slate-200"
           >
-            {verdict} {savings} {budgetFit} {discretionaryHeadline} {next}
+            {verdict} {next}
           </p>
-          {performance && (
-            <p
-              data-testid="quick-card-score-breakdown"
-              className="mt-3 text-xs leading-relaxed text-teal-800 dark:text-teal-200"
-              title={scoreExplanation}
-            >
-              Savings (40%): {performance.savings.toFixed(1)}/100 · Budget
-              (30%): {performance.budget.toFixed(1)}/100 · Discretionary (30%):{" "}
-              {performance.discretionary.toFixed(1)}/100. Weighted result:{" "}
-              {performance.total.toFixed(1)}/100 → {score}/5.
-            </p>
-          )}
         </div>
       </div>
     </section>
