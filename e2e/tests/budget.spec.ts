@@ -1440,6 +1440,20 @@ test.describe("Budget", () => {
     );
     const scoreTiles = quickCard.getByTestId("quick-card-score-tiles");
     await expect(scoreTiles.getByRole("meter")).toHaveCount(3);
+    for (const tile of await scoreTiles
+      .locator('[data-testid^="score-tile-"]')
+      .all()) {
+      const value = Number(await tile.getByRole("meter").getAttribute("value"));
+      const fill = tile.getByTestId("score-fill");
+      const height = await fill.evaluate((node) =>
+        Number.parseFloat((node as HTMLElement).style.height),
+      );
+      expect(height).toBeCloseTo(value * 10, 0);
+      await expect(tile.locator("[data-score-band]")).toHaveAttribute(
+        "data-score-band",
+        value >= 8 ? "strong" : value >= 6 ? "fair" : "low",
+      );
+    }
     await expect(
       scoreTiles.getByRole("meter", { name: "Savings score", exact: true }),
     ).toHaveAttribute("value", "10");
@@ -1561,6 +1575,16 @@ test.describe("Budget", () => {
         exact: true,
       }),
     ).toHaveAttribute("value", "2");
+    await expect(
+      quickCard
+        .getByTestId("score-tile-discretionary")
+        .locator("[data-score-band]"),
+    ).toHaveAttribute("data-score-band", "low");
+    await expect(
+      quickCard
+        .getByTestId("score-tile-discretionary")
+        .getByTestId("score-fill"),
+    ).toHaveAttribute("style", "height: 20%;");
     await expect(
       quickCard.getByText("10.0 percentage points below target", {
         exact: true,

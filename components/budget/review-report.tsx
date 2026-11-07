@@ -886,7 +886,15 @@ function QuickScoreTile({
   target: string;
   detail?: string;
 }) {
-  const good = points !== undefined && points >= 75;
+  const percentage = Math.min(100, Math.max(0, points ?? 0));
+  const band =
+    points === undefined
+      ? "unrated"
+      : points >= 80
+        ? "strong"
+        : points >= 60
+          ? "fair"
+          : "low";
   return (
     <div
       data-testid={`score-tile-${label.toLowerCase()}`}
@@ -896,11 +904,27 @@ function QuickScoreTile({
         <div
           className={cn(
             "relative h-12 w-12 shrink-0 sm:h-14 sm:w-14",
-            good
-              ? "text-teal-600 dark:text-teal-300"
-              : "text-amber-600 dark:text-amber-300",
+            band === "unrated"
+              ? "text-slate-500 dark:text-slate-400"
+              : band === "strong"
+                ? "text-emerald-700 dark:text-emerald-300"
+                : band === "fair"
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-rose-700 dark:text-rose-300",
           )}
+          data-score-band={band}
+          title="Green: 8–10 · Amber: 6–7.9 · Red: below 6"
         >
+          <div
+            aria-hidden="true"
+            className="absolute inset-1 overflow-hidden rounded-full bg-current/10"
+          >
+            <div
+              data-testid="score-fill"
+              className="absolute inset-x-0 bottom-0 bg-current opacity-25"
+              style={{ height: `${percentage}%` }}
+            />
+          </div>
           {points !== undefined ? (
             <meter
               className="sr-only"
@@ -935,7 +959,7 @@ function QuickScoreTile({
               stroke="currentColor"
               strokeWidth="4"
               pathLength="100"
-              strokeDasharray={`${points ?? 0} 100`}
+              strokeDasharray={`${percentage} 100`}
               strokeLinecap="round"
             />
           </svg>
