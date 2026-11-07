@@ -1144,6 +1144,7 @@ test.describe("Budget", () => {
       taggedSavings: 300,
       effectiveSavings: 1100,
       discretionary: { actual: 450, target: 500 },
+      controllableEssentials: { actual: 550, target: 600, points: 88 },
       buckets: {
         needs: {
           targetAmount: 1500,
@@ -1254,6 +1255,11 @@ test.describe("Budget", () => {
                       savingsRate: 10,
                       effectiveSavings: 400,
                       discretionary: { actual: 800, target: 500 },
+                      controllableEssentials: {
+                        actual: 800,
+                        target: 600,
+                        points: 45,
+                      },
                     }
                   : {}),
               },
@@ -1439,6 +1445,16 @@ test.describe("Budget", () => {
       "Focus on Takeout",
     );
     const scoreTiles = quickCard.getByTestId("quick-card-score-tiles");
+    await expect(quickCard.getByTestId("score-tile-budget")).toContainText(
+      "Unscheduled essentials $550.00 / $600.00",
+    );
+    await expect(
+      quickCard.getByTestId("score-tile-discretionary"),
+    ).toContainText("Enjoyment + Special");
+    await expect(
+      quickCard.getByTestId("score-tile-budget").getByRole("meter"),
+    ).toHaveAttribute("value", "8.9");
+
     await expect(scoreTiles.getByRole("meter")).toHaveCount(3);
     for (const tile of await scoreTiles
       .locator('[data-testid^="score-tile-"]')

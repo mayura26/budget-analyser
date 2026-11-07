@@ -10,9 +10,10 @@ export type ScoreMetrics = {
   savingsRate: number;
   buckets: { needs: Band; wants: Band; savings: Band };
   discretionary?: DiscretionaryMetrics;
+  controllableEssentials?: DiscretionaryMetrics & { points: number };
 };
 
-/** Needs and categories containing scheduled fixed costs are excluded. */
+/** All Enjoyment and Special expenses, including scheduled payments. */
 export function discretionaryMetrics(
   rows: BudgetCategoryRow[],
 ): DiscretionaryMetrics {
@@ -20,8 +21,9 @@ export function discretionaryMetrics(
     (sum, row) => {
       if (
         row.categoryKind !== "expense" ||
-        row.ruleBucket !== "wants" ||
-        row.scheduledAmount > 0
+        !["Enjoyment", "Special", "One-off & irregular"].includes(
+          row.parentName,
+        )
       )
         return sum;
       return {
@@ -40,6 +42,42 @@ function spendingPoints(actual: number, target: number): number {
   return clamp(80 + (100 * (target - actual)) / target);
 }
 
+/** Score each unscheduled Needs category so underspending cannot hide overspending. */
+export function controllableEssentialsMetrics(rows: BudgetCategoryRow[]) {
+  const eligible = rows.filter(
+    (row) =>
+      row.categoryKind === "expense" &&
+      row.ruleBucket === "needs" &&
+      row.scheduledAmount <= 0 &&
+      (row.targetAmount > 0 || row.actualSpent > 0),
+  );
+  if (!eligible.length) return undefined;
+  const weight = (row: BudgetCategoryRow) =>
+    Math.max(row.targetAmount, row.actualSpent, 1);
+  const totalWeight = eligible.reduce((sum, row) => sum + weight(row), 0);
+  return {
+    actual: eligible.reduce(
+      (sum, row) => sum + Math.max(0, row.actualSpent),
+      0,
+    ),
+    target: eligible.reduce(
+      (sum, row) => sum + Math.max(0, row.targetAmount),
+      0,
+    ),
+    points:
+      eligible.reduce(
+        (sum, row) =>
+          sum +
+          spendingPoints(
+            Math.max(0, row.actualSpent),
+            Math.max(0, row.targetAmount),
+          ) *
+            weight(row),
+        0,
+      ) / totalWeight,
+  };
+}
+
 export function calculateReviewScore(m: ScoreMetrics) {
   if (m.actualIncome <= 0 || m.totalBudgeted <= 0 || !m.discretionary)
     return null;
@@ -56,7 +94,10 @@ export function calculateReviewScore(m: ScoreMetrics) {
       clamp((80 * Math.max(0, m.savingsRate)) / 20)) /
     3;
   const budget =
-    (spendingPoints(m.totalSpent, m.totalBudgeted) + allocation) / 2;
+    (spendingPoints(m.totalSpent, m.totalBudgeted) +
+      allocation +
+      (m.controllableEssentials?.points ?? 0)) /
+    (m.controllableEssentials ? 3 : 2);
   const discretionary = spendingPoints(
     m.discretionary.actual,
     m.discretionary.target,

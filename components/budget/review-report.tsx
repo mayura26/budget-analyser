@@ -47,6 +47,7 @@ export type BucketBand = {
 
 export type ReviewMetrics = {
   discretionary?: DiscretionaryMetrics;
+  controllableEssentials?: DiscretionaryMetrics & { points: number };
   month: string;
   monthLabel: string;
   totalBudgeted: number;
@@ -1070,7 +1071,7 @@ export const QuickReviewCard = forwardRef<
     "Cheering",
   ];
   const scoreExplanation =
-    "Savings 40% (amount target and 20% rule), budget 30% (total target and 50/30/20 fit), discretionary 30% (non-essential categories without scheduled fixed costs). Meeting targets earns 80/100. Weighted totals: 1 below 40; 2 from 40; 3 from 60; 4 from 75; 5 from 90.";
+    "Savings 40% (amount target and 20% rule), budget 30% (equal parts total target, 50/30/20 fit and unscheduled Needs category adherence when available), discretionary 30% (all Enjoyment and Special expenses, including scheduled payments). Meeting targets earns 80/100. Weighted totals: 1 below 40; 2 from 40; 3 from 60; 4 from 75; 5 from 90.";
 
   return (
     <section
@@ -1235,7 +1236,7 @@ export const QuickReviewCard = forwardRef<
               detail={
                 noIncome
                   ? "Add income to compare"
-                  : `Needs ${m.buckets.needs.actualPct.toFixed(1)}% / 50% · Wants ${m.buckets.wants.actualPct.toFixed(1)}% / 30%`
+                  : `Needs ${m.buckets.needs.actualPct.toFixed(1)}% / 50% · Wants ${m.buckets.wants.actualPct.toFixed(1)}% / 30%${m.controllableEssentials ? ` · Unscheduled essentials ${money(m.controllableEssentials.actual)} / ${money(m.controllableEssentials.target)}` : ""}`
               }
             />
             <QuickScoreTile
@@ -1252,8 +1253,8 @@ export const QuickReviewCard = forwardRef<
               }
               detail={
                 m.discretionary && m.discretionary.target > 0
-                  ? `${money(Math.abs(m.discretionary.actual - m.discretionary.target))} ${m.discretionary.actual > m.discretionary.target ? "over" : "under"} target`
-                  : "Non-essential, non-fixed costs"
+                  ? `Enjoyment + Special · ${money(Math.abs(m.discretionary.actual - m.discretionary.target))} ${m.discretionary.actual > m.discretionary.target ? "over" : "under"} target`
+                  : "Enjoyment + Special, including scheduled costs"
               }
             />
           </div>

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { BudgetCategoryRow } from "@/types";
 import {
   calculateReviewScore,
+  controllableEssentialsMetrics,
   discretionaryMetrics,
   type ScoreMetrics,
 } from "./review-score";
@@ -109,7 +110,7 @@ test("unbudgeted discretionary spending earns zero, zero spending earns full cre
   );
 });
 
-test("discretionary totals exclude needs, savings and categories with scheduled fixed costs", () => {
+test("discretionary includes all Enjoyment and Special expenses and excludes other groups", () => {
   const row = (
     ruleBucket: BudgetCategoryRow["ruleBucket"],
     scheduledAmount: number,
@@ -117,7 +118,7 @@ test("discretionary totals exclude needs, savings and categories with scheduled 
   ): BudgetCategoryRow => ({
     categoryId: 1,
     categoryName: "Test",
-    parentName: "Test",
+    parentName: "Enjoyment",
     color: "#000000",
     targetAmount: 500,
     actualSpent: 400,
@@ -130,10 +131,60 @@ test("discretionary totals exclude needs, savings and categories with scheduled 
   assert.deepEqual(
     discretionaryMetrics([
       row("wants", 0),
-      row("needs", 0),
-      row("wants", 100),
+      { ...row("needs", 0), parentName: "Essentials" },
+      { ...row("wants", 100), parentName: "Special" },
+      { ...row("wants", 0), parentName: "Misc" },
       row("savings", 0, "savings"),
     ]),
-    { actual: 400, target: 500 },
+    { actual: 800, target: 1000 },
+  );
+});
+
+const essentialRow = (
+  actual: number,
+  target: number,
+  scheduled = 0,
+): BudgetCategoryRow => ({
+  categoryId: 1,
+  categoryName: "Groceries",
+  parentName: "Essentials",
+  color: "#000",
+  targetAmount: target,
+  actualSpent: actual,
+  scheduledAmount: scheduled,
+  scheduledBreakdown: [],
+  avg3Month: 0,
+  categoryKind: "expense",
+  ruleBucket: "needs",
+});
+
+test("controllable essentials excludes scheduled needs and non-needs", () => {
+  assert.deepEqual(
+    controllableEssentialsMetrics([
+      essentialRow(500, 500),
+      essentialRow(1000, 1000, 1000),
+      { ...essentialRow(400, 500), ruleBucket: "wants" },
+    ]),
+    { actual: 500, target: 500, points: 80 },
+  );
+  assert.equal(controllableEssentialsMetrics([essentialRow(0, 0)]), undefined);
+});
+
+test("category overspending cannot be cancelled by another category's underspending", () => {
+  const essentials = controllableEssentialsMetrics([
+    essentialRow(150, 100),
+    essentialRow(50, 100),
+  ]);
+  assert.ok(essentials);
+  assert.equal(essentials.actual, essentials.target);
+  assert.equal(essentials.points, 58);
+  const result = calculateReviewScore({
+    ...baseline,
+    controllableEssentials: essentials,
+  });
+  assert.equal(result?.budget, (80 + 80 + 58) / 3);
+  assert.equal(
+    controllableEssentialsMetrics([essentialRow(100, 0)])?.points,
+    0,
   );
 });
