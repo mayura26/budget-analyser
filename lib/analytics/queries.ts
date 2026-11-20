@@ -63,6 +63,7 @@ async function loadConvertedRows(
   start: string,
   end: string,
   homeCurrency: SupportedCurrency,
+  categoryId?: number,
 ): Promise<LoadedRow[]> {
   const rows = db
     .select({
@@ -89,6 +90,9 @@ async function loadConvertedRows(
         gte(transactions.date, start),
         lte(transactions.date, end),
         nonTransferFilter(),
+        categoryId === undefined
+          ? undefined
+          : eq(transactions.categoryId, categoryId),
       ),
     )
     .all();
@@ -1019,6 +1023,44 @@ export type AnalyticsPageData = {
     AnalyticsExpenseTransactionLine[]
   >;
 };
+
+export type SpendAnalysisLine = {
+  id: number;
+  categoryId: number;
+  date: string;
+  description: string;
+  accountName: string;
+  merchantKey: string;
+  merchant: string;
+  netSpend: number;
+};
+
+export async function getSpendAnalysisLines(
+  start: string,
+  end: string,
+  homeCurrency: SupportedCurrency,
+  categoryId: number,
+): Promise<SpendAnalysisLine[]> {
+  const rows = await loadConvertedRows(start, end, homeCurrency, categoryId);
+  return rows
+    .flatMap((row) => {
+      if (row.categoryType !== "expense" || row.categoryId == null) return [];
+      const source = merchantSource(row);
+      return [
+        {
+          id: row.transactionId,
+          categoryId: row.categoryId,
+          date: row.date,
+          description: row.description,
+          accountName: row.accountName,
+          merchantKey: merchantKey(source) || source.toLowerCase(),
+          merchant: merchantLabel(source),
+          netSpend: -row.converted,
+        },
+      ];
+    })
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+}
 
 /** Single DB round-trip + FX prefetch for all analytics aggregates. */
 export async function getAnalyticsPageData(

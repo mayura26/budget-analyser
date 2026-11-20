@@ -4,13 +4,18 @@ import { eq, sql } from "drizzle-orm";
 import { DollarSign, TrendingDown, TrendingUp } from "lucide-react";
 import { BudgetCalendar } from "@/components/budget/budget-calendar";
 import { BudgetMonthPicker } from "@/components/budget/budget-month-picker";
+import { BudgetPlannerTabs } from "@/components/budget/budget-planner-tabs";
 import { CashFlowChart } from "@/components/budget/cash-flow-chart";
 import { MonthlyBudgetTab } from "@/components/budget/monthly-budget-tab";
 import { ScheduleList } from "@/components/budget/schedule-list";
+import { SpendAnalysis } from "@/components/budget/spend-analysis";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getBudgetCategoryLinesByCategoryForRange } from "@/lib/analytics/queries";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  getBudgetCategoryLinesByCategoryForRange,
+  getSpendAnalysisLines,
+} from "@/lib/analytics/queries";
 import { buildBalancePoints, generateOccurrences } from "@/lib/budget/generate";
 import {
   convertOccurrencesToHomeCurrency,
@@ -63,7 +68,7 @@ function getEarliestTransactionMonth(): string | null {
 export default async function BudgetPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; tab?: string; category?: string }>;
 }) {
   const params = await searchParams;
   const homeCurrency = getHomeCurrency();
@@ -173,6 +178,30 @@ export default async function BudgetPage({
       monthRangeEnd,
       homeCurrency,
     );
+  const initialTab =
+    ["spend-analysis", "overview", "calendar", "schedules"].find(
+      (tab) => tab === params.tab,
+    ) ?? "monthly-budget";
+  const showAnalysis = initialTab === "spend-analysis";
+  const expenseRows = budgetRows.filter(
+    (row) => row.categoryKind === "expense",
+  );
+  const analysisCategory =
+    expenseRows.find((row) => String(row.categoryId) === params.category) ??
+    expenseRows
+      .filter((row) => row.ruleBucket === "wants")
+      .sort((a, b) => b.actualSpent - a.actualSpent)[0] ??
+    expenseRows[0];
+  const trendStart = addCalendarMonths(selectedMonth, -5);
+  const analysisLines =
+    showAnalysis && analysisCategory
+      ? await getSpendAnalysisLines(
+          getMonthRange(trendStart).start,
+          monthRangeEnd,
+          homeCurrency,
+          analysisCategory.categoryId,
+        )
+      : [];
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -185,16 +214,26 @@ export default async function BudgetPage({
             minMonth={minMonth}
             maxMonth={maxMonth}
             monthOptions={monthOptions}
+            analysisCategory={
+              showAnalysis ? (analysisCategory?.categoryId ?? 0) : undefined
+            }
           />
         }
       />
 
       {/* Tabs */}
-      <Tabs defaultValue="monthly-budget">
+      <BudgetPlannerTabs
+        key={initialTab}
+        initialTab={initialTab}
+        month={selectedMonth}
+      >
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
           <TabsList className="w-max">
             <TabsTrigger value="monthly-budget" className="px-2.5 sm:px-3">
               Monthly Budget
+            </TabsTrigger>
+            <TabsTrigger value="spend-analysis" className="px-2.5 sm:px-3">
+              Spend Analysis
             </TabsTrigger>
             <TabsTrigger value="overview" className="px-2.5 sm:px-3">
               Cash Flow
@@ -226,6 +265,28 @@ export default async function BudgetPage({
             monthRangeStart={monthRangeStart}
             monthRangeEnd={monthRangeEnd}
           />
+        </TabsContent>
+
+        <TabsContent value="spend-analysis" className="mt-4">
+          {showAnalysis && (
+            <SpendAnalysis
+              key={`${selectedMonth}:${analysisCategory?.categoryId}`}
+              month={selectedMonth}
+              currentMonth={currentMonth}
+              today={today}
+              earliest={earliest}
+              category={analysisCategory}
+              categories={expenseRows.map(
+                ({ categoryId, categoryName, parentName }) => ({
+                  categoryId,
+                  categoryName,
+                  parentName,
+                }),
+              )}
+              lines={analysisLines}
+              homeCurrency={homeCurrency}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="overview" className="mt-4">
@@ -313,7 +374,7 @@ export default async function BudgetPage({
             homeCurrency={homeCurrency}
           />
         </TabsContent>
-      </Tabs>
+      </BudgetPlannerTabs>
     </div>
   );
 }

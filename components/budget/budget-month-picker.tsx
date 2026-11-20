@@ -18,11 +18,13 @@ export function BudgetMonthPicker({
   minMonth,
   maxMonth,
   monthOptions,
+  analysisCategory,
 }: {
   selectedMonth: string;
   minMonth: string;
   maxMonth: string;
   monthOptions: string[];
+  analysisCategory?: number;
 }) {
   const router = useRouter();
   const prevMonth = addCalendarMonths(selectedMonth, -1);
@@ -30,6 +32,10 @@ export function BudgetMonthPicker({
   const canGoBack = selectedMonth > minMonth;
   // Allow navigating one month into the future for planning
   const canGoForward = selectedMonth < maxMonth;
+  const monthHref = (month: string) =>
+    analysisCategory === undefined
+      ? `/budget?month=${month}`
+      : `/budget?month=${month}&tab=spend-analysis&category=${analysisCategory}`;
 
   return (
     <div className="flex items-center gap-2">
@@ -40,7 +46,7 @@ export function BudgetMonthPicker({
           className="h-9 w-9 shrink-0"
           asChild
         >
-          <Link href={`/budget?month=${prevMonth}`} aria-label="Previous month">
+          <Link href={monthHref(prevMonth)} aria-label="Previous month">
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>
@@ -59,7 +65,7 @@ export function BudgetMonthPicker({
       <Select
         value={selectedMonth}
         onValueChange={(value) => {
-          router.push(`/budget?month=${value}`);
+          router.push(monthHref(value));
         }}
       >
         <SelectTrigger className="h-9 w-[min(100vw-8rem,14rem)] sm:w-56">
@@ -81,7 +87,7 @@ export function BudgetMonthPicker({
           className="h-9 w-9 shrink-0"
           asChild
         >
-          <Link href={`/budget?month=${nextMonth}`} aria-label="Next month">
+          <Link href={monthHref(nextMonth)} aria-label="Next month">
             <ChevronRight className="h-4 w-4" />
           </Link>
         </Button>

@@ -700,7 +700,15 @@ function CategoryRow({
 
       {expanded && canDrillDown && (
         <div className="mt-1 mb-2 ml-2 sm:ml-8 pl-3 border-l border-muted space-y-1">
-          <div className="flex justify-end pb-1">
+          <div className="flex justify-end gap-4 pb-1">
+            {row.categoryKind === "expense" && (
+              <Link
+                href={`/budget?month=${monthRangeStart?.slice(0, 7)}&tab=spend-analysis&category=${row.categoryId}`}
+                className="text-xs text-primary hover:underline"
+              >
+                Analyse spend
+              </Link>
+            )}
             <Link
               href={transactionsInRangeUrl({
                 from: monthRangeStart,

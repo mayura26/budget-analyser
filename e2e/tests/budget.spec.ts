@@ -643,6 +643,96 @@ function cleanupNearGuideNeedsTarget(seed: NearGuideSeed) {
 }
 
 test.describe("Budget", () => {
+  test("Spend Analysis drills down from a budget category to merchants and months", async ({
+    page,
+  }) => {
+    const seed = seedExpenseRefundBudgetRow();
+    const sqlite = new Database(process.env.DATABASE_PATH ?? "./data/test.db");
+    const previousMonth = new Date(`${seed.month}-01T00:00:00Z`);
+    previousMonth.setUTCMonth(previousMonth.getUTCMonth() - 1);
+    const previous = previousMonth.toISOString().slice(0, 7);
+
+    try {
+      const insert = sqlite.prepare(
+        `INSERT INTO transactions
+          (account_id, fingerprint, date, description, normalised, merchant, amount, category_id, category_source, category_confirmed, is_manual, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', 1, 1, unixepoch(), unixepoch())`,
+      );
+      for (const [date, description, merchant, amount] of [
+        [`${seed.month}-01`, "Harbour tickets", "Harbour Events", -50],
+        [`${seed.month}-01`, "Museum tickets", "Museum", -25],
+        [`${previous}-01`, "Previous harbour tickets", "Harbour Events", -20],
+      ] as const) {
+        insert.run(
+          seed.accountId,
+          `${seed.accountId}-${description}`,
+          date,
+          description,
+          description,
+          merchant,
+          amount,
+          seed.categoryId,
+        );
+      }
+
+      await page.goto(`/budget?month=${seed.month}`);
+      await page
+        .getByRole("button", {
+          name: `Show transactions for ${seed.categoryName}`,
+        })
+        .click();
+      await page.getByRole("link", { name: "Analyse spend" }).click();
+      await expect(
+        page.getByRole("tab", { name: "Spend Analysis" }),
+      ).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByLabel("Expense category")).toHaveValue(
+        String(seed.categoryId),
+      );
+      await expect(
+        page.getByText("-$3,716.56", { exact: true }).first(),
+      ).toBeVisible();
+      await expect(
+        page.getByText("Museum tickets", { exact: true }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: /Harbour Events/ }).click();
+      await expect(
+        page.getByText("Harbour tickets", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("Museum tickets", { exact: true }),
+      ).toHaveCount(0);
+      await page
+        .getByRole("button", {
+          name: new RegExp(
+            previousMonth.toLocaleDateString("en-AU", {
+              month: "long",
+              year: "numeric",
+              timeZone: "UTC",
+            }),
+          ),
+        })
+        .click();
+      await expect(
+        page.getByText("Previous harbour tickets", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Clear merchant filter" }),
+      ).toHaveCount(0);
+      await page.getByRole("link", { name: "Previous month" }).click();
+      await expect(
+        page.getByRole("tab", { name: "Spend Analysis" }),
+      ).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByLabel("Expense category")).toHaveValue(
+        String(seed.categoryId),
+      );
+    } finally {
+      sqlite
+        .prepare("DELETE FROM transactions WHERE account_id = ? AND id != ?")
+        .run(seed.accountId, seed.transactionId);
+      sqlite.close();
+      cleanupExpenseRefundBudgetRow(seed);
+    }
+  });
   test.beforeAll(() => {
     cleanupSchedules();
   });
