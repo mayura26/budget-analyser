@@ -186,12 +186,43 @@ export default async function BudgetPage({
   const expenseRows = budgetRows.filter(
     (row) => row.categoryKind === "expense",
   );
+  const analysisGroups = categoryMains.flatMap((main) => {
+    const childIds = new Set(
+      allCatsRaw.filter((cat) => cat.parentId === main.id).map((cat) => cat.id),
+    );
+    const children = expenseRows.filter((row) => childIds.has(row.categoryId));
+    if (children.length === 0) return [];
+    return [
+      {
+        categoryId: main.id,
+        categoryName: main.name,
+        actualSpent: children.reduce((sum, row) => sum + row.actualSpent, 0),
+        targetAmount: children.reduce((sum, row) => sum + row.targetAmount, 0),
+        children: children.map(({ categoryId, categoryName, actualSpent }) => ({
+          categoryId,
+          categoryName,
+          actualSpent,
+        })),
+      },
+    ];
+  });
+  const selectedGroup = analysisGroups.find(
+    (group) => String(group.categoryId) === params.category,
+  );
   const analysisCategory =
+    selectedGroup ??
     expenseRows.find((row) => String(row.categoryId) === params.category) ??
-    expenseRows
-      .filter((row) => row.ruleBucket === "wants")
-      .sort((a, b) => b.actualSpent - a.actualSpent)[0] ??
-    expenseRows[0];
+    analysisGroups.find((group) =>
+      expenseRows.some(
+        (row) =>
+          row.ruleBucket === "wants" &&
+          group.children.some((child) => child.categoryId === row.categoryId),
+      ),
+    ) ??
+    analysisGroups[0];
+  const analysisGroup = analysisGroups.find(
+    (group) => group.categoryId === analysisCategory?.categoryId,
+  );
   const trendStart = addCalendarMonths(selectedMonth, -5);
   const analysisLines =
     showAnalysis && analysisCategory
@@ -199,7 +230,9 @@ export default async function BudgetPage({
           getMonthRange(trendStart).start,
           monthRangeEnd,
           homeCurrency,
-          analysisCategory.categoryId,
+          analysisGroup?.children.map((child) => child.categoryId) ?? [
+            analysisCategory.categoryId,
+          ],
         )
       : [];
 
@@ -276,13 +309,8 @@ export default async function BudgetPage({
               today={today}
               earliest={earliest}
               category={analysisCategory}
-              categories={expenseRows.map(
-                ({ categoryId, categoryName, parentName }) => ({
-                  categoryId,
-                  categoryName,
-                  parentName,
-                }),
-              )}
+              groups={analysisGroups}
+              groupSelected={analysisGroup !== undefined}
               lines={analysisLines}
               homeCurrency={homeCurrency}
             />

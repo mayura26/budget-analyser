@@ -661,6 +661,8 @@ test.describe("Budget", () => {
       for (const [date, description, merchant, amount] of [
         [`${seed.month}-01`, "Harbour tickets", "Harbour Events", -50],
         [`${seed.month}-01`, "Museum tickets", "Museum", -25],
+        [`${seed.month}-01`, "Art materials", "Art shop", -10],
+        [`${seed.month}-01`, "Cinema tickets", "Cinema", -5],
         [`${previous}-01`, "Previous harbour tickets", "Harbour Events", -20],
       ] as const) {
         insert.run(
@@ -685,12 +687,39 @@ test.describe("Budget", () => {
       await expect(
         page.getByRole("tab", { name: "Spend Analysis" }),
       ).toHaveAttribute("aria-selected", "true");
-      await expect(page.getByLabel("Expense category")).toHaveValue(
-        String(seed.categoryId),
-      );
+      const categoryNav = page.getByRole("navigation", {
+        name: "Expense categories",
+      });
+      const subcategory = categoryNav.getByRole("link", {
+        name: new RegExp(seed.categoryName),
+      });
+      await expect(subcategory).toHaveAttribute("aria-current", "page");
+      const mainCategory = categoryNav.getByRole("link", {
+        name: "All Special",
+      });
+      await mainCategory.click();
+      await expect(mainCategory).toHaveAttribute("aria-current", "page");
       await expect(
-        page.getByText("-$3,716.56", { exact: true }).first(),
+        page.getByText("Harbour tickets", { exact: true }),
       ).toBeVisible();
+      await subcategory.click();
+      await expect(subcategory).toHaveAttribute("aria-current", "page");
+      await expect(
+        page.getByText("-$3,701.56", { exact: true }).first(),
+      ).toBeVisible();
+      const moreMerchants = page.getByRole("button", {
+        name: "Show 1 more merchant",
+      });
+      await expect(moreMerchants).toHaveAttribute("aria-expanded", "false");
+      await moreMerchants.click();
+      await expect(
+        page.getByRole("button", { name: "Show fewer merchants" }),
+      ).toHaveAttribute("aria-expanded", "true");
+      await page.getByRole("button", { name: /e2e travel refund/i }).click();
+      await expect(
+        page.getByText("Museum tickets", { exact: true }),
+      ).toHaveCount(0);
+      await page.getByRole("button", { name: "Clear merchant filter" }).click();
       await expect(
         page.getByText("Museum tickets", { exact: true }),
       ).toBeVisible();
@@ -701,17 +730,17 @@ test.describe("Budget", () => {
       await expect(
         page.getByText("Museum tickets", { exact: true }),
       ).toHaveCount(0);
-      await page
-        .getByRole("button", {
-          name: new RegExp(
-            previousMonth.toLocaleDateString("en-AU", {
-              month: "long",
-              year: "numeric",
-              timeZone: "UTC",
-            }),
-          ),
-        })
-        .click();
+      const previousBar = page.getByRole("button", {
+        name: new RegExp(
+          previousMonth.toLocaleDateString("en-AU", {
+            month: "long",
+            year: "numeric",
+            timeZone: "UTC",
+          }),
+        ),
+      });
+      await previousBar.click();
+      await expect(previousBar).toHaveAttribute("aria-pressed", "true");
       await expect(
         page.getByText("Previous harbour tickets", { exact: true }),
       ).toBeVisible();
@@ -722,9 +751,7 @@ test.describe("Budget", () => {
       await expect(
         page.getByRole("tab", { name: "Spend Analysis" }),
       ).toHaveAttribute("aria-selected", "true");
-      await expect(page.getByLabel("Expense category")).toHaveValue(
-        String(seed.categoryId),
-      );
+      await expect(subcategory).toHaveAttribute("aria-current", "page");
     } finally {
       sqlite
         .prepare("DELETE FROM transactions WHERE account_id = ? AND id != ?")

@@ -63,7 +63,7 @@ async function loadConvertedRows(
   start: string,
   end: string,
   homeCurrency: SupportedCurrency,
-  categoryId?: number,
+  categoryIds?: number[],
 ): Promise<LoadedRow[]> {
   const rows = db
     .select({
@@ -90,9 +90,9 @@ async function loadConvertedRows(
         gte(transactions.date, start),
         lte(transactions.date, end),
         nonTransferFilter(),
-        categoryId === undefined
+        categoryIds === undefined
           ? undefined
-          : eq(transactions.categoryId, categoryId),
+          : inArray(transactions.categoryId, categoryIds),
       ),
     )
     .all();
@@ -1039,9 +1039,9 @@ export async function getSpendAnalysisLines(
   start: string,
   end: string,
   homeCurrency: SupportedCurrency,
-  categoryId: number,
+  categoryIds: number[],
 ): Promise<SpendAnalysisLine[]> {
-  const rows = await loadConvertedRows(start, end, homeCurrency, categoryId);
+  const rows = await loadConvertedRows(start, end, homeCurrency, categoryIds);
   return rows
     .flatMap((row) => {
       if (row.categoryType !== "expense" || row.categoryId == null) return [];
