@@ -67,41 +67,61 @@ export function SpendAnalysis({
   if (!category) return <p>No expense categories to analyse.</p>;
 
   const money = (amount: number) => formatSignedCurrency(amount, homeCurrency);
+  const trendMoney = new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: homeCurrency,
+    currencyDisplay: "narrowSymbol",
+    maximumFractionDigits: 0,
+  });
+  const compactTrendMoney = new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: homeCurrency,
+    currencyDisplay: "narrowSymbol",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
   const monthToDate = month === currentMonth;
   const comparisonDay = monthToDate ? today.slice(-2) : null;
-  const trend = Array.from({ length: 6 }, (_, index) => {
-    const value = addCalendarMonths(month, index - 5);
+  const history = Array.from({ length: 7 }, (_, index) => {
+    const value = addCalendarMonths(month, index - 6);
     const monthLines = lines.filter((line) => line.date.startsWith(value));
     return { value, total: totalSpend(monthLines), lines: monthLines };
   });
+  const trend = history.slice(1);
   const selected = trend.find((point) => point.value === period) ?? trend[5];
-  const baseline = trend
-    .slice(2, 5)
+  const comparableSpend = (monthLines: SpendAnalysisLine[]) =>
+    totalSpend(
+      monthLines.filter(
+        (line) =>
+          comparisonDay === null || line.date.slice(-2) <= comparisonDay,
+      ),
+    );
+  const baseline = history
+    .slice(0, -1)
     .filter(
       ({ value }) =>
         earliest !== null && value >= earliest && value < currentMonth,
-    );
-  const comparableActual = totalSpend(
-    trend[5].lines.filter(
-      (line) => comparisonDay === null || line.date.slice(-2) <= comparisonDay,
-    ),
-  );
-  const average =
-    baseline.length && month <= currentMonth
-      ? baseline.reduce(
-          (sum, point) =>
-            sum +
-            totalSpend(
-              point.lines.filter(
-                (line) =>
-                  comparisonDay === null ||
-                  line.date.slice(-2) <= comparisonDay,
-              ),
-            ),
-          0,
-        ) / baseline.length
+    )
+    .map((point) => comparableSpend(point.lines));
+  const comparableActual = comparableSpend(trend[5].lines);
+  const averageFor = (values: number[]) =>
+    values.length
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
       : null;
-  const difference = average === null ? null : comparableActual - average;
+  const average3 = averageFor(baseline.slice(-3));
+  const average6 = averageFor(baseline);
+  const difference =
+    average3 === null || month > currentMonth
+      ? null
+      : comparableActual - average3;
+  const low = Math.min(...baseline);
+  const high = Math.max(...baseline);
+  const rangeMin = Math.min(low, comparableActual);
+  const rangeMax = Math.max(high, comparableActual);
+  const position = (amount: number) =>
+    rangeMin === rangeMax
+      ? 50
+      : 4 + (92 * (amount - rangeMin)) / (rangeMax - rangeMin);
   const remaining = category.targetAmount - category.actualSpent;
   const purchases = selected.lines.filter((line) => line.netSpend > 0);
   const merchants = new Map<
@@ -229,7 +249,7 @@ export function SpendAnalysis({
           {budgetCategoryShortTitle(category.categoryName)}
         </h2>
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border bg-card p-4 sm:grid-cols-3">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border bg-card p-4 sm:grid-cols-4 2xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(12rem,1.5fr)]">
           <div>
             <dt className="text-sm text-muted-foreground">
               Net spend · {formatMonth(month)}
@@ -263,16 +283,71 @@ export function SpendAnalysis({
               </div>
             )}
           </div>
-          <div className="col-span-2 sm:col-span-1">
+          <div>
             <dt className="text-sm text-muted-foreground">
-              {average === null
-                ? "Change from recent spending"
-                : `vs. previous ${baseline.length}-month average${monthToDate ? " to date" : ""}`}
+              3-month average{monthToDate ? " to date" : ""}
             </dt>
             <dd className="text-2xl font-semibold tabular-nums">
-              {difference === null
-                ? "No comparison"
-                : `${difference >= 0.005 ? "+" : ""}${money(difference)}`}
+              {average3 === null ? "No history" : money(average3)}
+            </dd>
+            {difference !== null && (
+              <dd className="text-xs text-muted-foreground">
+                {difference >= 0.005 ? "+" : ""}
+                {money(difference)} this month
+              </dd>
+            )}
+          </div>
+          <div>
+            <dt className="text-sm text-muted-foreground">
+              6-month average{monthToDate ? " to date" : ""}
+            </dt>
+            <dd className="text-2xl font-semibold tabular-nums">
+              {average6 === null ? "No history" : money(average6)}
+            </dd>
+            {baseline.length > 0 && baseline.length < 6 && (
+              <dd className="text-xs text-muted-foreground">
+                Based on {baseline.length}{" "}
+                {baseline.length === 1 ? "month" : "months"}
+              </dd>
+            )}
+          </div>
+          <div className="col-span-2 sm:col-span-4 2xl:col-span-1">
+            <dt className="text-sm text-muted-foreground">
+              Recent range{monthToDate ? " to date" : ""}
+            </dt>
+            <dd>
+              {difference === null ? (
+                <span className="text-sm text-muted-foreground">
+                  No comparison available
+                </span>
+              ) : (
+                <>
+                  <div
+                    role="img"
+                    aria-label={`Historical range ${money(low)} to ${money(high)}. Selected month ${money(comparableActual)}.`}
+                    className="relative my-2 h-2 rounded-full bg-muted"
+                  >
+                    <span
+                      className="absolute h-full min-w-0.5 rounded-full bg-primary/40"
+                      style={{
+                        left: `${position(low)}%`,
+                        width: `${position(high) - position(low)}%`,
+                      }}
+                    />
+                    <span
+                      className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card bg-primary"
+                      style={{ left: `${position(comparableActual)}%` }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap justify-between gap-x-2 text-xs tabular-nums text-muted-foreground">
+                    <span>{money(low)} low</span>
+                    <span className="font-medium text-foreground">
+                      {money(comparableActual)} selected
+                    </span>
+                    <span>{money(high)} high</span>
+                  </div>
+                </>
+              )}
             </dd>
           </div>
         </dl>
@@ -382,7 +457,7 @@ export function SpendAnalysis({
               <div className="relative grid grid-cols-6 gap-1">
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 top-0 h-24"
+                  className="pointer-events-none absolute inset-x-0 top-5 h-24"
                 >
                   <div
                     className="absolute inset-x-0 border-t border-border"
@@ -401,9 +476,19 @@ export function SpendAnalysis({
                       setMerchant(null);
                       setExpanded(false);
                     }}
-                    className="relative min-w-0 rounded-md text-xs text-muted-foreground hover:bg-muted/60 aria-pressed:bg-muted/60 aria-pressed:font-semibold aria-pressed:text-foreground"
+                    className="relative min-w-0 rounded-md pt-5 text-xs text-muted-foreground hover:bg-muted/60 aria-pressed:bg-muted/60 aria-pressed:font-semibold aria-pressed:text-foreground"
                   >
                     <span aria-hidden="true" className="relative block h-24">
+                      <span
+                        className="absolute inset-x-0 mb-0.5 whitespace-nowrap text-center text-[10px] font-medium leading-4 text-foreground tabular-nums sm:text-xs"
+                        style={{
+                          bottom: `${((Math.max(0, total) - chartMin) / chartSpan) * 100}%`,
+                        }}
+                      >
+                        {Math.abs(total) >= 10_000
+                          ? compactTrendMoney.format(total)
+                          : trendMoney.format(total)}
+                      </span>
                       <span
                         className={`absolute inset-x-1/4 rounded-sm ${total < 0 ? "bg-emerald-500" : value === period ? "bg-primary" : "bg-primary/40"}`}
                         style={{

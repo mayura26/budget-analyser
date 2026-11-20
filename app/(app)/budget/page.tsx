@@ -223,11 +223,11 @@ export default async function BudgetPage({
   const analysisGroup = analysisGroups.find(
     (group) => group.categoryId === analysisCategory?.categoryId,
   );
-  const trendStart = addCalendarMonths(selectedMonth, -5);
+  const analysisStart = addCalendarMonths(selectedMonth, -6);
   const analysisLines =
     showAnalysis && analysisCategory
       ? await getSpendAnalysisLines(
-          getMonthRange(trendStart).start,
+          getMonthRange(analysisStart).start,
           monthRangeEnd,
           homeCurrency,
           analysisGroup?.children.map((child) => child.categoryId) ?? [

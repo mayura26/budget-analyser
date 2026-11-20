@@ -651,8 +651,13 @@ test.describe("Budget", () => {
     const previousMonth = new Date(`${seed.month}-01T00:00:00Z`);
     previousMonth.setUTCMonth(previousMonth.getUTCMonth() - 1);
     const previous = previousMonth.toISOString().slice(0, 7);
+    const sixMonthsAgo = new Date(`${seed.month}-01T00:00:00Z`);
+    sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
 
     try {
+      sqlite
+        .prepare("UPDATE transactions SET date = ? WHERE id = ?")
+        .run(`${seed.month}-01`, seed.transactionId);
       const insert = sqlite.prepare(
         `INSERT INTO transactions
           (account_id, fingerprint, date, description, normalised, merchant, amount, category_id, category_source, category_confirmed, is_manual, created_at, updated_at)
@@ -664,6 +669,12 @@ test.describe("Budget", () => {
         [`${seed.month}-01`, "Art materials", "Art shop", -10],
         [`${seed.month}-01`, "Cinema tickets", "Cinema", -5],
         [`${previous}-01`, "Previous harbour tickets", "Harbour Events", -20],
+        [
+          sixMonthsAgo.toISOString().slice(0, 10),
+          "Older harbour tickets",
+          "Harbour Events",
+          -100,
+        ],
       ] as const) {
         insert.run(
           seed.accountId,
@@ -705,6 +716,17 @@ test.describe("Budget", () => {
       await subcategory.click();
       await expect(subcategory).toHaveAttribute("aria-current", "page");
       await expect(
+        page.getByText(/^3-month average/).locator(".."),
+      ).toContainText("$6.67");
+      await expect(
+        page.getByText(/^6-month average/).locator(".."),
+      ).toContainText("$20.00");
+      await expect(
+        page.getByRole("img", {
+          name: "Historical range $0.00 to $100.00. Selected month -$3,701.56.",
+        }),
+      ).toBeVisible();
+      await expect(
         page.getByText("-$3,701.56", { exact: true }).first(),
       ).toBeVisible();
       const moreMerchants = page.getByRole("button", {
@@ -739,6 +761,8 @@ test.describe("Budget", () => {
           }),
         ),
       });
+      await expect(previousBar.getByText("$20", { exact: true })).toBeVisible();
+      await expect(previousBar).toHaveAccessibleName(/\$20\.00 net spend$/);
       await previousBar.click();
       await expect(previousBar).toHaveAttribute("aria-pressed", "true");
       await expect(
