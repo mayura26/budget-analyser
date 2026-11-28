@@ -463,12 +463,8 @@ function normaliseSignedAmount(
     if (inValues.has(direction)) return absoluteAmount;
   }
 
-  // Normalise sign: negative = debit (money out)
-  // If the CSV convention is that positive = debit, flip the sign
-  if (!mapping.negativeIsDebit && amount > 0) {
-    return -amount;
-  }
-  return amount;
+  // Positive-debit exports also use negative amounts for credits.
+  return mapping.negativeIsDebit || amount === 0 ? amount : -amount;
 }
 
 function shouldSkipMappedRow(

@@ -535,12 +535,22 @@ test.describe("Import", () => {
     await page.locator("#csv-file").setInputFiles(amexCsv);
     await page.getByRole("button", { name: "Preview import" }).click();
 
-    await expect(page.getByText("3 new")).toBeVisible();
-    await expect(page.locator("tbody tr")).toHaveCount(3);
+    await expect(page.getByText("4 new")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(4);
     const paymentRow = page
       .locator("tbody tr")
       .filter({ hasText: "ONLINE PAYMENT RECEIVED" });
     await expect(paymentRow.locator("td").nth(3)).toHaveClass(/text-green-600/);
+    const refundAmount = page
+      .getByRole("row", { name: /SP NZ WARRIORS AUCKLAND/ })
+      .locator("td")
+      .nth(3);
+    await expect(refundAmount).toHaveText("+$75.00");
+    const purchaseAmount = page
+      .getByRole("row", { name: /AMAZON MARKETPLACE/ })
+      .locator("td")
+      .nth(3);
+    await expect(purchaseAmount).toHaveText("-$90.00");
   });
 
   test("Wise CSV auto-detects when wrong profile selected", async ({
@@ -581,7 +591,7 @@ test.describe("Import", () => {
     await page.locator("#csv-file").setInputFiles(amexCsv);
     await page.getByRole("button", { name: "Preview import" }).click();
 
-    await expect(page.getByText("3 new")).toBeVisible();
+    await expect(page.getByText("4 new")).toBeVisible();
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 
@@ -607,7 +617,7 @@ test.describe("Import", () => {
     await expect(filenameMatch).toContainText("activity*.csv");
     await page.getByRole("button", { name: "Preview import" }).click();
 
-    await expect(page.getByText("3 new")).toBeVisible();
+    await expect(page.getByText("4 new")).toBeVisible();
     await expect(page.getByText(/No valid rows found/i)).toHaveCount(0);
   });
 

@@ -75,22 +75,15 @@ test("Amex-style card payment row becomes positive credit", () => {
   assert.strictEqual(rows[1]?.amount, -12.5);
 });
 
-test("charges without payment phrase keep normal Amex sign convention", () => {
+test("Amex charges and merchant refunds use opposite signs", () => {
   const csv = `Date,Description,Amount
-26/04/2026,AMAZON AU,90.00`;
+26/04/2026,AMAZON AU,90.00
+27/11/2026,SP NZ WARRIORS AUCKLAND,-75`;
   const { rows } = parseCSV(csv, amexLikeMapping());
-  assert.strictEqual(rows.length, 1);
-  assert.strictEqual(rows[0]?.amount, -90);
-});
-
-test("description credit substrings absent leaves negative CSV amounts as-is", () => {
-  const csv = `Date,Description,Amount
-07/05/2026,ONLINE PAYMENT RECEIVED - THANKYOU,-1500.00`;
-  const { rows } = parseCSV(
-    csv,
-    amexLikeMapping({ descriptionCreditSubstrings: undefined }),
+  assert.deepStrictEqual(
+    rows.map((row) => row.amount),
+    [-90, 75],
   );
-  assert.strictEqual(rows[0]?.amount, -1500);
 });
 
 test("Wise UTC timestamp converts to next Sydney daylight-saving date", () => {
